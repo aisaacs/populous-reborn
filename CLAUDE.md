@@ -9,16 +9,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-This is a Populous-inspired isometric terrain editor running entirely in the browser.
+This is a Populous-inspired 1v1 multiplayer isometric game with authoritative server.
 
-**Server (`server.js`):** Minimal Express 5 static file server. Serves everything in `public/`.
+### File Structure
+- `shared/constants.js` — Constants shared between server and client (map size, teams, modes, tick rate)
+- `server.js` — HTTP static server + WebSocket server + game simulation + room management
+- `public/game.js` — Renderer + WebSocket client + walker interpolation + lobby handlers
+- `public/index.html` — Lobby UI + game canvas
 
-**Client (`public/game.js`):** Single-file game engine rendering a 64×64 isometric tile map on an HTML5 canvas. Key systems:
+### Server (`server.js`)
+- **HTTP:** Serves `public/` at root and `shared/` at `/shared/` using raw `http` + `fs` (no Express)
+- **Rooms:** Map of 4-letter room codes → game instances. Player 1 creates, Player 2 joins.
+- **Simulation:** Runs at 20Hz tick rate. All game logic (terrain gen, walker movement/targeting, settlements, combat, mana, population growth) lives server-side. Every function takes `state` as first parameter.
+- **WebSocket protocol:** Client sends `create`, `join`, `raise`, `lower`, `mode`, `magnet`. Server sends `created`, `joined`, `start`, `state` (20/sec), `gameover`, `error`.
+- **State serialization:** Heights as flat array, walkers/settlements as minimal objects. Each player receives only their own mana.
 
-- **Height map:** `(MAP_W+1) × (MAP_H+1)` integer grid (0–8). Terrain is procedurally generated at startup via blob/island placement (`generateIsland` → `placeBlob`) with an adjacency enforcement pass ensuring no neighbor differs by more than 1 height level.
-- **Rendering:** Painter's algorithm (back-to-front row/col loop). Each tile is a diamond formed by projecting its 4 corner heights with a 2:1 isometric ratio (32×16px tiles). Colors are height-based with slope darkening.
-- **Terrain editing:** Left-click raises, right-click lowers a grid point. Changes propagate via BFS to maintain the ≤1 adjacency constraint.
-- **Picking:** `screenToGrid` reverse-projects screen coordinates, searching nearby grid points to account for height displacement.
-- **Camera:** Middle-mouse panning via offset (`camX`, `camY`). G key cycles grid overlay modes.
+### Client (`public/game.js`)
+- **Rendering only:** No simulation. Receives state snapshots from server at 20Hz.
+- **Walker interpolation:** Stores prev/curr walker snapshots, lerps positions by elapsed tick fraction for smooth 60fps rendering.
+- **Input:** LMB raise, RMB lower, Shift+LMB magnet, 1-4 mode keys → all sent as WebSocket messages. MMB pan + G grid toggle are local-only.
+- **Lobby:** Create/Join UI in HTML overlay, hidden when game starts.
 
-All game state lives in the `heights[][]` array. There are no units, settlements, or game loop yet — terrain manipulation only.
+### Shared Constants (`shared/constants.js`)
+Dual-environment: loaded as `<script>` tag on client (globals), `require()` on server. Contains MAP_W/H, tile sizes, team/mode constants, walker speed, level capacity, tick rate.
