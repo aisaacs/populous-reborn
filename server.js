@@ -617,20 +617,35 @@ function tryMergeSettlements(state) {
 
     if (!bestSq) continue;
 
+    // Collect all settlements in the merge area (including s itself)
+    const participants = [s];
     for (const other of state.settlements) {
       if (other.dead || other === s || other.team !== s.team) continue;
       if (other.tx >= bestSq.ox && other.tx < bestSq.ox + bestSq.size &&
           other.ty >= bestSq.oy && other.ty < bestSq.oy + bestSq.size) {
-        s.population += other.population;
-        other.dead = true;
-        clearSettlementMap(state, other.tx, other.ty);
+        participants.push(other);
       }
     }
 
-    s.level = bestSq.size;
-    s.sqOx = bestSq.ox;
-    s.sqOy = bestSq.oy;
-    s.sqSize = bestSq.size;
+    // The biggest settlement (by population) survives at its position
+    participants.sort((a, b) => b.population - a.population);
+    const survivor = participants[0];
+
+    let totalPop = 0;
+    for (const p of participants) totalPop += p.population;
+
+    for (const p of participants) {
+      if (p === survivor) continue;
+      p.dead = true;
+      clearSettlementMap(state, p.tx, p.ty);
+    }
+
+    survivor.population = totalPop;
+    survivor.level = bestSq.size;
+    survivor.sqOx = bestSq.ox;
+    survivor.sqOy = bestSq.oy;
+    survivor.sqSize = bestSq.size;
+    setSettlement(state, survivor.tx, survivor.ty, survivor);
   }
 }
 
