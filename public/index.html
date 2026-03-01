@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Populous</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; overflow: hidden; }
+    canvas { display: block; cursor: crosshair; }
+    #ui {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      color: #ccc;
+      font: 14px monospace;
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="ui">LMB: Raise &nbsp; RMB: Lower &nbsp; MMB: Pan &nbsp; G: Grid</div>
+  <script src="game.js"></script>
+</body>
+</html>
