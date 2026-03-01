@@ -13,6 +13,76 @@ const SLOPE_DARKEN = 20;
 const GRID_MODES = [null, 'rgba(0,0,0,0.15)', 'rgba(255,255,255,0.25)'];
 let gridMode = 2;
 
+// ── Music System ───────────────────────────────────────────────────
+const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3'];
+let musicQueue = [];
+let musicAudio = null;
+let musicMuted = localStorage.getItem('musicMuted') === 'true';
+let musicVolume = parseFloat(localStorage.getItem('musicVolume') ?? '0.3');
+let musicStarted = false;
+
+function shuffleTracks() {
+  musicQueue = MUSIC_TRACKS.slice();
+  for (let i = musicQueue.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [musicQueue[i], musicQueue[j]] = [musicQueue[j], musicQueue[i]];
+  }
+}
+
+function playNextTrack() {
+  if (musicQueue.length === 0) shuffleTracks();
+  const src = musicQueue.shift();
+  musicAudio = new Audio(src);
+  musicAudio.volume = musicMuted ? 0 : musicVolume;
+  musicAudio.addEventListener('ended', playNextTrack);
+  musicAudio.play().catch(() => {});
+}
+
+function startMusic() {
+  if (musicStarted) return;
+  musicStarted = true;
+  shuffleTracks();
+  playNextTrack();
+  syncMusicUI();
+}
+
+function setMusicVolume(v) {
+  musicVolume = Math.max(0, Math.min(1, v));
+  localStorage.setItem('musicVolume', String(musicVolume));
+  if (musicAudio) musicAudio.volume = musicMuted ? 0 : musicVolume;
+  syncMusicUI();
+}
+
+function toggleMusicMute() {
+  musicMuted = !musicMuted;
+  localStorage.setItem('musicMuted', String(musicMuted));
+  if (musicAudio) musicAudio.volume = musicMuted ? 0 : musicVolume;
+  syncMusicUI();
+}
+
+function syncMusicUI() {
+  const btn = document.getElementById('btn-mute');
+  if (btn) btn.textContent = musicMuted ? '\u266C' : '\u266B';
+  if (btn) btn.style.opacity = musicMuted ? '0.4' : '1';
+  const slider = document.getElementById('music-vol');
+  if (slider) slider.value = musicVolume * 100;
+}
+
+// Volume slider
+document.getElementById('music-vol').addEventListener('input', (e) => {
+  setMusicVolume(e.target.valueAsNumber / 100);
+  if (musicMuted) toggleMusicMute();
+});
+
+// Mute button
+document.getElementById('btn-mute').addEventListener('click', () => {
+  if (!musicStarted) startMusic();
+  else toggleMusicMute();
+});
+
+// Init UI from saved prefs
+syncMusicUI();
+
 // ── Game State (received from server) ───────────────────────────────
 let heights = [];
 let walkers = [];
@@ -548,6 +618,7 @@ function handleServerMessage(msg) {
       document.getElementById('game').style.display = 'block';
       document.getElementById('ui').style.display = 'block';
       showPowerBar();
+      startMusic();
       resize();
       centerOnHome();
       lastFrame = performance.now();
@@ -674,6 +745,10 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'g' || e.key === 'G') {
     gridMode = (gridMode + 1) % GRID_MODES.length;
+  }
+  if (e.key === 'm' || e.key === 'M') {
+    toggleMusicMute();
+    return;
   }
 
   // Power hotkeys
