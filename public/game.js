@@ -160,6 +160,46 @@ function getOrigin() {
   };
 }
 
+// Clamp camera so viewport edges never scroll past the map edges.
+// The map diamond's bounding box in world space (relative to origin) is:
+//   left:   -MAP_H * TILE_HALF_W   (vertex 0,MAP_H)
+//   right:   MAP_W * TILE_HALF_W   (vertex MAP_W,0)
+//   top:    -MAX_HEIGHT * HEIGHT_STEP (vertex 0,0 at max height)
+//   bottom: (MAP_W+MAP_H) * TILE_HALF_H (vertex MAP_W,MAP_H)
+// We require viewport edges to stay inside this box.
+function clampCamera() {
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const hvw = cx / zoom; // half viewport width in world space
+  const hvh = cy / zoom; // half viewport height in world space
+
+  const pad = 48; // pixels of slack around the map
+  const mapL = -MAP_H * TILE_HALF_W - pad;
+  const mapR =  MAP_W * TILE_HALF_W + pad;
+  const mapT = -MAX_HEIGHT * HEIGHT_STEP - pad;
+  const mapB = (MAP_W + MAP_H) * TILE_HALF_H + pad;
+
+  // Viewport in world: [cx - hvw, cx + hvw] x [cy - hvh, cy + hvh]
+  // Map in world: [cx + camX + mapL, cx + camX + mapR] x [80 + camY + mapT, 80 + camY + mapB]
+  // Constraints: viewport left >= map left, viewport right <= map right, etc.
+  const minCamX = hvw - mapR;
+  const maxCamX = -mapL - hvw;
+  const minCamY = cy + hvh - 80 - mapB;
+  const maxCamY = cy - hvh - 80 - mapT;
+
+  if (minCamX <= maxCamX) {
+    camX = Math.max(minCamX, Math.min(maxCamX, camX));
+  } else {
+    camX = (minCamX + maxCamX) / 2; // map fits in viewport — center it
+  }
+
+  if (minCamY <= maxCamY) {
+    camY = Math.max(minCamY, Math.min(maxCamY, camY));
+  } else {
+    camY = (minCamY + maxCamY) / 2;
+  }
+}
+
 // ── Projection ──────────────────────────────────────────────────────
 function project(px, py, h) {
   const o = getOrigin();
@@ -410,6 +450,7 @@ function centerOnHome() {
   const h = 3; // approximate land height
   camX = -(home.x - home.y) * TILE_HALF_W;
   camY = canvas.height / 2 - 80 - (home.x + home.y) * TILE_HALF_H + h * HEIGHT_STEP;
+  clampCamera();
 }
 
 function render() {
@@ -516,6 +557,9 @@ function render() {
   // HUD
   drawUI();
   updatePowerBar();
+
+  // Minimap (drawn on top of HUD, in screen space)
+  drawMinimap();
 
   // Armageddon overlay
   if (armageddon && !gameOver) {
@@ -699,6 +743,13 @@ canvas.addEventListener('mousedown', (e) => {
   if (!gameStarted || gameOver) return;
   if (heights.length === 0) return;
 
+  // Minimap click — scroll camera
+  if (e.button === 0 && isInMinimap(e.clientX, e.clientY)) {
+    const { gx, gy } = minimapClickToGrid(e.clientX, e.clientY);
+    centerCameraOnGrid(gx, gy);
+    return;
+  }
+
   // Power targeting click
   if (targetingPower && e.button === 0) {
     const { px, py } = screenToGrid(e.clientX, e.clientY);
@@ -780,6 +831,7 @@ window.addEventListener('mousemove', (e) => {
   if (!panning) return;
   camX = camSX + (e.clientX - panSX);
   camY = camSY + (e.clientY - panSY);
+  clampCamera();
 });
 window.addEventListener('mouseup', (e) => { if (e.button === 1) panning = false; });
 
@@ -787,7 +839,7 @@ window.addEventListener('mouseup', (e) => { if (e.button === 1) panning = false;
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  const newZoom = Math.max(0.4, Math.min(5, zoom * factor));
+  const newZoom = Math.max(1, Math.min(5, zoom * factor));
   // Adjust camera so the world point under the cursor stays fixed
   const mx = e.clientX, my = e.clientY;
   const cx = canvas.width / 2, cy = canvas.height / 2;
@@ -801,6 +853,7 @@ canvas.addEventListener('wheel', (e) => {
   camX += (mx - sx) / newZoom;
   camY += (my - sy) / newZoom;
   zoom = newZoom;
+  clampCamera();
 }, { passive: false });
 
 // Edge pan — move camera when cursor is near screen edges
@@ -853,6 +906,126 @@ document.querySelectorAll('.power-btn').forEach(btn => {
   });
 });
 
+// ── Minimap ─────────────────────────────────────────────────────────
+const MM_SIZE = 200;
+const MM_MARGIN = 10;
+const MM_SCALE = MM_SIZE / MAP_W; // ~3.125 px per tile
+
+function getMinimapRect() {
+  return {
+    x: canvas.width - MM_MARGIN - MM_SIZE,
+    y: canvas.height - MM_MARGIN - MM_SIZE,
+  };
+}
+
+function isInMinimap(sx, sy) {
+  const mm = getMinimapRect();
+  return sx >= mm.x && sx < mm.x + MM_SIZE && sy >= mm.y && sy < mm.y + MM_SIZE;
+}
+
+function minimapClickToGrid(sx, sy) {
+  const mm = getMinimapRect();
+  return {
+    gx: (sx - mm.x) / MM_SCALE,
+    gy: (sy - mm.y) / MM_SCALE,
+  };
+}
+
+function centerCameraOnGrid(gx, gy) {
+  const hx = Math.max(0, Math.min(MAP_W, gx));
+  const hy = Math.max(0, Math.min(MAP_H, gy));
+  const h = heightAt(hx, hy);
+  camX = -(gx - gy) * TILE_HALF_W;
+  camY = canvas.height / 2 - 80 - (gx + gy) * TILE_HALF_H + h * HEIGHT_STEP;
+  clampCamera();
+}
+
+// Reverse-project screen point to grid coords ignoring height (for viewport outline)
+function screenToGridFlat(sx, sy) {
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const wx = (sx - cx * (1 - zoom)) / zoom;
+  const wy = (sy - cy * (1 - zoom)) / zoom;
+  const o = getOrigin();
+  const dx = wx - o.x, dy = wy - o.y;
+  return {
+    gx: (dx / TILE_HALF_W + dy / TILE_HALF_H) / 2,
+    gy: (dy / TILE_HALF_H - dx / TILE_HALF_W) / 2,
+  };
+}
+
+function drawMinimap() {
+  const mm = getMinimapRect();
+  const cs = Math.ceil(MM_SCALE);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(mm.x, mm.y, MM_SIZE, MM_SIZE);
+  ctx.clip();
+
+  // Background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(mm.x, mm.y, MM_SIZE, MM_SIZE);
+
+  // Pass 1: terrain
+  for (let ty = 0; ty < MAP_H; ty++) {
+    for (let tx = 0; tx < MAP_W; tx++) {
+      ctx.fillStyle = getTileColor(tx, ty);
+      ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
+    }
+  }
+
+  // Pass 2: swamps
+  ctx.fillStyle = '#3a5a1a';
+  for (const s of swamps) {
+    ctx.fillRect(mm.x + s.x * MM_SCALE, mm.y + s.y * MM_SCALE, cs, cs);
+  }
+
+  // Pass 3: settlements (team-colored squares sized to footprint)
+  for (const s of settlements) {
+    ctx.fillStyle = TEAM_COLORS[s.t];
+    const sz = Math.ceil(s.sz * MM_SCALE);
+    ctx.fillRect(mm.x + s.ox * MM_SCALE, mm.y + s.oy * MM_SCALE, sz, sz);
+  }
+
+  // Pass 4: walkers (single bright pixels)
+  for (const w of walkers) {
+    ctx.fillStyle = TEAM_COLORS[w.team];
+    ctx.fillRect(mm.x + Math.floor(w.x * MM_SCALE), mm.y + Math.floor(w.y * MM_SCALE), 1, 1);
+  }
+
+  // Pass 5: magnet flags (bright white dots)
+  ctx.fillStyle = '#fff';
+  for (let t = 0; t < 2; t++) {
+    const mp = magnetPos[t];
+    ctx.fillRect(mm.x + Math.floor(mp.x * MM_SCALE) - 1, mm.y + Math.floor(mp.y * MM_SCALE) - 1, 3, 3);
+  }
+
+  // Pass 6: viewport bounds (diamond in grid space)
+  const corners = [
+    screenToGridFlat(0, 0),
+    screenToGridFlat(canvas.width, 0),
+    screenToGridFlat(canvas.width, canvas.height),
+    screenToGridFlat(0, canvas.height),
+  ];
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const px = mm.x + corners[i].gx * MM_SCALE;
+    const py = mm.y + corners[i].gy * MM_SCALE;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Border (drawn outside clip so it's crisp on all edges)
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mm.x, mm.y, MM_SIZE, MM_SIZE);
+}
+
 // ── Power Bar ───────────────────────────────────────────────────────
 function updatePowerBar() {
   const bar = document.getElementById('power-bar');
@@ -891,6 +1064,7 @@ function updateEdgePan(dt) {
     const speed = EDGE_PAN_SPEED * dt;
     camX += dx * speed;
     camY += dy * speed;
+    clampCamera();
   }
 }
 

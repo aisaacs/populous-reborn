@@ -14,8 +14,9 @@ This is a Populous-inspired 1v1 multiplayer isometric god game with authoritativ
 ### File Structure
 - `shared/constants.js` — Constants shared between server and client (map, teams, modes, powers, tick rate)
 - `server.js` — HTTP static server + WebSocket server + game simulation + room management
-- `public/game.js` — Renderer + WebSocket client + walker interpolation + power targeting + lobby handlers
-- `public/index.html` — Lobby UI + game canvas + power bar UI
+- `public/game.js` — Renderer + WebSocket client + walker interpolation + power targeting + music + lobby handlers
+- `public/index.html` — Lobby UI + game canvas + power bar UI + music control
+- `public/music/` — Music tracks (`001.mp3`, `002.mp3`, `003.mp3`)
 
 ### Shared Constants (`shared/constants.js`)
 Dual-environment: loaded as `<script>` tag on client (globals), `require()` on server.
@@ -95,7 +96,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 ### Client (`public/game.js`)
 - **Rendering only:** No simulation. Receives state snapshots from server at 20Hz.
 - **Walker interpolation:** Stores prev/curr walker snapshots, lerps positions by elapsed tick fraction for smooth 60fps rendering. Passes through `isLeader`/`isKnight` flags.
-- **Drawing pipeline:** Pass 1: terrain tiles (with swamp/rock overlays). Pass 2: settlements (sorted by depth). Pass 3: walkers via grid (with leader crown / knight cross markers). Then: targeting overlay, magnet flags. Reset to screen space: HUD, power bar update, armageddon overlay, game over overlay.
+- **Drawing pipeline:** Pass 1: terrain tiles (with swamp/rock overlays). Pass 2: settlements (sorted by depth). Pass 3: walkers via grid (with leader crown / knight cross markers). Then: targeting overlay, magnet flags. Reset to screen space: HUD, power bar update, minimap, armageddon overlay, game over overlay.
 - **Swamp overlay:** Green-brown semi-transparent (`rgba(80,100,30,0.5)`) on swamp tiles
 - **Rock overlay:** Dark grey-brown semi-transparent (`rgba(60,50,40,0.6)`) on rock tiles
 - **Leader visual:** Gold crown polygon above walker
@@ -104,15 +105,18 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Armageddon overlay:** Red "ARMAGEDDON" text, disables all player input except camera
 - **Sea level:** Mutable `seaLevel` variable, updated from server state, replaces `SEA_LEVEL` constant in water checks
 - **State reception:** `applyStateSnapshot` unpacks heights, walkers, settlements, magnetPos, teamMode, mana, swamps (builds `swampSet` for O(1) lookup), rocks (builds Set from flat array), seaLevel, leaders, armageddon
-- **Input:** LMB raise (or power targeting click), RMB lower, Shift+LMB magnet, 1-4 mode keys, Q/W/E/R/T/Y power hotkeys, Escape cancel targeting, MMB pan, G grid toggle, mouse wheel zoom, edge pan. Armageddon blocks all non-camera input.
+- **Minimap:** 200x200px top-down map in bottom-right corner. `MM_SCALE = 200/64 ≈ 3.125` px/tile. Drawn in screen space every frame from the same game state. Pass 1: terrain colored by `getTileColor`. Pass 2: swamps (dark green). Pass 3: settlements (team-colored squares sized to footprint). Pass 4: walkers (single team-colored pixels). Pass 5: magnets (white 3x3 dots). Pass 6: viewport bounds (white polygon from `screenToGridFlat` at 4 screen corners — appears as diamond due to isometric projection). LMB click on minimap calls `centerCameraOnGrid` to scroll the main view. Minimap click is intercepted before all other input handlers.
+- **Input:** LMB raise (or power targeting click, or minimap click), RMB lower, Shift+LMB magnet, 1-4 mode keys, Q/W/E/R/T/Y power hotkeys, Escape cancel targeting, M mute toggle, MMB pan, G grid toggle, mouse wheel zoom, edge pan. Armageddon blocks all non-camera input.
 - **Power bar:** `updatePowerBar()` called each frame toggles `disabled`/`active` CSS classes. `showPowerBar()` on game start. Button click handlers mirror hotkey behavior via `activatePower()`.
+- **Music:** 3 tracks in `public/music/`, shuffled and played sequentially in a loop. Starts on game start (satisfies autoplay policy since it follows a user click). Volume (0-1, default 0.3) and mute state persisted to `localStorage` (`musicVolume`, `musicMuted`). `startMusic()`, `playNextTrack()`, `toggleMusicMute()`, `setMusicVolume()`, `syncMusicUI()`.
 - **Lobby:** Create/Join/AI UI in HTML overlay, hidden when game starts.
 
 ### HTML/CSS (`public/index.html`)
 - Full-viewport canvas with crosshair cursor
 - Lobby overlay: centered box with create/join/AI buttons, room code display, waiting state
 - Power bar: fixed bottom-center flex row of 6 buttons, each showing hotkey, name, cost. Dark semi-transparent background. `.disabled` class (opacity 0.35), `.active` class (orange border + glow).
-- Help text bar: fixed top-left showing all controls including powers and Escape
+- Music control: fixed top-right, mute button (note icon) + volume slider (range input). Always visible.
+- Help text bar: fixed top-left showing all controls including powers, Escape, and M for mute
 
 ### Key Design Patterns
 - **Authoritative server:** All game logic is server-side. Client is pure renderer + input sender.
@@ -121,3 +125,5 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **String-key Sets:** Swamps and rocks use `"x,y"` string keys in Sets for O(1) tile lookup.
 - **Mutable sea level:** `state.seaLevel` replaces the constant `SEA_LEVEL` on server, `seaLevel` variable replaces it on client, enabling the Flood power.
 - **Power validation:** Server validates power name against POWERS array, checks mana, validates coordinates for targeted powers. Some powers (`swamp`, `knight`) return false on invalid state to prevent mana deduction.
+- **Settlement merges:** When settlements merge, the highest-population settlement survives at its position; smaller ones are absorbed.
+- **localStorage persistence:** Music volume and mute state saved across sessions.
