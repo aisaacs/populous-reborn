@@ -23,6 +23,15 @@ let myMana = 0;
 let myTeam = -1;
 let walkerGrid = new Array(MAP_W * MAP_H);
 
+// Power system state
+let swamps = [];
+let swampSet = new Set();
+let rocks = new Set();
+let seaLevel = SEA_LEVEL;
+let leaders = [-1, -1];
+let armageddon = false;
+let targetingPower = null;
+
 // ── Walker Interpolation ────────────────────────────────────────────
 let prevWalkers = [];
 let currWalkers = [];
@@ -49,15 +58,18 @@ function getInterpolatedWalkers() {
         strength: w.s,
         x: pw.x + (w.x - pw.x) * fraction,
         y: pw.y + (w.y - pw.y) * fraction,
+        isLeader: w.l,
+        isKnight: w.k,
       });
     } else {
-      // New walker — snap to position
       result.push({
         id: w.id,
         team: w.t,
         strength: w.s,
         x: w.x,
         y: w.y,
+        isLeader: w.l,
+        isKnight: w.k,
       });
     }
   }
@@ -99,7 +111,7 @@ function getTileColor(tx, ty) {
   const t = heights[tx][ty], r = heights[tx + 1][ty];
   const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
 
-  if (t <= SEA_LEVEL && r <= SEA_LEVEL && b <= SEA_LEVEL && l <= SEA_LEVEL) {
+  if (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel) {
     return WATER_COLOR;
   }
 
@@ -138,7 +150,7 @@ function drawTile(tx, ty) {
   const t = heights[tx][ty], r = heights[tx + 1][ty];
   const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
 
-  const isWater = (t <= SEA_LEVEL && r <= SEA_LEVEL && b <= SEA_LEVEL && l <= SEA_LEVEL);
+  const isWater = (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel);
 
   const pTop    = project(tx,     ty,     isWater ? 0 : t);
   const pRight  = project(tx + 1, ty,     isWater ? 0 : r);
@@ -153,6 +165,19 @@ function drawTile(tx, ty) {
   ctx.closePath();
   ctx.fillStyle = getTileColor(tx, ty);
   ctx.fill();
+
+  // Swamp overlay
+  if (swampSet.has(tx + ',' + ty)) {
+    ctx.fillStyle = 'rgba(80, 100, 30, 0.5)';
+    ctx.fill();
+  }
+
+  // Rock overlay
+  if (rocks.has(tx + ',' + ty)) {
+    ctx.fillStyle = 'rgba(60, 50, 40, 0.6)';
+    ctx.fill();
+  }
+
   if (GRID_MODES[gridMode]) {
     ctx.strokeStyle = GRID_MODES[gridMode];
     ctx.lineWidth = 1;
@@ -175,7 +200,9 @@ function rebuildWalkerGrid() {
 function drawWalker(w) {
   const h = heightAt(w.x, w.y);
   const p = project(w.x, w.y, h);
-  const radius = 2 + Math.min(3, Math.floor(w.strength / 50));
+  const isKnight = w.isKnight;
+  const isLeader = w.isLeader;
+  const radius = isKnight ? 4 + Math.min(3, Math.floor(w.strength / 50)) : 2 + Math.min(3, Math.floor(w.strength / 50));
   ctx.beginPath();
   ctx.arc(p.x, p.y - 3, radius, 0, Math.PI * 2);
   ctx.fillStyle = TEAM_COLORS[w.team];
@@ -183,6 +210,33 @@ function drawWalker(w) {
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 0.5;
   ctx.stroke();
+
+  // Leader: gold crown
+  if (isLeader) {
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.moveTo(p.x - 4, p.y - 8);
+    ctx.lineTo(p.x - 3, p.y - 12);
+    ctx.lineTo(p.x - 1, p.y - 9);
+    ctx.lineTo(p.x, p.y - 13);
+    ctx.lineTo(p.x + 1, p.y - 9);
+    ctx.lineTo(p.x + 3, p.y - 12);
+    ctx.lineTo(p.x + 4, p.y - 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Knight: white cross
+  if (isKnight) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 10);
+    ctx.lineTo(p.x, p.y - 15);
+    ctx.moveTo(p.x - 2.5, p.y - 13);
+    ctx.lineTo(p.x + 2.5, p.y - 13);
+    ctx.stroke();
+  }
 }
 
 function drawSettlement(s) {
@@ -326,6 +380,62 @@ function render() {
     }
   }
 
+  // Targeting overlay
+  if (targetingPower) {
+    const powerDef = POWERS.find(p => p.id === targetingPower);
+    if (powerDef) {
+      // Get grid position under cursor
+      const { px, py } = screenToGrid(mouseX, mouseY);
+      let radius = 0;
+      if (targetingPower === 'earthquake') radius = EARTHQUAKE_RADIUS;
+      else if (targetingPower === 'volcano') radius = VOLCANO_RADIUS;
+
+      if (radius > 0) {
+        // Draw radius overlay
+        for (let tx = Math.max(0, px - radius); tx < Math.min(MAP_W, px + radius); tx++) {
+          for (let ty = Math.max(0, py - radius); ty < Math.min(MAP_H, py + radius); ty++) {
+            const dx = tx + 0.5 - px, dy = ty + 0.5 - py;
+            if (dx * dx + dy * dy < radius * radius) {
+              const t = heights[tx][ty], r = heights[tx + 1][ty];
+              const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
+              const pTop    = project(tx,     ty,     t);
+              const pRight  = project(tx + 1, ty,     r);
+              const pBottom = project(tx + 1, ty + 1, b);
+              const pLeft   = project(tx,     ty + 1, l);
+              ctx.beginPath();
+              ctx.moveTo(pTop.x, pTop.y);
+              ctx.lineTo(pRight.x, pRight.y);
+              ctx.lineTo(pBottom.x, pBottom.y);
+              ctx.lineTo(pLeft.x, pLeft.y);
+              ctx.closePath();
+              ctx.fillStyle = 'rgba(255, 140, 0, 0.25)';
+              ctx.fill();
+            }
+          }
+        }
+      } else if (targetingPower === 'swamp') {
+        // Single tile highlight
+        const tx = Math.floor(px), ty = Math.floor(py);
+        if (tx >= 0 && tx < MAP_W && ty >= 0 && ty < MAP_H) {
+          const t = heights[tx][ty], r = heights[tx + 1][ty];
+          const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
+          const pTop    = project(tx,     ty,     t);
+          const pRight  = project(tx + 1, ty,     r);
+          const pBottom = project(tx + 1, ty + 1, b);
+          const pLeft   = project(tx,     ty + 1, l);
+          ctx.beginPath();
+          ctx.moveTo(pTop.x, pTop.y);
+          ctx.lineTo(pRight.x, pRight.y);
+          ctx.lineTo(pBottom.x, pBottom.y);
+          ctx.lineTo(pLeft.x, pLeft.y);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(255, 140, 0, 0.35)';
+          ctx.fill();
+        }
+      }
+    }
+  }
+
   // Magnet flags
   drawMagnetFlag(TEAM_BLUE);
   drawMagnetFlag(TEAM_RED);
@@ -335,6 +445,16 @@ function render() {
 
   // HUD
   drawUI();
+  updatePowerBar();
+
+  // Armageddon overlay
+  if (armageddon && !gameOver) {
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255, 50, 0, 0.8)';
+    ctx.fillText('ARMAGEDDON', canvas.width / 2, 60);
+    ctx.textAlign = 'left';
+  }
 
   // Game over overlay
   if (gameOver) {
@@ -427,6 +547,7 @@ function handleServerMessage(msg) {
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('game').style.display = 'block';
       document.getElementById('ui').style.display = 'block';
+      showPowerBar();
       resize();
       centerOnHome();
       lastFrame = performance.now();
@@ -478,6 +599,22 @@ function applyStateSnapshot(msg) {
   magnetPos = msg.magnetPos;
   teamMode = msg.teamMode;
   myMana = msg.mana;
+
+  // Power system state
+  swamps = msg.swamps || [];
+  swampSet = new Set();
+  for (const s of swamps) swampSet.add(s.x + ',' + s.y);
+
+  rocks = new Set();
+  if (msg.rocks) {
+    for (let i = 0; i < msg.rocks.length; i += 2) {
+      rocks.add(msg.rocks[i] + ',' + msg.rocks[i + 1]);
+    }
+  }
+
+  seaLevel = msg.seaLevel !== undefined ? msg.seaLevel : SEA_LEVEL;
+  leaders = msg.leaders || [-1, -1];
+  armageddon = msg.armageddon || false;
 }
 
 function sendMessage(msg) {
@@ -490,6 +627,16 @@ function sendMessage(msg) {
 canvas.addEventListener('mousedown', (e) => {
   if (!gameStarted || gameOver) return;
   if (heights.length === 0) return;
+
+  // Power targeting click
+  if (targetingPower && e.button === 0) {
+    const { px, py } = screenToGrid(e.clientX, e.clientY);
+    sendMessage({ type: 'power', power: targetingPower, x: px, y: py });
+    targetingPower = null;
+    return;
+  }
+
+  if (armageddon) return; // Only camera during armageddon
 
   if (e.shiftKey && e.button === 0) {
     const { px, py } = screenToGrid(e.clientX, e.clientY);
@@ -507,12 +654,37 @@ canvas.addEventListener('mousedown', (e) => {
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+function activatePower(powerDef) {
+  if (armageddon) return;
+  if (myMana < powerDef.cost) return;
+  if (powerDef.targeted) {
+    targetingPower = powerDef.id;
+  } else {
+    sendMessage({ type: 'power', power: powerDef.id });
+  }
+}
+
 window.addEventListener('keydown', (e) => {
   if (!gameStarted) return;
+
+  if (e.key === 'Escape') {
+    targetingPower = null;
+    return;
+  }
 
   if (e.key === 'g' || e.key === 'G') {
     gridMode = (gridMode + 1) % GRID_MODES.length;
   }
+
+  // Power hotkeys
+  const key = e.key.toUpperCase();
+  const powerDef = POWERS.find(p => p.hotkey === key);
+  if (powerDef) {
+    activatePower(powerDef);
+    return;
+  }
+
+  if (armageddon) return;
   if (e.key === '1') sendMessage({ type: 'mode', mode: 0 });
   if (e.key === '2') sendMessage({ type: 'mode', mode: 1 });
   if (e.key === '3') sendMessage({ type: 'mode', mode: 2 });
@@ -596,6 +768,35 @@ document.getElementById('btn-join').addEventListener('click', () => {
 document.getElementById('join-code').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('btn-join').click();
 });
+
+// Power bar button click handlers
+document.querySelectorAll('.power-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const powerId = btn.dataset.power;
+    const powerDef = POWERS.find(p => p.id === powerId);
+    if (powerDef) activatePower(powerDef);
+  });
+});
+
+// ── Power Bar ───────────────────────────────────────────────────────
+function updatePowerBar() {
+  const bar = document.getElementById('power-bar');
+  if (!bar) return;
+  const buttons = bar.querySelectorAll('.power-btn');
+  buttons.forEach((btn, i) => {
+    const power = POWERS[i];
+    if (!power) return;
+    const canAfford = myMana >= power.cost;
+    const isActive = targetingPower === power.id;
+    btn.classList.toggle('disabled', !canAfford || armageddon);
+    btn.classList.toggle('active', isActive);
+  });
+}
+
+function showPowerBar() {
+  const bar = document.getElementById('power-bar');
+  if (bar) bar.style.display = 'flex';
+}
 
 // ── Game Loop ───────────────────────────────────────────────────────
 let lastFrame = 0;

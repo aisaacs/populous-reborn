@@ -92,6 +92,11 @@ function createGameState() {
     teamMode: [C.MODE_SETTLE, C.MODE_SETTLE],
     magnetPos: [{ x: 10, y: 10 }, { x: 50, y: 50 }],
     mana: [0, 0],
+    swamps: [],
+    rocks: new Set(),
+    seaLevel: C.SEA_LEVEL,
+    leaders: [-1, -1],
+    armageddon: false,
     levelEvalTimer: 0,
     popGrowthTimer: 0,
     pruneTimer: 0,
@@ -162,16 +167,17 @@ function generateTerrain(state) {
 // ── Utility Functions ───────────────────────────────────────────────
 function isTileWater(state, tx, ty) {
   if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return true;
-  return state.heights[tx][ty] <= C.SEA_LEVEL &&
-         state.heights[tx + 1][ty] <= C.SEA_LEVEL &&
-         state.heights[tx + 1][ty + 1] <= C.SEA_LEVEL &&
-         state.heights[tx][ty + 1] <= C.SEA_LEVEL;
+  return state.heights[tx][ty] <= state.seaLevel &&
+         state.heights[tx + 1][ty] <= state.seaLevel &&
+         state.heights[tx + 1][ty + 1] <= state.seaLevel &&
+         state.heights[tx][ty + 1] <= state.seaLevel;
 }
 
 function isTileFlat(state, tx, ty) {
   if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return false;
   const h = state.heights[tx][ty];
-  if (h <= C.SEA_LEVEL) return false;
+  if (h <= state.seaLevel) return false;
+  if (state.rocks.has(tx + ',' + ty)) return false;
   return state.heights[tx + 1][ty] === h &&
          state.heights[tx + 1][ty + 1] === h &&
          state.heights[tx][ty + 1] === h;
@@ -263,6 +269,39 @@ function lowerPoint(state, px, py) {
   }
 }
 
+// ── Swamp Helpers ──────────────────────────────────────────────────
+function invalidateSwamps(state) {
+  state.swamps = state.swamps.filter(s => {
+    const tx = s.x, ty = s.y;
+    if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return false;
+    if (isTileWater(state, tx, ty)) return false;
+    if (!isTileFlat(state, tx, ty)) return false;
+    return true;
+  });
+}
+
+// ── Walker Alive Helper ────────────────────────────────────────────
+function isWalkerAlive(state, id) {
+  if (id < 0) return false;
+  for (const w of state.walkers) {
+    if (w.id === id && !w.dead) return true;
+  }
+  return false;
+}
+
+// ── Armageddon Targeting ───────────────────────────────────────────
+function pickArmageddonTarget(state, w) {
+  const cx = C.MAP_W / 2, cy = C.MAP_H / 2;
+  const dx = cx - w.x, dy = cy - w.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 5) {
+    pickFightTarget(state, w);
+  } else {
+    w.tx = cx + (Math.random() - 0.5) * 4;
+    w.ty = cy + (Math.random() - 0.5) * 4;
+  }
+}
+
 // ── Walker System ───────────────────────────────────────────────────
 function spawnWalker(state, team, strength, x, y) {
   const w = {
@@ -291,7 +330,7 @@ function spawnInitialWalkers(state) {
           if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
           const tx = zone.cx + dx, ty = zone.cy + dy;
           if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
-          if (!isTileWater(state, tx, ty) && state.heights[tx][ty] > C.SEA_LEVEL) {
+          if (!isTileWater(state, tx, ty) && state.heights[tx][ty] > state.seaLevel) {
             spawnWalker(state, team, 5, tx + 0.5, ty + 0.5);
             spawned++;
           }
@@ -420,13 +459,40 @@ function updateWalkers(state, dt) {
       continue;
     }
 
+    // Swamp death check
+    for (const sw of state.swamps) {
+      if (Math.floor(w.x) === sw.x && Math.floor(w.y) === sw.y && sw.team !== w.team) {
+        w.dead = true;
+        break;
+      }
+    }
+    if (w.dead) continue;
+
+    // Leader assignment: walker near own magnet and no leader exists
+    if (!w.isLeader && !w.isKnight && state.leaders[w.team] < 0) {
+      const mp = state.magnetPos[w.team];
+      const ldx = mp.x - w.x, ldy = mp.y - w.y;
+      if (ldx * ldx + ldy * ldy < 4) { // radius 2
+        w.isLeader = true;
+        state.leaders[w.team] = w.id;
+      }
+    }
+
     const dx = w.tx - w.x, dy = w.ty - w.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist < 0.1) {
-      pickWalkerTarget(state, w);
+      // Choose target based on state
+      if (state.armageddon) {
+        pickArmageddonTarget(state, w);
+      } else if (w.isKnight) {
+        pickFightTarget(state, w);
+      } else {
+        pickWalkerTarget(state, w);
+      }
     } else {
-      const step = C.WALKER_SPEED * dt;
+      const speed = w.isKnight ? C.WALKER_SPEED * C.KNIGHT_SPEED_MULT : C.WALKER_SPEED;
+      const step = speed * dt;
       if (step >= dist) {
         w.x = w.tx;
         w.y = w.ty;
@@ -440,11 +506,19 @@ function updateWalkers(state, dt) {
 
       const ntx = Math.floor(w.x), nty = Math.floor(w.y);
       if (ntx >= 0 && ntx < C.MAP_W && nty >= 0 && nty < C.MAP_H && isTileWater(state, ntx, nty)) {
-        w.x -= (dx / dist) * step;
-        w.y -= (dy / dist) * step;
-        w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, w.x));
-        w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, w.y));
-        pickRandomTarget(state, w);
+        // Armageddon: auto-raise terrain instead of bouncing
+        if (state.armageddon) {
+          raisePoint(state, ntx, nty);
+          raisePoint(state, ntx + 1, nty);
+          raisePoint(state, ntx, nty + 1);
+          raisePoint(state, ntx + 1, nty + 1);
+        } else {
+          w.x -= (dx / dist) * step;
+          w.y -= (dy / dist) * step;
+          w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, w.x));
+          w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, w.y));
+          pickRandomTarget(state, w);
+        }
       }
     }
   }
@@ -469,7 +543,7 @@ function settleWalker(state, w, tx, ty) {
 
 function findLargestFlatSquare(state, tx, ty, exclude) {
   const h = state.heights[tx][ty];
-  if (h <= C.SEA_LEVEL || !isTileFlat(state, tx, ty)) return { ox: tx, oy: ty, size: 0 };
+  if (h <= state.seaLevel || !isTileFlat(state, tx, ty)) return { ox: tx, oy: ty, size: 0 };
 
   for (let n = 5; n >= 2; n--) {
     const oxMin = Math.max(0, tx - n + 1);
@@ -500,7 +574,7 @@ function tryMergeSettlements(state) {
   for (const s of state.settlements) {
     if (s.dead) continue;
     const h = state.heights[s.tx][s.ty];
-    if (h <= C.SEA_LEVEL || !isTileFlat(state, s.tx, s.ty)) continue;
+    if (h <= state.seaLevel || !isTileFlat(state, s.tx, s.ty)) continue;
 
     let bestSq = null;
     for (let n = 5; n > s.sqSize; n--) {
@@ -562,7 +636,7 @@ function tryMergeSettlements(state) {
 
 function isSquareStillValid(state, s) {
   const h = state.heights[s.tx][s.ty];
-  if (h <= C.SEA_LEVEL || !isTileFlat(state, s.tx, s.ty)) return false;
+  if (h <= state.seaLevel || !isTileFlat(state, s.tx, s.ty)) return false;
   for (let dx = 0; dx < s.sqSize; dx++) {
     for (let dy = 0; dy < s.sqSize; dy++) {
       const cx = s.sqOx + dx, cy = s.sqOy + dy;
@@ -698,6 +772,17 @@ function handleWalkerCollisions(state) {
         w.strength -= es.population;
         es.dead = true;
         clearSettlementMap(state, es.tx, es.ty);
+        // Knight: lower terrain around destroyed settlement
+        if (w.isKnight) {
+          for (let ddx = -2; ddx <= 2; ddx++) {
+            for (let ddy = -2; ddy <= 2; ddy++) {
+              const lpx = es.tx + ddx, lpy = es.ty + ddy;
+              if (lpx >= 0 && lpx <= C.MAP_W && lpy >= 0 && lpy <= C.MAP_H) {
+                lowerPoint(state, lpx, lpy);
+              }
+            }
+          }
+        }
         if (w.strength <= 0) w.dead = true;
       } else {
         es.population -= w.strength;
@@ -709,6 +794,12 @@ function handleWalkerCollisions(state) {
 
 // ── Entity Pruning ──────────────────────────────────────────────────
 function pruneDeadEntities(state) {
+  // Clear leaders if their walker is dead
+  for (let t = 0; t < 2; t++) {
+    if (state.leaders[t] >= 0 && !isWalkerAlive(state, state.leaders[t])) {
+      state.leaders[t] = -1;
+    }
+  }
   state.walkers = state.walkers.filter(w => !w.dead);
 
   const alive = state.settlements.filter(s => !s.dead);
@@ -762,13 +853,16 @@ function serializeState(state, team) {
   const walkerData = [];
   for (const w of state.walkers) {
     if (w.dead) continue;
-    walkerData.push({
+    const wd = {
       id: w.id,
       t: w.team,
       s: w.strength,
       x: Math.round(w.x * 100) / 100,
       y: Math.round(w.y * 100) / 100,
-    });
+    };
+    if (w.isLeader) wd.l = 1;
+    if (w.isKnight) wd.k = 1;
+    walkerData.push(wd);
   }
 
   // Settlements: living only, minimal fields
@@ -784,6 +878,16 @@ function serializeState(state, team) {
     });
   }
 
+  // Swamps: array of {x, y}
+  const swampData = state.swamps.map(s => ({ x: s.x, y: s.y, t: s.team }));
+
+  // Rocks: flat array [x1,y1,x2,y2,...]
+  const rockData = [];
+  for (const key of state.rocks) {
+    const parts = key.split(',');
+    rockData.push(+parts[0], +parts[1]);
+  }
+
   return {
     type: 'state',
     heights: flatHeights,
@@ -793,7 +897,135 @@ function serializeState(state, team) {
     teamMode: state.teamMode,
     mana: Math.floor(state.mana[team]),
     team,
+    swamps: swampData,
+    rocks: rockData,
+    seaLevel: state.seaLevel,
+    leaders: state.leaders,
+    armageddon: state.armageddon,
   };
+}
+
+// ── Divine Powers ───────────────────────────────────────────────────
+function executePowerEarthquake(state, team, px, py) {
+  const r = C.EARTHQUAKE_RADIUS;
+  const r2 = r * r;
+  for (let x = Math.max(0, px - r); x <= Math.min(C.MAP_W, px + r); x++) {
+    for (let y = Math.max(0, py - r); y <= Math.min(C.MAP_H, py + r); y++) {
+      const dx = x - px, dy = y - py;
+      if (dx * dx + dy * dy < r2) {
+        const times = Math.floor(Math.random() * 3); // 0-2
+        for (let i = 0; i < times; i++) lowerPoint(state, x, y);
+      }
+    }
+  }
+  invalidateSwamps(state);
+}
+
+function executePowerSwamp(state, team, tx, ty) {
+  if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return false;
+  if (!isTileFlat(state, tx, ty)) return false;
+  if (isTileWater(state, tx, ty)) return false;
+  for (const s of state.swamps) {
+    if (s.x === tx && s.y === ty) return false;
+  }
+  state.swamps.push({ x: tx, y: ty, team });
+  return true;
+}
+
+function executePowerKnight(state, team) {
+  const leaderId = state.leaders[team];
+  if (leaderId < 0) return false;
+  let leader = null;
+  for (const w of state.walkers) {
+    if (w.id === leaderId && !w.dead) { leader = w; break; }
+  }
+  if (!leader || leader.isKnight) return false;
+  leader.isKnight = true;
+  leader.strength = Math.min(255, leader.strength * C.KNIGHT_STRENGTH_MULT);
+  leader.isLeader = false;
+  state.leaders[team] = -1;
+  return true;
+}
+
+function executePowerVolcano(state, team, px, py) {
+  const r = C.VOLCANO_RADIUS;
+  const r2 = r * r;
+  // Raise terrain
+  for (let x = Math.max(0, px - r); x <= Math.min(C.MAP_W, px + r); x++) {
+    for (let y = Math.max(0, py - r); y <= Math.min(C.MAP_H, py + r); y++) {
+      const dx = x - px, dy = y - py;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < r2) {
+        const dist = Math.sqrt(d2);
+        const target = C.MAX_HEIGHT - Math.floor(dist);
+        while (state.heights[x][y] < target && state.heights[x][y] < C.MAX_HEIGHT) {
+          raisePoint(state, x, y);
+        }
+      }
+    }
+  }
+  // Add rock tiles in inner radius
+  const innerR = Math.floor(r / 2);
+  const innerR2 = innerR * innerR;
+  for (let tx = Math.max(0, px - innerR); tx < Math.min(C.MAP_W, px + innerR); tx++) {
+    for (let ty = Math.max(0, py - innerR); ty < Math.min(C.MAP_H, py + innerR); ty++) {
+      const dx = tx + 0.5 - px, dy = ty + 0.5 - py;
+      if (dx * dx + dy * dy < innerR2) {
+        state.rocks.add(tx + ',' + ty);
+      }
+    }
+  }
+  // Kill walkers and destroy settlements within radius
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    const dx = w.x - px, dy = w.y - py;
+    if (dx * dx + dy * dy < r2) w.dead = true;
+  }
+  for (const s of state.settlements) {
+    if (s.dead) continue;
+    const dx = (s.tx + 0.5) - px, dy = (s.ty + 0.5) - py;
+    if (dx * dx + dy * dy < r2) {
+      s.dead = true;
+      clearSettlementMap(state, s.tx, s.ty);
+    }
+  }
+  invalidateSwamps(state);
+}
+
+function executePowerFlood(state, team) {
+  state.seaLevel += 1;
+  // Kill walkers on newly submerged tiles
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    const tx = Math.floor(w.x), ty = Math.floor(w.y);
+    if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
+    if (isTileWater(state, tx, ty)) w.dead = true;
+  }
+  // Destroy settlements on newly submerged tiles
+  for (const s of state.settlements) {
+    if (s.dead) continue;
+    if (isTileWater(state, s.tx, s.ty)) {
+      s.dead = true;
+      clearSettlementMap(state, s.tx, s.ty);
+    }
+  }
+  invalidateSwamps(state);
+}
+
+function executePowerArmageddon(state, team) {
+  state.armageddon = true;
+  // Destroy all settlements, eject population as walkers
+  for (const s of state.settlements) {
+    if (s.dead) continue;
+    if (s.population > 0) {
+      const angle = Math.random() * Math.PI * 2;
+      spawnWalker(state, s.team, s.population,
+        s.tx + 0.5 + Math.cos(angle) * 1.2,
+        s.ty + 0.5 + Math.sin(angle) * 1.2);
+    }
+    s.dead = true;
+    clearSettlementMap(state, s.tx, s.ty);
+  }
 }
 
 // ── Basic AI ────────────────────────────────────────────────────────
@@ -869,17 +1101,19 @@ function startGame(room) {
     // AI update (if vs AI room)
     if (room.ai) updateAI(state, room, dt);
 
-    state.levelEvalTimer += dt;
-    if (state.levelEvalTimer >= 1.0) {
-      state.levelEvalTimer = 0;
-      tryMergeSettlements(state);
-      evaluateSettlementLevels(state);
-    }
+    if (!state.armageddon) {
+      state.levelEvalTimer += dt;
+      if (state.levelEvalTimer >= 1.0) {
+        state.levelEvalTimer = 0;
+        tryMergeSettlements(state);
+        evaluateSettlementLevels(state);
+      }
 
-    state.popGrowthTimer += dt;
-    if (state.popGrowthTimer >= 10.0) {
-      state.popGrowthTimer = 0;
-      updatePopulationGrowth(state);
+      state.popGrowthTimer += dt;
+      if (state.popGrowthTimer >= 10.0) {
+        state.popGrowthTimer = 0;
+        updatePopulationGrowth(state);
+      }
     }
 
     state.pruneTimer += dt;
@@ -1002,6 +1236,7 @@ wss.on('connection', (ws) => {
 
       case 'raise': {
         if (!playerRoom || !playerRoom.started || playerRoom.state.gameOver) return;
+        if (playerRoom.state.armageddon) return;
         const state = playerRoom.state;
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
@@ -1009,11 +1244,13 @@ wss.on('connection', (ws) => {
         if (state.mana[playerTeam] < 10) return;
         state.mana[playerTeam] -= 10;
         raisePoint(state, px, py);
+        invalidateSwamps(state);
         break;
       }
 
       case 'lower': {
         if (!playerRoom || !playerRoom.started || playerRoom.state.gameOver) return;
+        if (playerRoom.state.armageddon) return;
         const state = playerRoom.state;
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
@@ -1021,11 +1258,52 @@ wss.on('connection', (ws) => {
         if (state.mana[playerTeam] < 10) return;
         state.mana[playerTeam] -= 10;
         lowerPoint(state, px, py);
+        invalidateSwamps(state);
+        break;
+      }
+
+      case 'power': {
+        if (!playerRoom || !playerRoom.started || playerRoom.state.gameOver) return;
+        if (playerRoom.state.armageddon) return;
+        const state = playerRoom.state;
+        const powerDef = C.POWERS.find(p => p.id === msg.power);
+        if (!powerDef) return;
+        if (state.mana[playerTeam] < powerDef.cost) return;
+        if (powerDef.targeted) {
+          const { x, y } = msg;
+          if (typeof x !== 'number' || typeof y !== 'number') return;
+          if (x < 0 || x > C.MAP_W || y < 0 || y > C.MAP_H) return;
+        }
+        let success = true;
+        switch (powerDef.id) {
+          case 'earthquake':
+            executePowerEarthquake(state, playerTeam, msg.x, msg.y);
+            break;
+          case 'swamp':
+            success = executePowerSwamp(state, playerTeam, Math.floor(msg.x), Math.floor(msg.y));
+            break;
+          case 'knight':
+            success = executePowerKnight(state, playerTeam);
+            break;
+          case 'volcano':
+            executePowerVolcano(state, playerTeam, msg.x, msg.y);
+            break;
+          case 'flood':
+            executePowerFlood(state, playerTeam);
+            break;
+          case 'armageddon':
+            executePowerArmageddon(state, playerTeam);
+            break;
+        }
+        if (success !== false) {
+          state.mana[playerTeam] -= powerDef.cost;
+        }
         break;
       }
 
       case 'mode': {
         if (!playerRoom || !playerRoom.started || playerRoom.state.gameOver) return;
+        if (playerRoom.state.armageddon) return;
         const mode = msg.mode;
         if (typeof mode !== 'number' || mode < 0 || mode > 3) return;
         playerRoom.state.teamMode[playerTeam] = mode;
@@ -1034,6 +1312,7 @@ wss.on('connection', (ws) => {
 
       case 'magnet': {
         if (!playerRoom || !playerRoom.started || playerRoom.state.gameOver) return;
+        if (playerRoom.state.armageddon) return;
         const { x, y } = msg;
         if (typeof x !== 'number' || typeof y !== 'number') return;
         playerRoom.state.magnetPos[playerTeam] = { x, y };

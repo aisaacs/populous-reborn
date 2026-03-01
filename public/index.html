@@ -97,6 +97,51 @@
       margin-top: 12px;
       min-height: 16px;
     }
+
+    /* Power Bar */
+    #power-bar {
+      display: none;
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 6px 8px;
+      gap: 6px;
+      z-index: 10;
+      user-select: none;
+    }
+    .power-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(40, 40, 60, 0.9);
+      border: 2px solid #555;
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      min-width: 64px;
+      transition: border-color 0.15s, opacity 0.15s;
+    }
+    .power-btn:hover { border-color: #888; }
+    .power-btn.disabled { opacity: 0.35; cursor: default; }
+    .power-btn.active { border-color: #ff8c00; box-shadow: 0 0 6px rgba(255,140,0,0.5); }
+    .power-hotkey {
+      font: bold 11px monospace;
+      color: #ff8c00;
+      margin-bottom: 1px;
+    }
+    .power-name {
+      font: bold 10px monospace;
+      color: #ddd;
+      margin-bottom: 1px;
+    }
+    .power-cost {
+      font: 9px monospace;
+      color: #8af;
+    }
   </style>
 </head>
 <body>
@@ -127,7 +172,15 @@
   </div>
 
   <canvas id="game"></canvas>
-  <div id="ui">LMB: Raise &nbsp; RMB: Lower &nbsp; MMB: Pan &nbsp; G: Grid &nbsp; 1-4: Mode (Settle/Magnet/Fight/Gather) &nbsp; Shift+LMB: Magnet</div>
+  <div id="power-bar">
+    <div class="power-btn" data-power="earthquake"><span class="power-hotkey">Q</span><span class="power-name">Quake</span><span class="power-cost">200</span></div>
+    <div class="power-btn" data-power="swamp"><span class="power-hotkey">W</span><span class="power-name">Swamp</span><span class="power-cost">350</span></div>
+    <div class="power-btn" data-power="knight"><span class="power-hotkey">E</span><span class="power-name">Knight</span><span class="power-cost">600</span></div>
+    <div class="power-btn" data-power="volcano"><span class="power-hotkey">R</span><span class="power-name">Volcano</span><span class="power-cost">1500</span></div>
+    <div class="power-btn" data-power="flood"><span class="power-hotkey">T</span><span class="power-name">Flood</span><span class="power-cost">4000</span></div>
+    <div class="power-btn" data-power="armageddon"><span class="power-hotkey">Y</span><span class="power-name">Armgddn</span><span class="power-cost">10000</span></div>
+  </div>
+  <div id="ui">LMB: Raise &nbsp; RMB: Lower &nbsp; MMB: Pan &nbsp; G: Grid &nbsp; 1-4: Mode &nbsp; Shift+LMB: Magnet &nbsp; Q/W/E/R/T/Y: Powers &nbsp; Esc: Cancel</div>
 
   <script src="/shared/constants.js"></script>
   <script src="game.js"></script>
