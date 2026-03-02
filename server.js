@@ -1325,6 +1325,13 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'godmode': {
+        if (!playerRoom || !playerRoom.started) return;
+        const state = playerRoom.state;
+        state.mana[playerTeam] = 999999;
+        break;
+      }
+
       case 'magnet': {
         if (!playerRoom || !playerRoom.started || playerRoom.state.gameOver) return;
         if (playerRoom.state.armageddon) return;

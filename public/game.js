@@ -13,6 +13,59 @@ const SLOPE_DARKEN = 20;
 const GRID_MODES = [null, 'rgba(0,0,0,0.15)', 'rgba(255,255,255,0.25)'];
 let gridMode = 2;
 
+// ── Terrain Textures ────────────────────────────────────────────────
+const TEX_NAMES = ['grass', 'rock', 'water', 'sand', 'snow', 'swamp'];
+const terrainTextures = {};
+let texturesLoaded = false;
+let textureOpacity = parseFloat(localStorage.getItem('texOpacity') ?? '0.4');
+
+(function loadTextures() {
+  let count = 0;
+  for (const name of TEX_NAMES) {
+    const img = new Image();
+    img.src = 'gfx/' + name + '.jpg';
+    img.onload = () => { if (++count === TEX_NAMES.length) texturesLoaded = true; };
+    terrainTextures[name] = img;
+  }
+})();
+
+function getTileTexture(tx, ty) {
+  if (swampSet.has(tx + ',' + ty)) return terrainTextures.swamp;
+  if (rocks.has(tx + ',' + ty)) return terrainTextures.rock;
+
+  const t = heights[tx][ty], r = heights[tx + 1][ty];
+  const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
+
+  if (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel) {
+    return terrainTextures.water;
+  }
+
+  const avg = (t + r + b + l) / 4;
+  if (avg <= 1) return terrainTextures.sand;
+  if (avg <= 5) return terrainTextures.grass;
+  if (avg <= 7) return terrainTextures.rock;
+  return terrainTextures.snow;
+}
+
+// ── Settlement Sprites ──────────────────────────────────────────────
+const SETT_LEVEL_NAMES = ['tent', 'hut', 'house', 'manor', 'castle'];
+const settlementSprites = {};
+let settlementSpritesLoaded = false;
+
+(function loadSettlementSprites() {
+  let count = 0;
+  const total = SETT_LEVEL_NAMES.length * 2;
+  for (const name of SETT_LEVEL_NAMES) {
+    for (const team of ['blue', 'red']) {
+      const key = name + '-' + team;
+      const img = new Image();
+      img.src = 'gfx/' + key + '.png';
+      img.onload = () => { if (++count === total) settlementSpritesLoaded = true; };
+      settlementSprites[key] = img;
+    }
+  }
+})();
+
 // ── Music System ───────────────────────────────────────────────────
 const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3'];
 let musicQueue = [];
@@ -79,6 +132,13 @@ document.getElementById('btn-mute').addEventListener('click', () => {
   if (!musicStarted) startMusic();
   else toggleMusicMute();
 });
+
+// Texture opacity slider
+document.getElementById('tex-opacity').addEventListener('input', (e) => {
+  textureOpacity = e.target.valueAsNumber / 100;
+  localStorage.setItem('texOpacity', String(textureOpacity));
+});
+document.getElementById('tex-opacity').value = textureOpacity * 100;
 
 // Init UI from saved prefs
 syncMusicUI();
@@ -276,6 +336,65 @@ function drawTile(tx, ty) {
   ctx.fillStyle = getTileColor(tx, ty);
   ctx.fill();
 
+  // Texture overlay — split into 2 triangles for correct projection on slopes
+  if (texturesLoaded && textureOpacity > 0) {
+    const tex = getTileTexture(tx, ty);
+    const iw = tex.width, ih = tex.height;
+    const hcx = canvas.width / 2;
+    const hcy = canvas.height / 2;
+    const zox = hcx * (1 - zoom), zoy = hcy * (1 - zoom);
+
+    // Triangle 1: Top → Right → Bottom
+    // Maps image (0,0)→pTop, (iw,0)→pRight, (iw,ih)→pBottom
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pTop.x, pTop.y);
+    ctx.lineTo(pRight.x, pRight.y);
+    ctx.lineTo(pBottom.x, pBottom.y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.globalAlpha = textureOpacity;
+    ctx.setTransform(
+      zoom * (pRight.x - pTop.x) / iw,
+      zoom * (pRight.y - pTop.y) / iw,
+      zoom * (pBottom.x - pRight.x) / ih,
+      zoom * (pBottom.y - pRight.y) / ih,
+      zoom * pTop.x + zox,
+      zoom * pTop.y + zoy
+    );
+    ctx.drawImage(tex, 0, 0);
+    ctx.restore();
+
+    // Triangle 2: Top → Bottom → Left
+    // Maps image (0,0)→pTop, (iw,ih)→pBottom, (0,ih)→pLeft
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pTop.x, pTop.y);
+    ctx.lineTo(pBottom.x, pBottom.y);
+    ctx.lineTo(pLeft.x, pLeft.y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.globalAlpha = textureOpacity;
+    ctx.setTransform(
+      zoom * (pBottom.x - pLeft.x) / iw,
+      zoom * (pBottom.y - pLeft.y) / iw,
+      zoom * (pLeft.x - pTop.x) / ih,
+      zoom * (pLeft.y - pTop.y) / ih,
+      zoom * pTop.x + zox,
+      zoom * pTop.y + zoy
+    );
+    ctx.drawImage(tex, 0, 0);
+    ctx.restore();
+
+    // Rebuild diamond path (destroyed by clip's beginPath)
+    ctx.beginPath();
+    ctx.moveTo(pTop.x, pTop.y);
+    ctx.lineTo(pRight.x, pRight.y);
+    ctx.lineTo(pBottom.x, pBottom.y);
+    ctx.lineTo(pLeft.x, pLeft.y);
+    ctx.closePath();
+  }
+
   // Swamp overlay
   if (swampSet.has(tx + ',' + ty)) {
     ctx.fillStyle = 'rgba(80, 100, 30, 0.5)';
@@ -351,15 +470,19 @@ function drawWalker(w) {
 
 function drawSettlement(s) {
   const h = heights[s.tx][s.ty];
+
+  // Colored diamond (covering area) at 50% opacity — always drawn
   const cx = s.ox + s.sz * 0.5;
   const cy = s.oy + s.sz * 0.5;
-  const he = s.sz * 0.5 * 0.75;
+  const he = s.sz * 0.5;
 
   const pTop    = project(cx - he, cy - he, h);
   const pRight  = project(cx + he, cy - he, h);
   const pBottom = project(cx + he, cy + he, h);
   const pLeft   = project(cx - he, cy + he, h);
 
+  ctx.save();
+  ctx.globalAlpha = 0.25;
   ctx.beginPath();
   ctx.moveTo(pTop.x, pTop.y);
   ctx.lineTo(pRight.x, pRight.y);
@@ -373,6 +496,23 @@ function drawSettlement(s) {
   ctx.strokeStyle = darkenColor(TEAM_COLORS[s.t], 40);
   ctx.lineWidth = 1;
   ctx.stroke();
+  ctx.restore();
+
+  // Sprite on top, sized to 50% of the footprint
+  if (settlementSpritesLoaded && s.l >= 1 && s.l <= 5) {
+    const team = s.t === TEAM_BLUE ? 'blue' : 'red';
+    const key = SETT_LEVEL_NAMES[s.l - 1] + '-' + team;
+    const img = settlementSprites[key];
+    if (img && img.complete) {
+      const he2 = s.sz * 0.5 * 0.5;
+      const pSprTop = project(cx - he2, cy - he2, h);
+      const pSprBot = project(cx + he2, cy + he2, h);
+      const scale = (pSprBot.y - pSprTop.y) / (img.height / 2);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      ctx.drawImage(img, pSprTop.x - dw / 2, pSprTop.y - dh / 2, dw, dh);
+    }
+  }
 }
 
 function drawMagnetFlag(team) {
@@ -478,7 +618,7 @@ function render() {
   }
 
   // Pass 2: settlements
-  const sortedSettlements = settlements.slice().sort((a, b) => (a.tx + a.ty) - (b.tx + b.ty));
+  const sortedSettlements = settlements.slice().sort((a, b) => (a.ox + a.oy) - (b.ox + b.oy));
   for (const s of sortedSettlements) drawSettlement(s);
 
   // Pass 3: walkers via grid
@@ -794,6 +934,11 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  if (e.key === 'G' && e.ctrlKey && e.shiftKey) {
+    e.preventDefault();
+    sendMessage({ type: 'godmode' });
+    return;
+  }
   if (e.key === 'g' || e.key === 'G') {
     gridMode = (gridMode + 1) % GRID_MODES.length;
   }

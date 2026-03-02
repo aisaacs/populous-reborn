@@ -143,11 +143,18 @@
       color: #8af;
     }
 
-    /* Music Control */
-    #music-ctrl {
+    /* Top-right controls */
+    .top-ctrl {
       position: fixed;
       top: 12px;
       right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 20;
+      user-select: none;
+    }
+    .ctrl-row {
       display: flex;
       align-items: center;
       gap: 6px;
@@ -155,10 +162,13 @@
       border: 1px solid #444;
       border-radius: 4px;
       padding: 4px 8px;
-      z-index: 20;
-      user-select: none;
     }
-    #music-ctrl button {
+    .ctrl-label {
+      font: 11px monospace;
+      color: #888;
+      min-width: 28px;
+    }
+    .ctrl-row button {
       background: none;
       border: none;
       color: #ccc;
@@ -167,8 +177,8 @@
       padding: 0 2px;
       line-height: 1;
     }
-    #music-ctrl button:hover { color: #fff; }
-    #music-vol {
+    .ctrl-row button:hover { color: #fff; }
+    .ctrl-slider {
       -webkit-appearance: none;
       appearance: none;
       width: 60px;
@@ -178,7 +188,7 @@
       outline: none;
       cursor: pointer;
     }
-    #music-vol::-webkit-slider-thumb {
+    .ctrl-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
       width: 10px;
       height: 10px;
@@ -186,7 +196,7 @@
       background: #ccc;
       cursor: pointer;
     }
-    #music-vol::-moz-range-thumb {
+    .ctrl-slider::-moz-range-thumb {
       width: 10px;
       height: 10px;
       border-radius: 50%;
@@ -232,9 +242,15 @@
     <div class="power-btn" data-power="flood"><span class="power-hotkey">T</span><span class="power-name">Flood</span><span class="power-cost">4000</span></div>
     <div class="power-btn" data-power="armageddon"><span class="power-hotkey">Y</span><span class="power-name">Armgddn</span><span class="power-cost">10000</span></div>
   </div>
-  <div id="music-ctrl">
-    <button id="btn-mute" title="Mute (M)">&#9835;</button>
-    <input id="music-vol" type="range" min="0" max="100" value="30">
+  <div class="top-ctrl">
+    <div class="ctrl-row">
+      <button id="btn-mute" title="Mute (M)">&#9835;</button>
+      <input id="music-vol" class="ctrl-slider" type="range" min="0" max="100" value="30">
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Tex</span>
+      <input id="tex-opacity" class="ctrl-slider" type="range" min="0" max="100" value="40">
+    </div>
   </div>
   <div id="ui">LMB: Raise &nbsp; RMB: Lower &nbsp; MMB: Pan &nbsp; G: Grid &nbsp; 1-4: Mode &nbsp; Shift+LMB: Magnet &nbsp; Q/W/E/R/T/Y: Powers &nbsp; Esc: Cancel &nbsp; M: Mute</div>
 
