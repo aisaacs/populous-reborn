@@ -1013,67 +1013,98 @@ function handleWalkerCollisions(state) {
     const stx = Math.floor(w.x), sty = Math.floor(w.y);
     const es = getSettlement(state, stx, sty);
     if (es && es.team !== w.team) {
-      // Gradual assault: exchange damage each tick
-      const dt = 1 / C.TICK_RATE;
+      // Track this walker as an attacker of this settlement
+      if (!es._attackers) es._attackers = [];
+      es._attackers.push(w);
+    }
+  }
+
+  // Process settlement assaults — retaliation is split among all attackers
+  for (const es of state.settlements) {
+    if (es.dead || !es._attackers || es._attackers.length === 0) continue;
+    const attackers = es._attackers;
+    delete es._attackers;
+
+    const dt = 1 / C.TICK_RATE;
+    const sTech = C.SETTLEMENT_LEVELS[es.level] ? C.SETTLEMENT_LEVELS[es.level].tech : 0;
+
+    // Total damage dealt to settlement by all attackers this tick
+    let totalDmgToSett = 0;
+    for (const w of attackers) {
       const wTech = w.tech || 0;
-      const sTech = C.SETTLEMENT_LEVELS[es.level] ? C.SETTLEMENT_LEVELS[es.level].tech : 0;
       const techDiff = wTech - sTech;
       const wMult = techDiff > 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, techDiff) : 1;
-      const sMult = techDiff < 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff) : 1;
-
-      // Damage dealt to settlement (scaled by tech); knights deal more
-      const baseDmg = C.ASSAULT_DMG_PER_SEC * dt;
       const atkMult = w.isKnight ? C.KNIGHT_STRENGTH_MULT : 1;
-      const dmgToSett = Math.max(0.1, baseDmg * wMult * atkMult);
-      // Retaliation damage from settlement to walker (knights take much less)
-      const retalFrac = w.isKnight ? C.ASSAULT_RETALIATE_FRAC * 0.2 : C.ASSAULT_RETALIATE_FRAC;
-      const dmgToWalker = Math.max(0.05, baseDmg * retalFrac * sMult);
+      // Stronger walkers deal more damage (scaled by strength)
+      const strMult = Math.max(1, w.strength / 5);
+      totalDmgToSett += C.ASSAULT_DMG_PER_SEC * dt * wMult * atkMult * strMult;
+    }
 
-      // Apply fractional damage using accumulators
-      es.assaultFrac = (es.assaultFrac || 0) + dmgToSett;
-      w.assaultFrac = (w.assaultFrac || 0) + dmgToWalker;
+    // Apply damage to settlement
+    es.assaultFrac = (es.assaultFrac || 0) + totalDmgToSett;
+    if (es.assaultFrac >= 1) {
+      const loss = Math.floor(es.assaultFrac);
+      es.assaultFrac -= loss;
+      es.population -= loss;
+    }
 
-      if (es.assaultFrac >= 1) {
-        const loss = Math.floor(es.assaultFrac);
-        es.assaultFrac -= loss;
-        es.population -= loss;
-      }
+    // Settlement retaliates — fixed firepower divided among attackers
+    // Scales with settlement population (weaker settlement = weaker retaliation)
+    const popScale = Math.max(0.2, es.population / 20);
+    const totalRetal = C.ASSAULT_DMG_PER_SEC * dt * C.ASSAULT_RETALIATE_FRAC * popScale;
+    const retalPerWalker = totalRetal / attackers.length;
+
+    for (const w of attackers) {
+      const wTech = w.tech || 0;
+      const techDiff = wTech - sTech;
+      const sMult = techDiff < 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff) : 1;
+      const retalMult = w.isKnight ? 0.2 : 1;
+      w.assaultFrac = (w.assaultFrac || 0) + retalPerWalker * sMult * retalMult;
       if (w.assaultFrac >= 1) {
         const loss = Math.floor(w.assaultFrac);
         w.assaultFrac -= loss;
         w.strength -= loss;
       }
+      if (w.strength <= 0) w.dead = true;
+    }
 
-      // Walker dies
-      if (w.strength <= 0) {
-        w.dead = true;
+    // Settlement falls
+    if (es.population <= 0) {
+      if (es.hasLeader) {
+        state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
+        state.magnetLocked[es.team] = true;
+        state.leaders[es.team] = -1;
+        es.hasLeader = false;
       }
-
-      // Settlement falls
-      if (es.population <= 0) {
-        if (es.hasLeader) {
-          state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
-          state.magnetLocked[es.team] = true;
-          state.leaders[es.team] = -1;
-          es.hasLeader = false;
-        }
-        if (w.isKnight) {
-          // Knight: destroy settlement, set on fire
-          es.dead = true;
-          clearSettlementMap(state, es.tx, es.ty);
-          state.fires.push({ x: es.tx, y: es.ty, age: 0 });
-          if (!w.dead) pickFightTarget(state, w);
-        } else {
-          // Regular walker: conquer settlement
-          es.team = w.team;
-          es.population = Math.max(1, w.strength);
-          es.popFrac = 0;
-          es.atCapTime = 0;
-          es.assaultFrac = 0;
-          w.dead = true;
-        }
+      // Find strongest surviving attacker for conquest
+      let best = null;
+      for (const w of attackers) {
+        if (!w.dead && (!best || w.strength > best.strength)) best = w;
+      }
+      if (best && best.isKnight) {
+        es.dead = true;
+        clearSettlementMap(state, es.tx, es.ty);
+        state.fires.push({ x: es.tx, y: es.ty, age: 0 });
+        pickFightTarget(state, best);
+      } else if (best) {
+        // Conquer
+        es.team = best.team;
+        es.population = Math.max(1, best.strength);
+        es.popFrac = 0;
+        es.atCapTime = 0;
+        es.assaultFrac = 0;
+        best.dead = true;
+      } else {
+        // All attackers died but settlement fell too — just destroy it
+        es.dead = true;
+        clearSettlementMap(state, es.tx, es.ty);
       }
     }
+  }
+
+  // Clean up _attackers on any settlements that weren't processed
+  for (const es of state.settlements) {
+    delete es._attackers;
   }
 }
 

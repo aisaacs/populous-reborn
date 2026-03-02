@@ -209,11 +209,13 @@ let inspectData = null; // {type:'settlement'|'walker', screenX, screenY, ...dat
 const STAR_COUNT = 300;
 const stars = [];
 for (let i = 0; i < STAR_COUNT; i++) {
+  const bright = 0.3 + Math.random() * 0.7;
   stars.push({
     x: Math.random(), y: Math.random(),
     size: Math.random() < 0.85 ? 1 : 2,
-    brightness: 0.3 + Math.random() * 0.7,
+    brightness: bright,
     twinkleSpeed: 0.5 + Math.random() * 2.0,
+    spikeLen: 8 + Math.random() * 16,
   });
 }
 
@@ -800,8 +802,38 @@ function drawSpaceBackground(time) {
   for (const star of stars) {
     const twinkle = 0.5 + 0.5 * Math.sin(time * star.twinkleSpeed + star.x * 100);
     const alpha = star.brightness * twinkle;
+    const sx = Math.floor(star.x * canvas.width);
+    const sy = Math.floor(star.y * canvas.height);
     ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
-    ctx.fillRect(Math.floor(star.x * canvas.width), Math.floor(star.y * canvas.height), star.size, star.size);
+    ctx.fillRect(sx, sy, star.size, star.size);
+
+    // Diffraction spikes — any bright star can get one at peak, but rarely
+    // Deterministic hash from time so the spike holds briefly rather than flickering per-frame
+    if (star.brightness > 0.6 && twinkle > 0.8) {
+      const spikeHash = Math.sin(Math.floor(time * star.twinkleSpeed * 0.1) * 9999 + star.x * 7777 + star.y * 3333) * 0.5 + 0.5;
+      if (spikeHash < 0.002) {
+        const intensity = (twinkle - 0.8) / 0.2;
+        const len = star.spikeLen * intensity;
+        const cx = sx + star.size * 0.5;
+        const cy = sy + star.size * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - len, cy);
+        ctx.lineTo(cx + len, cy);
+        ctx.moveTo(cx, cy - len);
+        ctx.lineTo(cx, cy + len);
+        ctx.strokeStyle = `rgba(200,220,255,${(alpha * intensity * 0.6).toFixed(2)})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - len * 0.6, cy);
+        ctx.lineTo(cx + len * 0.6, cy);
+        ctx.moveTo(cx, cy - len * 0.6);
+        ctx.lineTo(cx, cy + len * 0.6);
+        ctx.strokeStyle = `rgba(180,200,255,${(alpha * intensity * 0.25).toFixed(2)})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    }
   }
 }
 
