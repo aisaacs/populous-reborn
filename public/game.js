@@ -17,7 +17,7 @@ let gridMode = 2;
 const TEX_NAMES = ['grass', 'rock', 'water', 'sand', 'snow', 'swamp'];
 const terrainTextures = {};
 let texturesLoaded = false;
-let textureOpacity = parseFloat(localStorage.getItem('texOpacity') ?? '0.4');
+let textureOpacity = 1.0;
 
 (function loadTextures() {
   let count = 0;
@@ -173,12 +173,6 @@ document.getElementById('btn-mute').addEventListener('click', () => {
   else toggleMusicMute();
 });
 
-// Texture opacity slider
-document.getElementById('tex-opacity').addEventListener('input', (e) => {
-  textureOpacity = e.target.valueAsNumber / 100;
-  localStorage.setItem('texOpacity', String(textureOpacity));
-});
-document.getElementById('tex-opacity').value = textureOpacity * 100;
 
 // Init UI from saved prefs
 syncMusicUI();
@@ -636,12 +630,11 @@ function drawSettlement(s) {
     const img = settlementSprites[key];
     if (img && img.complete) {
       const tileH = pBottom.y - pTop.y;
-      // Fill %: 75% tent/hut, 85% cottage-manor, 95% towerhouse/fortress, 60% castle (3×3)
-      const fillPct = s.sz >= 3 ? 0.60 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
-      // Scale sprite around the visual center
-      const centerY = s.sz >= 3 ? (pTop.y + pBottom.y) / 2 : pTop.y + tileH * 0.25;
-      const basePct = s.sz >= 3 ? 1.0 : 0.75;
-      const dh = tileH * fillPct / basePct;
+      // Fill %: 75% tent/hut, 85% cottage-manor, 95% towerhouse/fortress, 55% castle (3×3)
+      const fillPct = s.sz >= 3 ? 0.55 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
+      // Anchor sprite so buildings extend above their diamond
+      const centerY = pTop.y + tileH * 0.25;
+      const dh = tileH * fillPct / 0.75;
       const scale = dh / img.height;
       const dw = img.width * scale;
       ctx.drawImage(img, pTop.x - dw / 2, centerY - dh / 2, dw, dh);

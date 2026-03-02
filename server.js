@@ -1013,63 +1013,61 @@ function handleWalkerCollisions(state) {
     const stx = Math.floor(w.x), sty = Math.floor(w.y);
     const es = getSettlement(state, stx, sty);
     if (es && es.team !== w.team) {
-      if (w.isKnight) {
-        // Knight: gradual assault — damage settlement each tick
-        const dmg = Math.min(es.population, Math.max(1, Math.floor(w.strength / 10)));
-        es.population -= dmg;
-        if (es.population <= 0) {
-          // If settlement had a leader, leader is killed
-          if (es.hasLeader) {
-            state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
-            state.magnetLocked[es.team] = true;
-            state.leaders[es.team] = -1;
-            es.hasLeader = false;
-          }
+      // Gradual assault: exchange damage each tick
+      const dt = 1 / C.TICK_RATE;
+      const wTech = w.tech || 0;
+      const sTech = C.SETTLEMENT_LEVELS[es.level] ? C.SETTLEMENT_LEVELS[es.level].tech : 0;
+      const techDiff = wTech - sTech;
+      const wMult = techDiff > 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, techDiff) : 1;
+      const sMult = techDiff < 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff) : 1;
+
+      // Damage dealt to settlement (scaled by tech)
+      const baseDmg = C.ASSAULT_DMG_PER_SEC * dt;
+      const dmgToSett = Math.max(0.1, baseDmg * wMult);
+      // Retaliation damage from settlement to walker (scaled by tech)
+      const dmgToWalker = Math.max(0.05, baseDmg * C.ASSAULT_RETALIATE_FRAC * sMult);
+
+      // Apply fractional damage using accumulators
+      es.assaultFrac = (es.assaultFrac || 0) + dmgToSett;
+      w.assaultFrac = (w.assaultFrac || 0) + dmgToWalker;
+
+      if (es.assaultFrac >= 1) {
+        const loss = Math.floor(es.assaultFrac);
+        es.assaultFrac -= loss;
+        es.population -= loss;
+      }
+      if (w.assaultFrac >= 1) {
+        const loss = Math.floor(w.assaultFrac);
+        w.assaultFrac -= loss;
+        w.strength -= loss;
+      }
+
+      // Walker dies
+      if (w.strength <= 0) {
+        w.dead = true;
+      }
+
+      // Settlement falls
+      if (es.population <= 0) {
+        if (es.hasLeader) {
+          state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
+          state.magnetLocked[es.team] = true;
+          state.leaders[es.team] = -1;
+          es.hasLeader = false;
+        }
+        if (w.isKnight) {
+          // Knight: destroy settlement, set on fire
           es.dead = true;
           clearSettlementMap(state, es.tx, es.ty);
-          // Set building on fire
           state.fires.push({ x: es.tx, y: es.ty, age: 0 });
-          pickFightTarget(state, w); // find next target
-        }
-      } else {
-        // Tech-based settlement assault — CONQUEST, not destruction
-        const wTech = w.tech || 0;
-        const sTech = C.SETTLEMENT_LEVELS[es.level] ? C.SETTLEMENT_LEVELS[es.level].tech : 0;
-        const techDiff = wTech - sTech;
-        let wStr = w.strength;
-        let sPop = es.population;
-        if (techDiff > 0) {
-          wStr = Math.floor(wStr * Math.pow(C.TECH_ADVANTAGE_MULT, techDiff));
-        } else if (techDiff < 0) {
-          sPop = Math.floor(sPop * Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff));
-        }
-
-        if (wStr > sPop) {
-          // CONQUEST — settlement changes team
-          // If conquered settlement had a leader, that team's leader is killed
-          if (es.hasLeader) {
-            state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
-            state.magnetLocked[es.team] = true;
-            state.leaders[es.team] = -1;
-            es.hasLeader = false;
-          }
-          const effRemainder = wStr - sPop;
-          const rawRemainder = techDiff > 0
-            ? Math.ceil(effRemainder / Math.pow(C.TECH_ADVANTAGE_MULT, techDiff))
-            : effRemainder;
+          if (!w.dead) pickFightTarget(state, w);
+        } else {
+          // Regular walker: conquer settlement
           es.team = w.team;
-          es.population = Math.min(rawRemainder, C.LEVEL_CAPACITY[es.level]);
+          es.population = Math.max(1, w.strength);
           es.popFrac = 0;
           es.atCapTime = 0;
-          w.dead = true;
-          // Crops recalculated next tick by computeCrops
-        } else {
-          // Defense holds — walker dies
-          const effRemainder = sPop - wStr;
-          const rawRemainder = techDiff < 0
-            ? Math.ceil(effRemainder / Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff))
-            : effRemainder;
-          es.population = Math.max(1, rawRemainder);
+          es.assaultFrac = 0;
           w.dead = true;
         }
       }
