@@ -47,7 +47,7 @@ function getTileTexture(tx, ty) {
 }
 
 // ── Settlement Sprites ──────────────────────────────────────────────
-const SETT_LEVEL_NAMES = ['tent', 'hut', 'house', 'manor', 'castle'];
+const SETT_LEVEL_NAMES = ['tent', 'hut', 'cottage', 'house', 'largehouse', 'manor', 'towerhouse', 'fortress', 'castle'];
 const settlementSprites = {};
 let settlementSpritesLoaded = false;
 
@@ -511,7 +511,7 @@ function drawWalker(w) {
 function drawSettlement(s) {
   const h = heights[s.tx][s.ty];
 
-  // Diamond footprint: 1 tile for levels 1-4, 3×3 for castle (level 5)
+  // Diamond footprint: 1 tile for levels 1-8, 3×3 for castle (level 9)
   const cx = s.ox + s.sz * 0.5;
   const cy = s.oy + s.sz * 0.5;
   const he = s.sz * 0.5;
@@ -539,17 +539,21 @@ function drawSettlement(s) {
   ctx.restore();
 
   // Sprite: center at top corner of diamond, bottom-center at bottom corner
-  if (settlementSpritesLoaded && s.l >= 1 && s.l <= 5) {
+  if (settlementSpritesLoaded && s.l >= 1 && s.l <= SETT_LEVEL_NAMES.length) {
     const team = s.t === TEAM_BLUE ? 'blue' : 'red';
     const key = SETT_LEVEL_NAMES[s.l - 1] + '-' + team;
     const img = settlementSprites[key];
     if (img && img.complete) {
       const tileH = pBottom.y - pTop.y;
-      const margin = tileH * 0.25;
-      const dh = tileH; // center-to-bottom = tileH*0.5, full height = tileH
+      // Fill %: 75% tent/hut, 85% cottage-manor, 95% towerhouse/fortress, 60% castle (3×3)
+      const fillPct = s.sz >= 3 ? 0.60 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
+      // Scale sprite around the visual center
+      const centerY = s.sz >= 3 ? (pTop.y + pBottom.y) / 2 : pTop.y + tileH * 0.25;
+      const basePct = s.sz >= 3 ? 1.0 : 0.75;
+      const dh = tileH * fillPct / basePct;
       const scale = dh / img.height;
       const dw = img.width * scale;
-      ctx.drawImage(img, pTop.x - dw / 2, pTop.y - margin, dw, dh);
+      ctx.drawImage(img, pTop.x - dw / 2, centerY - dh / 2, dw, dh);
     }
   }
 }

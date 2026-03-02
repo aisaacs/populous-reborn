@@ -24,7 +24,23 @@ const MODE_NAMES = ['Settle', 'Magnet', 'Fight', 'Gather'];
 
 // ── Gameplay ────────────────────────────────────────────────────────
 const WALKER_SPEED = 1.5;
-const LEVEL_CAPACITY = [0, 6, 20, 50, 100, 200];
+const MAX_LEVEL = 9;
+const LEVEL_CAPACITY = [0, 4, 8, 15, 30, 55, 90, 140, 200, 255];
+
+// ── Settlement Levels ──────────────────────────────────────────────
+// Index 0 unused; levels 1-9
+const SETTLEMENT_LEVELS = [
+  null,
+  { name: 'tent',       minCrops: 0,  capacity: 4,   tech: 0, sprite: 'tent',       footprint: 1 },
+  { name: 'hut',        minCrops: 2,  capacity: 8,   tech: 1, sprite: 'hut',        footprint: 1 },
+  { name: 'cottage',    minCrops: 4,  capacity: 15,  tech: 1, sprite: 'cottage',    footprint: 1 },
+  { name: 'house',      minCrops: 7,  capacity: 30,  tech: 2, sprite: 'house',      footprint: 1 },
+  { name: 'largehouse', minCrops: 10, capacity: 55,  tech: 2, sprite: 'largehouse', footprint: 1 },
+  { name: 'manor',      minCrops: 13, capacity: 90,  tech: 3, sprite: 'manor',      footprint: 1 },
+  { name: 'towerhouse', minCrops: 17, capacity: 140, tech: 3, sprite: 'towerhouse', footprint: 1 },
+  { name: 'fortress',   minCrops: 20, capacity: 200, tech: 4, sprite: 'fortress',   footprint: 1 },
+  { name: 'castle',     minCrops: 24, capacity: 255, tech: 4, sprite: 'castle',     footprint: 9 },
+];
 
 // ── Powers ──────────────────────────────────────────────────────────
 const POWERS = [
@@ -45,7 +61,7 @@ const TERRAIN_TREES = 0.06; // fraction of land tiles with trees
 
 // ── Crops ────────────────────────────────────────────────────────────
 const CROP_ZONE_RADIUS = 2;  // 5×5 evaluation zone (center ± 2)
-const CROP_LEVEL_THRESHOLDS = [0, 0, 4, 8, 13, 18]; // crop count to reach level (indexed by level)
+const CROP_LEVEL_THRESHOLDS = [0, 0, 2, 4, 7, 10, 13, 17, 20, 24]; // crop count to reach level (indexed by level)
 const CROP_GROWTH_FACTOR = 0.5; // population growth per crop tile per growth tick
 
 // ── Tick ────────────────────────────────────────────────────────────
@@ -58,7 +74,7 @@ if (typeof module !== 'undefined') {
     MAP_W, MAP_H, TILE_HALF_W, TILE_HALF_H, HEIGHT_STEP, MAX_HEIGHT, SEA_LEVEL,
     TEAM_BLUE, TEAM_RED, TEAM_COLORS, TEAM_NAMES,
     MODE_SETTLE, MODE_MAGNET, MODE_FIGHT, MODE_GATHER, MODE_NAMES,
-    WALKER_SPEED, LEVEL_CAPACITY,
+    WALKER_SPEED, MAX_LEVEL, LEVEL_CAPACITY, SETTLEMENT_LEVELS,
     POWERS, EARTHQUAKE_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT,
     TERRAIN_TREES, CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, CROP_GROWTH_FACTOR,
     TICK_RATE, TICK_INTERVAL,

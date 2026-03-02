@@ -334,11 +334,11 @@ function isTileInSettlementFootprint(state, tx, ty, exclude) {
   return false;
 }
 
-// Physical footprint size per level: 1 tile for levels 1-4, 3×3 for castle (level 5)
-const LEVEL_SQ_SIZE = [0, 1, 1, 1, 1, 3];
+// Physical footprint size per level: 1 tile for levels 1-8, 3×3 for castle (level 9)
+const LEVEL_SQ_SIZE = [0, 1, 1, 1, 1, 1, 1, 1, 1, 3];
 
 function getLevelFromCropCount(count) {
-  for (let l = 5; l >= 1; l--) {
+  for (let l = C.MAX_LEVEL; l >= 1; l--) {
     if (count >= C.CROP_LEVEL_THRESHOLDS[l]) return l;
   }
   return 1;
@@ -701,7 +701,7 @@ function settleWalker(state, w, tx, ty) {
   // Immediately evaluate level from surrounding crop fields
   const cropCount = countSettlementCrops(state, s);
   let level = getLevelFromCropCount(cropCount);
-  if (level >= 5 && !isCastleAreaValid(state, s)) level = 4;
+  if (level >= C.MAX_LEVEL && !isCastleAreaValid(state, s)) level = C.MAX_LEVEL - 1;
   s.level = level;
   updateSettlementFootprint(s);
 
@@ -775,9 +775,9 @@ function evaluateSettlementLevels(state) {
     const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
     let newLevel = getLevelFromCropCount(cropCount);
 
-    // Castle (level 5) requires a valid 3×3 flat area around home tile
-    if (newLevel >= 5 && !isCastleAreaValid(state, s)) {
-      newLevel = 4;
+    // Castle (max level) requires a valid 3×3 flat area around home tile
+    if (newLevel >= C.MAX_LEVEL && !isCastleAreaValid(state, s)) {
+      newLevel = C.MAX_LEVEL - 1;
     }
 
     if (newLevel !== s.level) {
@@ -853,7 +853,7 @@ function computeCrops(state) {
 
 // ── Population Growth ───────────────────────────────────────────────
 // Eject delay: bigger settlements take more growth ticks at cap before spawning
-const EJECT_DELAY = [0, 1, 2, 3, 4, 5]; // indexed by level
+const EJECT_DELAY = [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]; // indexed by level
 
 function updatePopulationGrowth(state) {
   for (let si = 0; si < state.settlements.length; si++) {
