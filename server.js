@@ -347,6 +347,22 @@ function clearSettlementMap(state, tx, ty) {
   state.settlementMap[ty * C.MAP_W + tx] = -1;
 }
 
+function clearSettlementFootprint(state, s) {
+  for (let fx = 0; fx < s.sqSize; fx++) {
+    for (let fy = 0; fy < s.sqSize; fy++) {
+      const mx = s.sqOx + fx, my = s.sqOy + fy;
+      if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
+        state.settlementMap[my * C.MAP_W + mx] = -1;
+      }
+    }
+  }
+}
+
+function isNearSettlement(s, lx, ly) {
+  return lx >= s.sqOx - 1 && lx < s.sqOx + s.sqSize + 1 &&
+         ly >= s.sqOy - 1 && ly < s.sqOy + s.sqSize + 1;
+}
+
 function isTileInSettlementFootprint(state, tx, ty, exclude) {
   for (const s of state.settlements) {
     if (s.dead || s === exclude) continue;
@@ -591,7 +607,7 @@ function pickRandomTarget(state, w) {
 function isTileSettleable(state, tx, ty) {
   if (!isTileFlat(state, tx, ty)) return false;
   if (isTileInSettlementFootprint(state, tx, ty)) return false;
-  if (state.cropOwnerMap[ty * C.MAP_W + tx] >= 0) return false;
+  if (state.cropOwnerMap[ty * C.MAP_W + tx] !== -1) return false; // blocks owned (>=0) and contested (-2)
   // Ruins block settlement placement
   if (state.ruinSet.has(tx + ',' + ty)) return false;
   // Hard rocks in orthogonal neighbors block settlement placement
@@ -849,6 +865,16 @@ function settleWalker(state, w, tx, ty) {
   if (level >= C.MAX_LEVEL && !isCastleAreaValid(state, s)) level = C.MAX_LEVEL - 1;
   s.level = level;
   updateSettlementFootprint(s);
+  // Update settlementMap for new footprint (may be larger than 1x1 if enough crops)
+  const newSi = state.settlements.indexOf(s);
+  for (let fx = 0; fx < s.sqSize; fx++) {
+    for (let fy = 0; fy < s.sqSize; fy++) {
+      const mx = s.sqOx + fx, my = s.sqOy + fy;
+      if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
+        state.settlementMap[my * C.MAP_W + mx] = newSi;
+      }
+    }
+  }
 
   // Deposit population: cap at capacity, walker keeps remainder (chain-settling)
   const cap = C.LEVEL_CAPACITY[s.level];
@@ -886,19 +912,26 @@ function countSettlementCrops(state, s) {
   // last tick's computeCrops — close enough for initial placement).
   let count = 0;
   const r = C.CROP_ZONE_RADIUS;
-  for (let dx = -r; dx <= r; dx++) {
-    for (let dy = -r; dy <= r; dy++) {
-      if (dx === 0 && dy === 0) continue;
+  // Extend crop scan from footprint edges for multi-tile settlements
+  const halfFp = Math.floor(s.sqSize / 2);
+  const scanR = halfFp + r;
+  for (let dx = -scanR; dx <= scanR; dx++) {
+    for (let dy = -scanR; dy <= scanR; dy++) {
       const cx = s.tx + dx, cy = s.ty + dy;
       if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
+      // Skip home tile
+      if (cx === s.tx && cy === s.ty) continue;
       if (!isTileFlat(state, cx, cy)) continue;
-      if (state.settlementMap[cy * C.MAP_W + cx] >= 0) continue;
+      // Skip tiles in OTHER settlements' footprints
+      const smIdx = state.settlementMap[cy * C.MAP_W + cx];
+      if (smIdx >= 0 && smIdx !== state.settlements.indexOf(s)) continue;
       const key = cx + ',' + cy;
       if (state.swampSet.has(key)) continue;
       if (state.pebbles.has(key)) continue;
       if (state.ruinSet.has(key)) continue;
-      // Enemy crops from previous tick block this tile
+      // Enemy or contested crops from previous tick block this tile
       const ownerIdx = state.cropOwnerMap[cy * C.MAP_W + cx];
+      if (ownerIdx === -2) continue; // contested tile
       if (ownerIdx >= 0) {
         const owner = state.settlements[ownerIdx];
         if (owner && !owner.dead && owner.team !== s.team) continue;
@@ -918,13 +951,23 @@ function evaluateSettlementLevels(state) {
     // Home tile must still be flat (covers water, rock, non-flat terrain)
     if (!isTileFlat(state, s.tx, s.ty)) {
       s.dead = true;
-      clearSettlementMap(state, s.tx, s.ty);
+      clearSettlementFootprint(state, s);
       if (s.population > 0) {
         const angle = Math.random() * Math.PI * 2;
         const sTech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
-        spawnWalker(state, s.team, s.population,
+        const w = spawnWalker(state, s.team, s.population,
           s.tx + 0.5 + Math.cos(angle) * 1.2,
           s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
+        if (s.hasLeader) {
+          w.isLeader = true;
+          state.leaders[s.team] = w.id;
+          s.hasLeader = false;
+        }
+      } else if (s.hasLeader) {
+        state.magnetPos[s.team] = { x: s.tx + 0.5, y: s.ty + 0.5 };
+        state.magnetLocked[s.team] = true;
+        state.leaders[s.team] = -1;
+        s.hasLeader = false;
       }
       continue;
     }
@@ -939,8 +982,19 @@ function evaluateSettlementLevels(state) {
     }
 
     if (newLevel !== s.level) {
+      // Clear old footprint from settlementMap before changing size
+      clearSettlementFootprint(state, s);
       s.level = newLevel;
       updateSettlementFootprint(s);
+      // Register new footprint in settlementMap
+      for (let fx = 0; fx < s.sqSize; fx++) {
+        for (let fy = 0; fy < s.sqSize; fy++) {
+          const mx = s.sqOx + fx, my = s.sqOy + fy;
+          if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
+            state.settlementMap[my * C.MAP_W + mx] = si;
+          }
+        }
+      }
     }
 
     // Eject if over capacity
@@ -984,13 +1038,19 @@ function computeCrops(state) {
     settlementClaims[si] = claims;
     const s = state.settlements[si];
     if (s.dead) continue;
-    for (let dx = -r; dx <= r; dx++) {
-      for (let dy = -r; dy <= r; dy++) {
-        if (dx === 0 && dy === 0) continue;
+    // Extend crop scan from footprint edges, not just home tile
+    const halfFp = Math.floor(s.sqSize / 2);
+    const scanR = halfFp + r;
+    for (let dx = -scanR; dx <= scanR; dx++) {
+      for (let dy = -scanR; dy <= scanR; dy++) {
         const cx = s.tx + dx, cy = s.ty + dy;
         if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
+        // Skip home tile
+        if (cx === s.tx && cy === s.ty) continue;
         if (!isTileFlat(state, cx, cy)) continue;
-        if (state.settlementMap[cy * C.MAP_W + cx] >= 0) continue;
+        // Skip tiles in OTHER settlements' footprints (own footprint tiles count as crops)
+        const smIdx = state.settlementMap[cy * C.MAP_W + cx];
+        if (smIdx >= 0 && smIdx !== si) continue;
         const key = cx + ',' + cy;
         if (state.swampSet.has(key)) continue;
         if (state.pebbles.has(key)) continue;
@@ -1006,6 +1066,13 @@ function computeCrops(state) {
   const contested = new Set();
   for (const key of teamTiles[0]) {
     if (teamTiles[1].has(key)) contested.add(key);
+  }
+
+  // Mark contested tiles in cropOwnerMap so they block settlement placement
+  // Value -2 = contested (distinct from -1 = unclaimed and >= 0 = owned)
+  for (const key of contested) {
+    const [x, y] = key.split(',').map(Number);
+    state.cropOwnerMap[y * C.MAP_W + x] = -2;
   }
 
   // Phase 3: Count crops per settlement. Same-team sharing: all same-team
@@ -1246,7 +1313,7 @@ function handleWalkerCollisions(state) {
           }
         }
         es.dead = true;
-        clearSettlementMap(state, es.tx, es.ty);
+        clearSettlementFootprint(state, es);
         state.fires.push({ x: es.tx, y: es.ty, age: 0 });
         pickFightTarget(state, best);
       } else if (best) {
@@ -1260,7 +1327,7 @@ function handleWalkerCollisions(state) {
       } else {
         // All attackers died but settlement fell too — just destroy it
         es.dead = true;
-        clearSettlementMap(state, es.tx, es.ty);
+        clearSettlementFootprint(state, es);
       }
     }
   }
@@ -1312,7 +1379,15 @@ function pruneDeadEntities(state) {
   state.settlements = alive;
   for (let i = 0; i < state.settlements.length; i++) {
     const s = state.settlements[i];
-    state.settlementMap[s.ty * C.MAP_W + s.tx] = i;
+    // Rebuild full footprint (1x1 for most, 5x5 for castles)
+    for (let fx = 0; fx < s.sqSize; fx++) {
+      for (let fy = 0; fy < s.sqSize; fy++) {
+        const mx = s.sqOx + fx, my = s.sqOy + fy;
+        if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
+          state.settlementMap[my * C.MAP_W + mx] = i;
+        }
+      }
+    }
   }
 }
 
@@ -1521,7 +1596,7 @@ function executePowerKnight(state, team) {
     // Destroy host settlement
     hostSettlement.dead = true;
     hostSettlement.hasLeader = false;
-    clearSettlementMap(state, hostSettlement.tx, hostSettlement.ty);
+    clearSettlementFootprint(state, hostSettlement);
 
     // Magnet drops at destroyed settlement
     state.magnetPos[team] = { x: hostSettlement.tx, y: hostSettlement.ty };
@@ -1545,12 +1620,12 @@ function executePowerKnight(state, team) {
   const lx = Math.floor(leader.x), ly = Math.floor(leader.y);
   for (const s of state.settlements) {
     if (s.dead || s.team !== team) continue;
-    if (Math.abs(s.tx - lx) <= 1 && Math.abs(s.ty - ly) <= 1) {
+    if (isNearSettlement(s, lx, ly)) {
       hostSettlement = s;
       break;
     }
   }
-  if (!hostSettlement) return false; // leader not at a settlement — fail
+  if (!hostSettlement) return false;
 
   // Promote to knight
   leader.isKnight = true;
@@ -1561,7 +1636,7 @@ function executePowerKnight(state, team) {
   // Destroy host settlement
   hostSettlement.dead = true;
   hostSettlement.hasLeader = false;
-  clearSettlementMap(state, hostSettlement.tx, hostSettlement.ty);
+  clearSettlementFootprint(state, hostSettlement);
 
   // Magnet drops at destroyed settlement
   state.magnetPos[team] = { x: hostSettlement.tx, y: hostSettlement.ty };
@@ -1619,7 +1694,7 @@ function executePowerVolcano(state, team, px, py) {
         s.hasLeader = false;
       }
       s.dead = true;
-      clearSettlementMap(state, s.tx, s.ty);
+      clearSettlementFootprint(state, s);
     }
   }
   invalidateSwamps(state);
@@ -1655,7 +1730,7 @@ function executePowerFlood(state, team) {
         s.hasLeader = false;
       }
       s.dead = true;
-      clearSettlementMap(state, s.tx, s.ty);
+      clearSettlementFootprint(state, s);
     }
   }
   invalidateSwamps(state);
@@ -1691,7 +1766,7 @@ function executePowerArmageddon(state, team) {
       s.hasLeader = false;
     }
     s.dead = true;
-    clearSettlementMap(state, s.tx, s.ty);
+    clearSettlementFootprint(state, s);
   }
 }
 

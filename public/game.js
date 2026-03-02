@@ -31,7 +31,6 @@ let textureOpacity = 1.0;
 
 function getTileTexture(tx, ty) {
   if (swampSet.has(tx + ',' + ty)) return terrainTextures.swamp;
-  if (pebbles.has(tx + ',' + ty)) return terrainTextures.rock;
 
   const t = heights[tx][ty], r = heights[tx + 1][ty];
   const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
@@ -118,6 +117,34 @@ const ruinsImg = new Image();
 let ruinsLoaded = false;
 ruinsImg.src = 'gfx/ruins.png';
 ruinsImg.onload = () => { ruinsLoaded = true; };
+
+// ── Water Animation ─────────────────────────────────────────────────
+function drawWaterPulse(time) {
+  const sin = Math.sin(time * 0.35);
+  if (sin > 0) {
+    ctx.fillStyle = `rgba(140, 200, 255, ${(sin * 0.35).toFixed(2)})`;
+  } else {
+    ctx.fillStyle = `rgba(0, 10, 40, ${(-sin * 0.3).toFixed(2)})`;
+  }
+  ctx.fill();
+}
+
+function drawWaterSparkles(pTop, pRight, pBottom, pLeft, time, tx, ty) {
+  const seed = tx * 73 + ty * 137;
+  const midX = (pTop.x + pBottom.x) / 2;
+  const midY = (pTop.y + pBottom.y) / 2;
+  const hw = (pRight.x - pLeft.x) / 2;
+  const hh = (pBottom.y - pTop.y) / 2;
+  for (let i = 0; i < 3; i++) {
+    const phase = (time * 1.5 + seed + i * 47.3) % 4.0;
+    if (phase > 0.3) continue;
+    const brightness = 1.0 - (phase / 0.3);
+    const px = midX + Math.sin(seed + i * 3.1) * hw * 0.6;
+    const py = midY + Math.cos(seed + i * 7.7) * hh * 0.5;
+    ctx.fillStyle = `rgba(255, 255, 255, ${(brightness * 0.8).toFixed(2)})`;
+    ctx.fillRect(Math.floor(px), Math.floor(py), 1, 1);
+  }
+}
 
 // ── Music System ───────────────────────────────────────────────────
 const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3', 'music/004.mp3'];
@@ -498,6 +525,13 @@ function drawTile(tx, ty) {
     ctx.lineTo(pBottom.x, pBottom.y);
     ctx.lineTo(pLeft.x, pLeft.y);
     ctx.closePath();
+  }
+
+  // Water animation: pulse + sparkles (per-tile)
+  if (isWater) {
+    const time = performance.now() / 1000;
+    drawWaterPulse(time);
+    drawWaterSparkles(pTop, pRight, pBottom, pLeft, time, tx, ty);
   }
 
   // Crop overlay
