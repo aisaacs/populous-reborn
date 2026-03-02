@@ -205,6 +205,47 @@ let targetingPower = null;
 let inspectMode = false;
 let inspectData = null; // {type:'settlement'|'walker', screenX, screenY, ...data}
 
+// ── Space Background ────────────────────────────────────────────────
+const STAR_COUNT = 300;
+const stars = [];
+for (let i = 0; i < STAR_COUNT; i++) {
+  stars.push({
+    x: Math.random(), y: Math.random(),
+    size: Math.random() < 0.85 ? 1 : 2,
+    brightness: 0.3 + Math.random() * 0.7,
+    twinkleSpeed: 0.5 + Math.random() * 2.0,
+  });
+}
+
+let nebulaCanvas = null;
+function buildNebulaCanvas(w, h) {
+  nebulaCanvas = document.createElement('canvas');
+  nebulaCanvas.width = w;
+  nebulaCanvas.height = h;
+  const nctx = nebulaCanvas.getContext('2d');
+  const nebulae = [
+    { x: 0.2, y: 0.3, r: 0.25, color: '40, 20, 80' },
+    { x: 0.7, y: 0.6, r: 0.3,  color: '20, 40, 60' },
+    { x: 0.5, y: 0.15, r: 0.2, color: '20, 30, 50' },
+  ];
+  for (const n of nebulae) {
+    const gx = n.x * w, gy = n.y * h;
+    const gr = n.r * Math.max(w, h);
+    const grad = nctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+    grad.addColorStop(0, `rgba(${n.color}, 0.08)`);
+    grad.addColorStop(1, `rgba(${n.color}, 0)`);
+    nctx.fillStyle = grad;
+    nctx.fillRect(0, 0, w, h);
+  }
+}
+
+// ── Waterfall Particles ─────────────────────────────────────────────
+const WATERFALL_MAX = 3000;
+const waterfallParticles = [];
+for (let i = 0; i < WATERFALL_MAX; i++) {
+  waterfallParticles.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, size: 2, active: false });
+}
+
 // ── Walker Interpolation ────────────────────────────────────────────
 let prevWalkers = [];
 let currWalkers = [];
@@ -744,6 +785,146 @@ function drawFireParticles() {
   }
 }
 
+// ── Space Background ────────────────────────────────────────────────
+function drawSpaceBackground(time) {
+  ctx.fillStyle = '#05080f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Nebula (cached)
+  if (!nebulaCanvas || nebulaCanvas.width !== canvas.width || nebulaCanvas.height !== canvas.height) {
+    buildNebulaCanvas(canvas.width, canvas.height);
+  }
+  ctx.drawImage(nebulaCanvas, 0, 0);
+
+  // Stars — screen space, don't move with camera
+  for (const star of stars) {
+    const twinkle = 0.5 + 0.5 * Math.sin(time * star.twinkleSpeed + star.x * 100);
+    const alpha = star.brightness * twinkle;
+    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+    ctx.fillRect(Math.floor(star.x * canvas.width), Math.floor(star.y * canvas.height), star.size, star.size);
+  }
+}
+
+// ── Waterfall System ────────────────────────────────────────────────
+function clientIsTileWater(tx, ty) {
+  if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
+  return heights[tx][ty] <= seaLevel &&
+         heights[tx + 1][ty] <= seaLevel &&
+         heights[tx + 1][ty + 1] <= seaLevel &&
+         heights[tx][ty + 1] <= seaLevel;
+}
+
+function spawnWaterfallParticles(dt) {
+  if (heights.length === 0) return;
+  const rate = 3; // particles per edge tile per second
+  // Only front edges (bottom-right in isometric): x=MAP_W-1 and y=MAP_H-1
+  for (let x = 0; x < MAP_W; x++) {
+    if (clientIsTileWater(x, MAP_H - 1)) spawnAtEdge(x, MAP_H - 1, dt, rate);
+  }
+  for (let y = 0; y < MAP_H - 1; y++) {
+    if (clientIsTileWater(MAP_W - 1, y)) spawnAtEdge(MAP_W - 1, y, dt, rate);
+  }
+}
+
+let wfNextIdx = 0; // round-robin index for particle pool
+function spawnAtEdge(tx, ty, dt, rate) {
+  if (Math.random() > rate * dt) return;
+
+  // Find an inactive particle via round-robin
+  let wp = null;
+  for (let i = 0; i < 20; i++) {
+    const candidate = waterfallParticles[wfNextIdx];
+    wfNextIdx = (wfNextIdx + 1) % WATERFALL_MAX;
+    if (!candidate.active) { wp = candidate; break; }
+  }
+  if (!wp) return;
+
+  // Spawn along the outer edge of the tile
+  // Right map edge (x=MAP_W-1): outer edge runs from (tx+1,ty) to (tx+1,ty+1)
+  // Bottom map edge (y=MAP_H-1): outer edge runs from (tx,ty+1) to (tx+1,ty+1)
+  const t = Math.random(); // interpolation along the edge
+  let gx, gy, dvx = 0, dvy = 0;
+
+  if (tx === MAP_W - 1 && ty === MAP_H - 1) {
+    // Corner tile — randomly pick one of the two edges
+    if (Math.random() < 0.5) {
+      gx = tx + 1; gy = ty + t;
+      dvx = 6; dvy = 3;
+    } else {
+      gx = tx + t; gy = ty + 1;
+      dvx = -3; dvy = 6;
+    }
+  } else if (tx === MAP_W - 1) {
+    // Right edge: line from (tx+1, ty) to (tx+1, ty+1)
+    gx = tx + 1; gy = ty + t;
+    dvx = 6; dvy = 3;
+  } else {
+    // Bottom edge: line from (tx, ty+1) to (tx+1, ty+1)
+    gx = tx + t; gy = ty + 1;
+    dvx = -3; dvy = 6;
+  }
+
+  wp.gx = gx;
+  wp.gy = gy;
+  wp.ox = 0;
+  wp.oy = 0;
+  wp.vx = dvx + (Math.random() - 0.5) * 4;
+  wp.vy = 15 + Math.random() * 25;
+  wp.life = 2.5 + Math.random() * 2.0;
+  wp.maxLife = wp.life;
+  wp.size = 1 + Math.random() * 1.5;
+  wp.active = true;
+}
+
+function updateWaterfallParticles(dt) {
+  for (const p of waterfallParticles) {
+    if (!p.active) continue;
+    p.ox += p.vx * dt;
+    p.oy += p.vy * dt;
+    p.vy += 25 * dt; // gravity into the void
+    p.life -= dt;
+    if (p.life <= 0) p.active = false;
+  }
+}
+
+function drawWaterfallParticles() {
+  for (const p of waterfallParticles) {
+    if (!p.active) continue;
+    const proj = project(p.gx, p.gy, 0);
+    const sx = proj.x + p.ox;
+    const sy = proj.y + p.oy;
+    const alpha = Math.min(1, p.life / p.maxLife) * 0.6;
+    ctx.fillStyle = `rgba(150,200,255,${alpha.toFixed(2)})`;
+    ctx.fillRect(Math.floor(sx), Math.floor(sy), p.size, p.size);
+  }
+}
+
+function drawEdgeMist() {
+  // Only front edges (bottom-right in isometric)
+  for (let x = 0; x < MAP_W; x++) {
+    if (clientIsTileWater(x, MAP_H - 1)) drawMistAt(project(x + 0.5, MAP_H - 0.5, 0));
+  }
+  for (let y = 0; y < MAP_H - 1; y++) {
+    if (clientIsTileWater(MAP_W - 1, y)) drawMistAt(project(MAP_W - 0.5, y + 0.5, 0));
+  }
+}
+
+function drawMistAt(p) {
+  // Cull off-screen
+  const cx2 = canvas.width / 2, cy2 = canvas.height / 2;
+  const sx = p.x * zoom + cx2 * (1 - zoom);
+  const sy = p.y * zoom + cy2 * (1 - zoom);
+  if (sx < -60 || sx > canvas.width + 60 || sy < -60 || sy > canvas.height + 200) return;
+
+  ctx.save();
+  ctx.globalAlpha = 0.08;
+  ctx.fillStyle = '#c8dcff';
+  const w = TILE_HALF_W * 2;
+  const h = TILE_HALF_H * 2;
+  ctx.fillRect(p.x - TILE_HALF_W, p.y, w, h);
+  ctx.restore();
+}
+
 function getTeamStats(team) {
   let pop = 0, set = 0, walk = 0;
   for (const s of settlements) {
@@ -826,9 +1007,9 @@ function render() {
   // Get interpolated walkers for smooth rendering
   walkers = getInterpolatedWalkers();
 
-  // Clear at identity transform
+  // Space background (screen space, before zoom)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawSpaceBackground(performance.now() / 1000);
 
   // Apply zoom around screen center
   const cx = canvas.width / 2;
@@ -864,6 +1045,9 @@ function render() {
 
   // Fire particles (on top of everything in world space)
   drawFireParticles();
+
+  // Edge mist (world space, tied to tiles)
+  drawEdgeMist();
 
   // Targeting overlay
   if (targetingPower) {
@@ -924,6 +1108,9 @@ function render() {
   // Magnet flags
   drawMagnetFlag(TEAM_BLUE);
   drawMagnetFlag(TEAM_RED);
+
+  // Waterfall particles (front edges, falling into the void)
+  drawWaterfallParticles();
 
   // Reset transform for HUD (drawn in screen space)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1259,7 +1446,11 @@ window.addEventListener('mouseup', (e) => { if (e.button === 1) panning = false;
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  const newZoom = Math.max(1, Math.min(5, zoom * factor));
+  // Min zoom fits entire map diamond in viewport (with padding)
+  const mapScreenW = MAP_W * 2 * TILE_HALF_W;
+  const mapScreenH = MAP_H * 2 * TILE_HALF_H + MAX_HEIGHT * HEIGHT_STEP;
+  const minZoom = Math.min(canvas.width / mapScreenW, canvas.height / mapScreenH) * 0.9;
+  const newZoom = Math.max(minZoom, Math.min(5, zoom * factor));
   // Adjust camera so the world point under the cursor stays fixed
   const mx = e.clientX, my = e.clientY;
   const cx = canvas.width / 2, cy = canvas.height / 2;
@@ -1636,6 +1827,8 @@ function gameLoop(now) {
   lastFrame = now;
   updateEdgePan(dt);
   updateFireParticles(dt);
+  spawnWaterfallParticles(dt);
+  updateWaterfallParticles(dt);
   render();
   requestAnimationFrame(gameLoop);
 }
