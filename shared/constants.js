@@ -39,7 +39,7 @@ const SETTLEMENT_LEVELS = [
   { name: 'manor',      minCrops: 13, capacity: 90,  tech: 3, sprite: 'manor',      footprint: 1 },
   { name: 'towerhouse', minCrops: 17, capacity: 140, tech: 3, sprite: 'towerhouse', footprint: 1 },
   { name: 'fortress',   minCrops: 20, capacity: 200, tech: 4, sprite: 'fortress',   footprint: 1 },
-  { name: 'castle',     minCrops: 24, capacity: 255, tech: 4, sprite: 'castle',     footprint: 9 },
+  { name: 'castle',     minCrops: 24, capacity: 255, tech: 4, sprite: 'castle',     footprint: 25 },
 ];
 
 // ── Powers ──────────────────────────────────────────────────────────
@@ -58,6 +58,7 @@ const KNIGHT_SPEED_MULT = 1.5;
 
 // ── Terrain ──────────────────────────────────────────────────────────
 const TERRAIN_TREES = 0.06;
+const TERRAIN_PEBBLES = 0.04;
 const TERRAIN_RAISE_COST = 1;
 const TERRAIN_LOWER_COST = 1;
 
@@ -101,7 +102,7 @@ if (typeof module !== 'undefined') {
     MODE_SETTLE, MODE_MAGNET, MODE_FIGHT, MODE_GATHER, MODE_NAMES,
     WALKER_SPEED, MAX_LEVEL, LEVEL_CAPACITY, SETTLEMENT_LEVELS,
     POWERS, EARTHQUAKE_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT,
-    TERRAIN_TREES, TERRAIN_RAISE_COST, TERRAIN_LOWER_COST,
+    TERRAIN_TREES, TERRAIN_PEBBLES, TERRAIN_RAISE_COST, TERRAIN_LOWER_COST,
     CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, GROWTH_PER_CROP_PER_SEC,
     EJECT_DWELL_TIME, EJECT_FRACTION, EJECT_MIN_STRENGTH,
     MANA_PER_POP_PER_SEC, MANA_MAX,

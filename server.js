@@ -93,8 +93,12 @@ function createGameState() {
     magnetPos: [{ x: 10, y: 10 }, { x: 50, y: 50 }],
     mana: [C.START_MANA, C.START_MANA],
     swamps: [],
+    swampSet: new Set(),
     rocks: new Set(),
     trees: new Set(),
+    pebbles: new Set(),
+    ruins: [],
+    ruinSet: new Set(),
     crops: [],
     cropCounts: [],
     cropOwnerMap: new Int32Array(C.MAP_W * C.MAP_H).fill(-1),
@@ -265,6 +269,21 @@ function generateTerrain(state) {
       }
     }
 
+    // Scatter pebbles on land tiles (avoid spawn zones, rocks, trees)
+    state.pebbles.clear();
+    for (let x = 0; x < C.MAP_W; x++) {
+      for (let y = 0; y < C.MAP_H; y++) {
+        if (isTileWater(state, x, y)) continue;
+        const key = x + ',' + y;
+        if (state.rocks.has(key)) continue;
+        if (state.trees.has(key)) continue;
+        const d0 = Math.abs(x - 10) + Math.abs(y - 10);
+        const d1 = Math.abs(x - 50) + Math.abs(y - 50);
+        if (d0 < 8 || d1 < 8) continue;
+        if (Math.random() < C.TERRAIN_PEBBLES) state.pebbles.add(key);
+      }
+    }
+
     // Validate: both spawn zones must have a 5x5 flat area nearby
     if (hasSpawnFlat(state, 10, 10) && hasSpawnFlat(state, 50, 50)) return;
 
@@ -289,7 +308,9 @@ function isTileFlat(state, tx, ty) {
   if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return false;
   const h = state.heights[tx][ty];
   if (h <= state.seaLevel) return false;
-  if (state.rocks.has(tx + ',' + ty)) return false;
+  const key = tx + ',' + ty;
+  if (state.rocks.has(key)) return false;
+  if (state.pebbles.has(key)) return false;
   return state.heights[tx + 1][ty] === h &&
          state.heights[tx + 1][ty + 1] === h &&
          state.heights[tx][ty + 1] === h;
@@ -336,7 +357,7 @@ function isTileInSettlementFootprint(state, tx, ty, exclude) {
 }
 
 // Physical footprint size per level: 1 tile for levels 1-8, 3×3 for castle (level 9)
-const LEVEL_SQ_SIZE = [0, 1, 1, 1, 1, 1, 1, 1, 1, 3];
+const LEVEL_SQ_SIZE = [0, 1, 1, 1, 1, 1, 1, 1, 1, 5];
 
 function getLevelFromCropCount(count) {
   for (let l = C.MAX_LEVEL; l >= 1; l--) {
@@ -351,13 +372,13 @@ function updateSettlementFootprint(s) {
   s.sqOy = s.ty - Math.floor((s.sqSize - 1) / 2);
 }
 
-// Check that the 3×3 area centered on home tile is all flat and unoccupied
+// Check that the 5×5 area centered on home tile is all flat and unoccupied
 function isCastleAreaValid(state, s) {
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dy = -2; dy <= 2; dy++) {
       const cx = s.tx + dx, cy = s.ty + dy;
       if (!isTileFlat(state, cx, cy)) return false;
-      // Check no other settlement's home tile is in this 3×3
+      // Check no other settlement's home tile is in this 5×5
       if (dx === 0 && dy === 0) continue;
       const idx = state.settlementMap[cy * C.MAP_W + cx];
       if (idx >= 0 && idx !== state.settlements.indexOf(s)) return false;
@@ -383,6 +404,18 @@ function raisePoint(state, px, py) {
       }
     }
   }
+  // Remove pebbles and ruins on tiles sharing this point
+  for (const [dx, dy] of [[0,0],[-1,0],[0,-1],[-1,-1]]) {
+    const tx = px + dx, ty = py + dy;
+    if (tx >= 0 && tx < C.MAP_W && ty >= 0 && ty < C.MAP_H) {
+      const key = tx + ',' + ty;
+      state.pebbles.delete(key);
+      if (state.ruinSet.has(key)) {
+        state.ruins = state.ruins.filter(r => !(r.x === tx && r.y === ty));
+        state.ruinSet.delete(key);
+      }
+    }
+  }
 }
 
 function lowerPoint(state, px, py) {
@@ -401,6 +434,18 @@ function lowerPoint(state, px, py) {
       }
     }
   }
+  // Remove pebbles and ruins on tiles sharing this point
+  for (const [dx, dy] of [[0,0],[-1,0],[0,-1],[-1,-1]]) {
+    const tx = px + dx, ty = py + dy;
+    if (tx >= 0 && tx < C.MAP_W && ty >= 0 && ty < C.MAP_H) {
+      const key = tx + ',' + ty;
+      state.pebbles.delete(key);
+      if (state.ruinSet.has(key)) {
+        state.ruins = state.ruins.filter(r => !(r.x === tx && r.y === ty));
+        state.ruinSet.delete(key);
+      }
+    }
+  }
 }
 
 // ── Swamp Helpers ──────────────────────────────────────────────────
@@ -412,6 +457,9 @@ function invalidateSwamps(state) {
     if (!isTileFlat(state, tx, ty)) return false;
     return true;
   });
+  // Rebuild swampSet
+  state.swampSet.clear();
+  for (const s of state.swamps) state.swampSet.add(s.x + ',' + s.y);
 }
 
 // Remove rocks on tiles that are now underwater
@@ -427,6 +475,24 @@ function invalidateTrees(state) {
   for (const key of state.trees) {
     const [x, y] = key.split(',').map(Number);
     if (isTileWater(state, x, y)) state.trees.delete(key);
+  }
+}
+
+// Remove ruins on tiles that are now underwater
+function invalidateRuins(state) {
+  state.ruins = state.ruins.filter(r => {
+    if (isTileWater(state, r.x, r.y)) return false;
+    return true;
+  });
+  state.ruinSet.clear();
+  for (const r of state.ruins) state.ruinSet.add(r.x + ',' + r.y);
+}
+
+// Remove pebbles on tiles that are now underwater
+function invalidatePebbles(state) {
+  for (const key of state.pebbles) {
+    const [x, y] = key.split(',').map(Number);
+    if (isTileWater(state, x, y)) state.pebbles.delete(key);
   }
 }
 
@@ -526,6 +592,13 @@ function isTileSettleable(state, tx, ty) {
   if (!isTileFlat(state, tx, ty)) return false;
   if (isTileInSettlementFootprint(state, tx, ty)) return false;
   if (state.cropOwnerMap[ty * C.MAP_W + tx] >= 0) return false;
+  // Ruins block settlement placement
+  if (state.ruinSet.has(tx + ',' + ty)) return false;
+  // Hard rocks in orthogonal neighbors block settlement placement
+  for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const nx = tx + dx, ny = ty + dy;
+    if (state.rocks.has(nx + ',' + ny)) return false;
+  }
   return true;
 }
 
@@ -632,11 +705,14 @@ function updateWalkers(state, dt) {
       continue;
     }
 
-    // Swamp death check
-    for (const sw of state.swamps) {
-      if (Math.floor(w.x) === sw.x && Math.floor(w.y) === sw.y && sw.team !== w.team) {
-        w.dead = true;
-        break;
+    // Swamp death check (knights avoid swamps, so they skip this)
+    if (!w.isKnight) {
+      const swKey = ctx2 + ',' + cty;
+      if (state.swampSet.has(swKey)) {
+        const sw = state.swamps.find(s => s.x === ctx2 && s.y === cty);
+        if (sw && sw.team !== w.team) {
+          w.dead = true;
+        }
       }
     }
     if (w.dead) continue;
@@ -667,6 +743,43 @@ function updateWalkers(state, dt) {
     } else {
       const speed = w.isKnight ? C.WALKER_SPEED * C.KNIGHT_SPEED_MULT : C.WALKER_SPEED;
       const step = speed * dt;
+
+      // Knight swamp avoidance: check if next tile is an enemy swamp
+      if (w.isKnight && step < dist) {
+        const nextX = w.x + (dx / dist) * step;
+        const nextY = w.y + (dy / dist) * step;
+        const nextTx = Math.floor(nextX), nextTy = Math.floor(nextY);
+        const nextKey = nextTx + ',' + nextTy;
+        if (state.swampSet.has(nextKey)) {
+          const sw = state.swamps.find(s => s.x === nextTx && s.y === nextTy);
+          if (sw && sw.team !== w.team) {
+            // Try perpendicular directions
+            const perpX1 = -dy / dist, perpY1 = dx / dist;
+            const perpX2 = dy / dist, perpY2 = -dx / dist;
+            let moved = false;
+            for (const [px, py] of [[perpX1, perpY1], [perpX2, perpY2]]) {
+              const altX = w.x + px * step;
+              const altY = w.y + py * step;
+              const altTx = Math.floor(altX), altTy = Math.floor(altY);
+              if (altTx >= 0 && altTx < C.MAP_W && altTy >= 0 && altTy < C.MAP_H &&
+                  !isTileWater(state, altTx, altTy)) {
+                const altKey = altTx + ',' + altTy;
+                const altSw = state.swampSet.has(altKey) &&
+                  state.swamps.find(s => s.x === altTx && s.y === altTy && s.team !== w.team);
+                if (!altSw) {
+                  w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, altX));
+                  w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, altY));
+                  moved = true;
+                  break;
+                }
+              }
+            }
+            if (!moved) { /* wait — don't move */ }
+            continue; // skip normal movement for this walker
+          }
+        }
+      }
+
       if (step >= dist) {
         w.x = w.tx;
         w.y = w.ty;
@@ -765,25 +878,31 @@ function settleWalker(state, w, tx, ty) {
   computeCrops(state);
 }
 
-// Count crop fields in fixed 5×5 zone around a settlement (for instant evaluation)
+// Count crop fields for a settlement (for instant evaluation at settle time).
+// Uses computeCrops result if available, otherwise quick local count.
 function countSettlementCrops(state, s) {
+  // After settling, computeCrops() is called, but for the initial level
+  // we do a quick local scan. Enemy crops block (check cropOwnerMap from
+  // last tick's computeCrops — close enough for initial placement).
   let count = 0;
   const r = C.CROP_ZONE_RADIUS;
   for (let dx = -r; dx <= r; dx++) {
     for (let dy = -r; dy <= r; dy++) {
-      if (dx === 0 && dy === 0) continue; // settlement's own tile
+      if (dx === 0 && dy === 0) continue;
       const cx = s.tx + dx, cy = s.ty + dy;
       if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
       if (!isTileFlat(state, cx, cy)) continue;
       if (state.settlementMap[cy * C.MAP_W + cx] >= 0) continue;
       const key = cx + ',' + cy;
-      // Swamps block crops
-      let blocked = false;
-      for (const sw of state.swamps) {
-        if (sw.x === cx && sw.y === cy) { blocked = true; break; }
+      if (state.swampSet.has(key)) continue;
+      if (state.pebbles.has(key)) continue;
+      if (state.ruinSet.has(key)) continue;
+      // Enemy crops from previous tick block this tile
+      const ownerIdx = state.cropOwnerMap[cy * C.MAP_W + cx];
+      if (ownerIdx >= 0) {
+        const owner = state.settlements[ownerIdx];
+        if (owner && !owner.dead && owner.team !== s.team) continue;
       }
-      if (blocked) continue;
-      // Trees are auto-cleared by settlements
       if (state.trees.has(key)) state.trees.delete(key);
       count++;
     }
@@ -814,7 +933,7 @@ function evaluateSettlementLevels(state) {
     const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
     let newLevel = getLevelFromCropCount(cropCount);
 
-    // Castle (max level) requires a valid 3×3 flat area around home tile
+    // Castle (max level) requires a valid 5×5 flat area around home tile
     if (newLevel >= C.MAX_LEVEL && !isCastleAreaValid(state, s)) {
       newLevel = C.MAX_LEVEL - 1;
     }
@@ -845,54 +964,71 @@ function evaluateSettlementLevels(state) {
 }
 
 // ── Crop Computation ────────────────────────────────────────────────
-// Fixed 5×5 zone around each settlement. Flat tiles at any height count.
-// Trees auto-cleared. Swamps block.
-// Competition: higher level wins, same level = first-created (lower index) wins.
+// Populous-faithful rules:
+// - Same-team settlements SHARE cropland (both count the tile)
+// - Enemy cropland blocks yours (contested tiles hamper both sides)
+// - Swamps, rocks, settlement footprints block crops
+// - Trees auto-cleared by crop zones
 function computeCrops(state) {
-  // Build swamp set for O(1) lookup
-  const swampSet = new Set();
-  for (const sw of state.swamps) swampSet.add(sw.x + ',' + sw.y);
-
-  // Reset crop owner map
   state.cropOwnerMap.fill(-1);
 
-  const cropMap = {}; // "x,y" → {team, level, settIdx}
   const r = C.CROP_ZONE_RADIUS;
 
+  // Phase 1: Each settlement claims flat tiles in radius. Track per-team claims.
+  // settlementClaims[si] = Set of "x,y" keys
+  const settlementClaims = new Array(state.settlements.length);
+  const teamTiles = [new Set(), new Set()]; // team → Set of "x,y"
+
   for (let si = 0; si < state.settlements.length; si++) {
+    const claims = new Set();
+    settlementClaims[si] = claims;
     const s = state.settlements[si];
     if (s.dead) continue;
     for (let dx = -r; dx <= r; dx++) {
       for (let dy = -r; dy <= r; dy++) {
-        if (dx === 0 && dy === 0) continue; // settlement's own tile
+        if (dx === 0 && dy === 0) continue;
         const cx = s.tx + dx, cy = s.ty + dy;
         if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
         if (!isTileFlat(state, cx, cy)) continue;
-        // Exclude tiles that are home tiles of other settlements
         if (state.settlementMap[cy * C.MAP_W + cx] >= 0) continue;
         const key = cx + ',' + cy;
-        if (swampSet.has(key)) continue;
-        // Auto-clear trees in crop zones
+        if (state.swampSet.has(key)) continue;
+        if (state.pebbles.has(key)) continue;
+        if (state.ruinSet.has(key)) continue;
         if (state.trees.has(key)) state.trees.delete(key);
-        const existing = cropMap[key];
-        // Higher level wins; same level = first-created (lower index) wins
-        if (!existing || s.level > existing.level ||
-            (s.level === existing.level && si < existing.settIdx)) {
-          cropMap[key] = { team: s.team, level: s.level, settIdx: si };
-        }
+        claims.add(key);
+        teamTiles[s.team].add(key);
       }
     }
   }
+
+  // Phase 2: Contested tiles — claimed by both teams — block both
+  const contested = new Set();
+  for (const key of teamTiles[0]) {
+    if (teamTiles[1].has(key)) contested.add(key);
+  }
+
+  // Phase 3: Count crops per settlement. Same-team sharing: all same-team
+  // settlements in range count the tile. Contested tiles excluded.
   const cropCounts = new Array(state.settlements.length).fill(0);
   const cropList = [];
-  for (const key in cropMap) {
-    const c = cropMap[key];
-    cropCounts[c.settIdx]++;
-    const [x, y] = key.split(',').map(Number);
-    cropList.push({ x, y, t: c.team });
-    // Populate crop owner map
-    state.cropOwnerMap[y * C.MAP_W + x] = c.settIdx;
+  const addedCrops = new Set();
+
+  for (let si = 0; si < state.settlements.length; si++) {
+    const s = state.settlements[si];
+    if (s.dead) continue;
+    for (const key of settlementClaims[si]) {
+      if (contested.has(key)) continue;
+      cropCounts[si]++;
+      if (!addedCrops.has(key)) {
+        addedCrops.add(key);
+        const [x, y] = key.split(',').map(Number);
+        cropList.push({ x, y, t: s.team });
+        state.cropOwnerMap[y * C.MAP_W + x] = si;
+      }
+    }
   }
+
   state.crops = cropList;
   state.cropCounts = cropCounts;
 }
@@ -1012,6 +1148,20 @@ function handleWalkerCollisions(state) {
 
     const stx = Math.floor(w.x), sty = Math.floor(w.y);
     const es = getSettlement(state, stx, sty);
+
+    // Walker reinforcement: deposit strength into friendly settlement
+    if (es && es.team === w.team && !w.isKnight && !w.isLeader) {
+      const cap = C.LEVEL_CAPACITY[es.level] || 0;
+      if (es.population < cap) {
+        const space = cap - es.population;
+        const deposit = Math.min(w.strength, space);
+        es.population += deposit;
+        w.strength -= deposit;
+        if (w.strength <= 0) w.dead = true;
+        continue;
+      }
+    }
+
     if (es && es.team !== w.team) {
       // Track this walker as an attacker of this settlement
       if (!es._attackers) es._attackers = [];
@@ -1082,6 +1232,19 @@ function handleWalkerCollisions(state) {
         if (!w.dead && (!best || w.strength > best.strength)) best = w;
       }
       if (best && best.isKnight) {
+        // Create ruins at all tiles in the settlement footprint
+        for (let rdx = 0; rdx < es.sqSize; rdx++) {
+          for (let rdy = 0; rdy < es.sqSize; rdy++) {
+            const rx = es.sqOx + rdx, ry = es.sqOy + rdy;
+            if (rx >= 0 && rx < C.MAP_W && ry >= 0 && ry < C.MAP_H) {
+              const rkey = rx + ',' + ry;
+              if (!state.ruinSet.has(rkey)) {
+                state.ruins.push({ x: rx, y: ry, team: es.team });
+                state.ruinSet.add(rkey);
+              }
+            }
+          }
+        }
         es.dead = true;
         clearSettlementMap(state, es.tx, es.ty);
         state.fires.push({ x: es.tx, y: es.ty, age: 0 });
@@ -1242,6 +1405,19 @@ function serializeState(state, team) {
     treeData.push(+parts[0], +parts[1]);
   }
 
+  // Pebbles: flat array [x1,y1,x2,y2,...]
+  const pebbleData = [];
+  for (const key of state.pebbles) {
+    const parts = key.split(',');
+    pebbleData.push(+parts[0], +parts[1]);
+  }
+
+  // Ruins: flat array [x1,y1,t1,x2,y2,t2,...] (x, y, team triplets)
+  const ruinData = [];
+  for (const r of state.ruins) {
+    ruinData.push(r.x, r.y, r.team);
+  }
+
   // Crops: flat array [x1,y1,t1,x2,y2,t2,...] (x, y, team triplets)
   const cropData = [];
   if (state.crops) {
@@ -1262,12 +1438,14 @@ function serializeState(state, team) {
     swamps: swampData,
     rocks: rockData,
     trees: treeData,
+    pebbles: pebbleData,
+    ruins: ruinData,
     crops: cropData,
     fires: state.fires.map(f => ({ x: f.x, y: f.y, a: Math.round(f.age * 10) / 10 })),
     seaLevel: state.seaLevel,
     leaders: state.leaders,
     armageddon: state.armageddon,
-    magnetLocked: state.magnetLocked[team],
+    magnetLocked: [state.magnetLocked[0], state.magnetLocked[1]],
     teamPop: [getTeamStats(state, C.TEAM_BLUE).pop, getTeamStats(state, C.TEAM_RED).pop],
   };
 }
@@ -1280,26 +1458,39 @@ function executePowerEarthquake(state, team, px, py) {
     for (let y = Math.max(0, py - r); y <= Math.min(C.MAP_H, py + r); y++) {
       const dx = x - px, dy = y - py;
       if (dx * dx + dy * dy < r2) {
+        const action = Math.random() < 0.5 ? 'raise' : 'lower';
         const times = Math.floor(Math.random() * 3); // 0-2
-        for (let i = 0; i < times; i++) lowerPoint(state, x, y);
+        for (let i = 0; i < times; i++) {
+          if (action === 'raise') raisePoint(state, x, y);
+          else lowerPoint(state, x, y);
+        }
       }
     }
   }
   invalidateSwamps(state);
   invalidateRocks(state);
   invalidateTrees(state);
+  invalidateRuins(state);
   evaluateSettlementLevels(state);
 }
 
 function executePowerSwamp(state, team, tx, ty) {
-  if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return false;
-  if (!isTileFlat(state, tx, ty)) return false;
-  if (isTileWater(state, tx, ty)) return false;
-  for (const s of state.swamps) {
-    if (s.x === tx && s.y === ty) return false;
+  const placed = [];
+  const attempts = 20;
+  const targetCount = 3 + Math.floor(Math.random() * 3); // 3-5
+  for (let i = 0; i < attempts && placed.length < targetCount; i++) {
+    const dx = i === 0 ? 0 : Math.floor(Math.random() * 7) - 3;
+    const dy = i === 0 ? 0 : Math.floor(Math.random() * 7) - 3;
+    const sx = tx + dx, sy = ty + dy;
+    if (sx < 0 || sx >= C.MAP_W || sy < 0 || sy >= C.MAP_H) continue;
+    const key = sx + ',' + sy;
+    if (state.swampSet.has(key)) continue;
+    if (!isTileFlat(state, sx, sy)) continue;
+    state.swamps.push({ x: sx, y: sy, team });
+    state.swampSet.add(key);
+    placed.push(key);
   }
-  state.swamps.push({ x: tx, y: ty, team });
-  return true;
+  return placed.length > 0;
 }
 
 function executePowerKnight(state, team) {
@@ -1434,6 +1625,8 @@ function executePowerVolcano(state, team, px, py) {
   invalidateSwamps(state);
   invalidateRocks(state);
   invalidateTrees(state);
+  invalidatePebbles(state);
+  invalidateRuins(state);
   evaluateSettlementLevels(state);
 }
 
@@ -1468,6 +1661,8 @@ function executePowerFlood(state, team) {
   invalidateSwamps(state);
   invalidateRocks(state);
   invalidateTrees(state);
+  invalidatePebbles(state);
+  invalidateRuins(state);
   evaluateSettlementLevels(state);
 }
 
@@ -1722,6 +1917,8 @@ wss.on('connection', (ws) => {
         invalidateSwamps(state);
         invalidateRocks(state);
         invalidateTrees(state);
+        invalidatePebbles(state);
+        invalidateRuins(state);
         evaluateSettlementLevels(state);
         break;
       }
@@ -1740,6 +1937,8 @@ wss.on('connection', (ws) => {
         invalidateSwamps(state);
         invalidateRocks(state);
         invalidateTrees(state);
+        invalidatePebbles(state);
+        invalidateRuins(state);
         evaluateSettlementLevels(state);
         break;
       }
@@ -1810,6 +2009,13 @@ wss.on('connection', (ws) => {
         const { x, y } = msg;
         if (typeof x !== 'number' || typeof y !== 'number') return;
         playerRoom.state.magnetPos[playerTeam] = { x, y };
+        // Magnet placement removes swamps at that position
+        const mx = Math.floor(x), my = Math.floor(y);
+        const mkey = mx + ',' + my;
+        if (playerRoom.state.swampSet.has(mkey)) {
+          playerRoom.state.swamps = playerRoom.state.swamps.filter(sw => !(sw.x === mx && sw.y === my));
+          playerRoom.state.swampSet.delete(mkey);
+        }
         break;
       }
     }

@@ -1,0 +1,2411 @@
+Populous FAQ
+Version 1.13
+By edwithgames
+Created: October 2005
+Updated on 02/09/2011. Spelling mistakes corrected, added a proper walkthrough,
+added more to the list of worlds and generally revamped and polished the guide.
+Updated on 19/09/2011. Slightly altered the formatting of two of the subsection
+headings.
+Updated on 31/08/2012. Added Hidden Messages section and added more information
+to the Worlds section.
+Updated on 28/11/2017. Updated the Landscapes and Settlements sections.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Introduction ******
+
+This walkthrough was created because at the time I could find no walkthrough
+for the Sega Master System version of Populous. I've been playing Populous for 
+a very long time now and have completely mastered it and I want to share my
+strategies and knowledge of the game with others.
+
+This version, in my opinion, is much better than any other version of Populous
+since the player can't change the laws of each world once the game has started.
+
+For example, water fatality cannot be changed nor can Evil's statistics be
+changed. The only bad things about this game are that there is no two player
+option nor does this game actually end.
+
+This FAQ is split up into several sections and subsections.
+These are:
+
+- Technical Information
+- My Experience With The Game
+- Story/Object Of The Game
+- How To Play
+- Starting A World
+- The World Information Screen
+- The Game Screen Buttons
+    * Pause And Place Buttons
+    * Search Buttons
+    * Power Buttons
+    * Behavioural Modification Buttons
+- The Manna Bar
+- The Close Up Map
+- The World Map
+- The Info-Shield
+    * Walker
+    * Settlement
+- Population Meters
+- Landscapes
+    * Grassy Plains
+    * Desert
+    * Snow And Ice
+    * Rock And Lava
+    * Futuristic
+    * Bitmap
+- Settlements
+    * Grassy Plains
+    * Desert
+    * Snow And Ice
+    * Rock And Lava
+    * Futuristic
+    * Bitmap
+    * Ruined Settlements
+- Walkers
+    * Regular Walkers
+    * The Leader
+    * Knights
+    * Craziness
+- Strategies
+    * Raise/Lower Terrain
+    * Move Papal Magnet
+    * Earthquakes
+    * Swamps
+    * Knights
+    * Volcanoes
+    * Floods
+    * Armageddon
+    * Reducing Evil's Population
+    * Go To Papal Magnet
+    * Fight Then Settle
+    * Gather Then Settle
+    * Settle
+    * Invading
+    * Continental Shelf
+- FAQs
+- Bugs/Glitches
+    * Landscape Out
+    * Leader Knights
+    * Unoccupied Settlements
+    * Demoted Knights
+- Worlds
+    * The Score Screen
+    * The Blue-Hooded Figure
+    * World Types
+    * World Name List
+    * The End?
+    * World 5995 NIMINGTORY
+    * World 5995 NIMINGTORY Screenshot Links
+    * New Information
+- Hidden Messages
+- Final Notes
+
+
+-------------------------------------------------------------------------------
+
+
+****** Technical Information ******
+
+Populous was created by Bullfrog and Electronic Arts and released by Tecmagik
+on the Sega Master System in 1991. Since then many clones have been made. It
+also inspired other games to be made such as Command and Conquer and Sim City
+to name a few.
+
+
+-------------------------------------------------------------------------------
+
+
+****** My Experience With The Game ******
+
+I first played this game back in 1992 when my brother got it from a shop
+advertised in Sega Power Magazine. I first thought it was boring but after
+learning how to play it I eventually got to the point where I thought it was
+one of the best games on the Sega Master System.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Story/Object Of The Game ******
+
+The story is that you are a deity who controls a population of followers. These
+followers are what give you power. Unfortunately there is another deity with an
+opposing group of followers... So the object is to wipe out the opposing
+followers with the powers which you will later acquire and thus defeat the
+other deity.
+
+
+-------------------------------------------------------------------------------
+
+
+****** How To Play ******
+
+The controls are as follows:
+
+D-Pad: Moves the cursor all around the screen to wherever you need it.
+The cursor is in the form of a fist or a pointing hand. The cursor becomes a
+closed fist when you are not permitted to perform an action e.g. when the game
+is paused. The cursor becomes a pointing hand when you are permitted to do
+perform an action.
+
+Button 1: This presses the button on which the hand cursor is currently placed
+and uses a pre-selected power.
+
+Button 2: This is the cancel button. Use this whenever you want to cancel using
+a power such as swamp. This also toggles between the three on-screen menus.
+
+Button 1 + Up/Down: Press and hold button 1 and then press up or down. This
+will raise/lower the terrain when the hand cursor is on the close Up Map.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Starting A World ******
+
+When you first start the game, you will see the title screens. After these you
+will get to a red screen called the World Information Screen which describes
+the first world called GENESIS. From here, you can either press Button 1 to
+start playing GENESIS and the word "BUILDING" will appear before you're
+transported to the world; or you can press Button 2 to go to the password entry
+screen. Here you can type the name of a world and if you're successful, you
+will be taken to that world's World Information Screen instead. A nice touch
+the programmers added is that the higher the world number (from here on
+referred to as "Battle Number"), the longer it takes to find the world so don't
+be worried if the game is "SEARCHING" for a long time for the password you put
+in. If unsuccessful, the game will eventually say that the password was not
+found and you will be returned to the previous world's World Information
+Screen.
+
+
+-------------------------------------------------------------------------------
+
+
+****** The World Information Screen ******
+
+The World Information Screen will describe that particular world's attributes.
+Please note that although each world is unique, some may have identical
+attributes. See the Worlds section found towards the end of this guide for more
+about this.
+
+- World Name: This is the world name and is basically a password you can enter
+  in the password entry screen. It's a good idea to write them down so you can
+  enter them in the password entry screen and return to the world you were
+  playing before.
+
+- Battle Number: This is the number of the world you are about to start.
+  Generally, the higher the world number, the harder the world will be although
+  there are exceptions.
+
+- Landscape Is: This will describe which landscape type the world has. There
+  are six in total. These are explained later.
+
+- Evil Is: This describes how fast your computer-controlled opponent (from here
+  on referred to as "Evil") creates terrain. There are five levels: very slow,
+  slow, average, fast and very fast. Generally, the faster Evil creates
+  terrain, the harder it will be to defeat him.
+
+- Evil Rating Is: This describes Evil's Artificial Intelligence. Evil's
+  intelligence can be very low, low, average, high and very high. Generally,
+  the higher Evil's intelligence, the more difficult it will be to defeat him
+  
+- Build Near: This describes the rule for raising and lowering terrain in the
+  world. "Build Near Towns Or People" means that you can raise and lower
+  terrain on the Close Up Map as long as one of your settlements (the blue flag
+  must be visible) or one of your walkers is visible. With "Build Near Towns
+  Only", you can only raise and lower terrain when one of your settlements is
+  visible (the blue flag  must be visible). There is a small exception to this
+  rule: you can still raise terrain one level up from sea level with just a
+  walker present but you may not lower terrain or raise it above one level
+  above sea level. This is so you can still allow a walker to build a basic
+  settlement or so you can build a small bridge for him to cross the water
+  when no settlements are nearby.
+
+- The swamps Are: The swamps in a world can either be shallow or bottomless.
+  Shallow swamps disappear when a regular walker falls in and dies in them.
+  Bottomless swamps do not disappear when a regular walker falls in and dies in
+  them.
+
+- Water Is: The water is either fatal or harmful. Fatal water means that a
+  walker will die if he falls into the water of this world; no matter what the
+  landscape, the walker will die immediately. When the water is harmful, the
+  walker will drown at a rate that depends upon the landscape type.
+
+- Population: This tells us the exact number of walkers with which both Good
+  (you) and Evil start. The higher the number, the easier it is for either side
+  to establish themselves, build a sizeable population and gain manna quickly
+  at the start. The lower the number, the longer it will take at the start.
+  Generally, whichever side starts with the most walkers will find it easier to
+  establish themselves and gain manna during the earlier stages of each world.
+  The lowest number of walkers with which you can start is 1 and the highest
+  number is 15.
+
+- Powers: Below the population number will be five YES or NOs. If you look to
+  the left, you will see that each YES and NO corresponds to a certain power.
+  This part basically tells us what powers both Good and Evil are able to
+  perform in this world. If the power has NO corresponding to it, then the
+  power may not be performed even if you have the required manna to perform it.
+
+It is recommended that you make a note of all these details before you press
+Button 1 and start the world because you will not be told again unless you
+lose the world. Make a note of the powers you can perform and the attributes
+of each world before starting so that you don't plan to perform powers that
+you ultimately won't be able to perform.
+
+
+-------------------------------------------------------------------------------
+
+
+****** The Game Screen Buttons ******
+
+After you've read and made notes from the World Information Screen, press
+Button 1 to start the world. The word BUILD will superimpose itself over the
+World Information Screen for a couple of seconds before you're transported to
+the world. You will find yourself exactly in the centre of the world you just
+started with the hand cursor over the two Papal Magnets. You can now begin the
+game.
+
+You will notice several things on the screen. You will notice the Close Up Map
+which is the big map in the centre of the screen; you will notice the World Map
+at the top of the screen which is located inside a large book; and you will
+also notice many grey tiles surrounding the Close Up Map with strange symbols
+on them. The grey tiles with symbols on them are buttons and placing the cursor
+on them and pressing Button 1 will do a variety of different things. The grey
+tiles with no symbols on them do nothing so you can ignore them safely. You
+will also notice a large red and white shield in the upper-right of the screen.
+This is the Info-Shield and it will display information about the bearer of the
+shield throughout the game.
+
+As stated, once the world is started, your hand cursor will be on the Close Up
+Map in the exact centre of the world. Pressing Button 2 here will transport the
+hand cursor to the group of several buttons on the left of the Close Up Map.
+Pressing Button 2 again in this are without pressing any other button before
+will transport your hand cursor to the group of four buttons below the Close Up
+Map. Pressing Button 2 again will return the hand cursor to the Close Up Map.
+By doing this, you can gain access to all the buttons at your disposal.
+
+*******************************************************************************
+
+Here I will list and explain the functions of all the buttons on the left of
+the Close Up Map.
+
+*** Pause And Place Buttons ***
+
+- Pause: This button is on the far left of the tiles and has the symbol ZZZ on
+  it. This is the Pause Button. When you press pause on your Sega Master System
+  Power Base, this tile will be highlighted and will turn a lighter shade of
+  grey. If you wish, you may press this button instead of pressing the button
+  on your Power Base. Regardless of that, it's very useful for telling you if
+  the game is paused or not. When paused, you may not perform any powers nor
+  can you alter terrain. You can however, still move around the world, use the
+  search buttons and place the Info-Shield on walkers and settlements.
+
+- Papal magnet: This button is in the middle at the botton of the first group
+  of buttons and it looks like an ankh. Providing you have enough manna, you
+  can press this button and your hand cursor will both turn into an ankh cursor
+  and be transported to the Close Up Map. With this new cursor you can place
+  the Papal Magnet on any tile of flat land on the Close Up Map. If you do not
+  want to place the Papal Magnet, simply press Button 2 to cancel and the
+  cursor will again be a hand cursor on the Close Up Map.
+
+- Info-Shield: This button is located next to the Papal Magnet button and has a
+  ? symbol on it. Pressing this button will change your hand cursor into a
+  shield cursor and transport it to the Close Up Map. With this cursor you can
+  place the Info-Shield on any Good or Evil walkers on settlements. This will
+  cause information about the walker or settlement to show up on the main
+  Info-Shield located in the upper-right of the screen.
+
+*******************************************************************************
+
+*** Search Buttons ***
+
+The next four buttons are search buttons. These will search for specific
+walkers and settlements when pressed. This means that when you press them, the
+Close Up Map will move to the location of the searched walker or settlement.
+They are located just to the left of the Close Up Map and each has a symbol in
+brackets.
+
+- Papal Magnet In brackets: When pressed, this will move the Close Up Map to 
+  four different things in this order:
+ 
+1. When pressed once, the Close Up Map Will move to the position of the Good
+   leader.
+2. When pressed twice, the Close Up Map will move to the position of the Good
+   Papal Magnet.
+3. When pressed thrice, the Close Up Map will move to the position of the Evil
+   Leader.
+4. When pressed four times, the Close Up Map will move to the position of the
+   Evil Papal Magnet.
+
+Note: If Good or Evil have no leader the button will skip them so for example,
+if there is no Good leader, the button will go from step 1 to step 3 and then
+to step 4 before repeating the cycle.
+
+- Shield In Brackets: When pressed, this will move the Close Up Map to where the
+  bearer of the Info-Shield currently is whether it be a walker or a
+  settlement. If no walker or settlement is holding the Info-Shield, pressing
+  this button will do nothing.
+
+- Swords In Brackets: When pressed, this moves the Close Up Map to the location
+  of a battle. If more than one battle is happening, it will choose one at
+  random and place the Close Up Map there. If no battles are happening, it will
+  place the Close Up Map on one of the Good settlements. If more than one Good
+  settlement exists it will choose one at random and place the Close Up Map
+  there.
+
+- Knight Helmet In Brackets: When pressed, this will place the Close Up Map on
+  one of the Good knights. If there is more than one Good Knight, it will
+  choose one at random and place the Close Up Map there. If there are no Good
+  knights it will place the Close Up Map on one of the Good walkers. If more
+  than one Good walker exists, it will choose one at random and place the Close
+  Up Map there.
+
+*******************************************************************************
+
+*** Power Buttons ***
+
+The next six buttons are power buttons. With these buttons, various powers can
+be performed that will have some effect on the Close Up Map. I have described
+the symbols on the buttons and what power they perform.
+
+- Earthquake: This button performs an Earthquake and has a sound wave symbol on
+  it. Providing that you may perform this power and have enough manna, pressing
+  this button will randomly raise and lower the terrain that is currently
+  displayed on the Close Up Map thereby making it unsuitable for building upon.
+  You will notice also that with repeated use on the same area of terrain, the
+  Earthquake power will gradually lower the land while also unflattening it. To
+  Earthquake a different area, go to the Close Up Map, move to a different
+  location, return to the button and perform the power on this new area of
+  terrain.
+
+- Swamps: This button will make swamps on the Close Up Map and has a symbol
+  that looks like a man drowning. Providing that you may perform this power and
+  have enough manna, pressing this button will transport your hand cursor to
+  the Close Up Map and will transform it into a swamp cursor. Pressing Button 1
+  here will place a random number of swamps on tiles of flat terrain on the
+  area shown on the Close Up Map. If no flat tiles are shown, no swamps will be
+  made so try and find an area with lots of tiles of flat terrain. Swamps can
+  also not be placed on tiles with settlements, rocks or trees but can be
+  placed in water although they are invisible in it. Walkers may not be able to
+  walk on the water but if a swamp is in the water, the walker will walk in it
+  and die.
+
+- Knight: This button will transform your leader into a knight and has a helmet
+  symbol. Providing that you may perform this power and you have enough manna,
+  pressing this button will immediately transform your leader into a knight. If
+  your leader is currently occupying a settlement, the settlement will
+  disappear and the knight will take its place.
+
+- Volcano: This button performs a volcano and has a mountain symbol on it.
+  Providing that you may perform this power and you have enough manna, pressing
+  this button will cause the terrain shown on the close up map to be raised in
+  a peak much like a mountain. A number of rocks will also be created but no
+  lava or crater is formed. With repeated use over the same area of terrain,
+  more rocks are created and the terrain will gradually be raised to its
+  maximum height.
+
+- Flood: This button performs a flood and similarly to the Swamp button, has a
+  symbol of a man drowning on it although it's located a bit higher than that
+  button. Providing that you may perform this power and you have enough manna,
+  pressing this button will raise the sea level by one and will submerge all
+  terrain which was previously one level above sea level. All settlements will
+  disappear and all walkers will either die or start drowning depending upon
+  the water type.
+
+- Armageddon: This button will start Armageddon and has a Skull and Crossbones
+  symbol on it. Providing that you have enough manna, pressing this button will
+  remove all Good and Evil settlements and place the Papal Magnets in the
+  centre of the world. All Good and Evil walkers will all go towards them,
+  gather together and then fight until only either one Good or one Evil walker
+  remains. This will end the game.
+
+I will go into further detail about these powers in the Strategy section of
+this walkthrough.
+
+*******************************************************************************
+
+*** Behavioural Modification Buttons ***
+
+The next four buttons are behavioural modification buttons and can only be
+pressed one at a time and will alter the behaviour of the Good walkers. To get
+to the buttons, press Button 2 twice from the Close Up Map.
+
+- Settle: This button looks like a flag and will command your walkers to build
+  settlements. Fights will still happen and the walkers may gather but they
+  will not go out of their way to do so. Building settlements becomes their
+  priority.
+
+- Gather Then Settle: This button looks like a walker and will command your
+  walkers to gather first then settle when there is one person remaining.
+  Gathering is the process wherein one walker joins with another to make one
+  stronger walker. This process is vital for winning the game.
+
+- Fight Then Settle: This looks like two swords and will command the Good
+  walkers to fight the nearest Evil walker or settlement. When none are
+  nearby, your walkers will settle.
+
+- Go To Papal Magnet: This looks like a Papal Magnet and will cause the Good
+  leader to go to the Papal Magnet. Your walkers will go to the leader and
+  gather with him. If there is no Good leader, all Good walkers will go to the
+  Papal Magnet and the first to get there is the leader. While this button is
+  on, no settlements will be built by any of your walkers.
+
+I will go into further detail about these buttons in the Strategy section of
+this walkthrough.
+
+
+-------------------------------------------------------------------------------
+
+
+****** The Manna Bar ******
+
+The Manna Bar is directly above the Close Up Map. An arrow points to where you
+are on the bar. You start each world with the arrow on the right of two arrows.
+This means that you can raise and lower terrain as long as either a settlement
+or a walker are in view on the Close Up Map (see above). The arrow on the Manna
+Bar moves to the right gradually when your population increases and sometimes
+will move a lot to the right in instances of good fortune. The more population
+you have, the more population you will produce so it makes sense that when you
+start and therefore have a low population, the Manna Bar will move to the right
+very slowly. As the game progresses and your population increases, the faster
+the arrow will move to the right. You will notice that symbols are placed upon
+the Manna Bar and that the majority of these symbols correspond to the power
+buttons mentioned earlier. When the arrow is pointing at a symbol, it means
+that you have enough manna to perform that power and providing that you are
+allowed to perform it (as explained on the World Information Screen), you can
+press the appropriate button to perform the power. As the arrow moves towards
+the right, it should make sense that you have enough manna to perform all the
+powers that are to the left of it and that you haven't enough manna for the
+powers that are to the right of it.
+
+You start off only able to Move Papal Magnet and Raise and Lower Land. You then
+get the power to Earthquake, Swamp, Knight, Volcano, Flood and start Armageddon
+in that order.
+
+
+-------------------------------------------------------------------------------
+
+
+****** The Close Up Map ******
+
+The Close Up Map is the section of the World Map covered by a + sign. Moving
+the Close Up Map will move the + sign around the World Map. The Close Up Map is
+where most of the action in the game will take place so it is vital that you
+know what all the symbols mean and that you know how to manipulate things in
+it.
+
+Many objects can be seen on the close Up Map. They are explained here. Please
+note that many of the objects will look different depending upon the type of
+landscape the world uses. Landscapes are explained below.
+
+- Clear Terrain: Terrain is the land upon which your walkers settle, walk,
+  fight etc. Flat terrain is needed to build settlements. Much of your time
+  will be spent flattening terrain so that walkers can build settlements on it.
+
+- Water: Water appears whenever the terrain is lowered enough. Settlements
+  can't exist in water and walkers can't survive in it either. Walkers will
+  either die or will drown depending upon the water type.
+
+- Walkers: Walkers are your followers and as such are the source of your power
+  as a deity. Walkers roam the terrain either building settlements on flat
+  terrain, fighting, gathering or dying. The blonde-haired walkers are Good and
+  the brown-haired walkers are Evil.
+
+- Settlements: Settlements are buildings created on tiles of flat terrain by
+  walkers in which to live and grow. Every settlement will have either a blue
+  flag if it is a Good settlement or a red flag if it is an Evil settlement.
+
+- Cropland: Cropland surrounds every settlement. Depending upon the
+  availability of flat terrain surrounding the settlement, the amount of
+  cropland will vary. The more flat terrain, the more cropland will be made and
+  the more cropland that's made, the better the settlement will be. Good
+  cropland is white uniform dots on normal terrain; Evil cropland is uniform
+  grey specks on normal terrain. Cropland cannot be built upon; it can be
+  built next to and if the buildings are both Good or both Evil, cropland will
+  be shared. If the two buildings are different (i.e. one Good and one Evil),
+  the cropland will not be shared and will hamper the other cropland in the
+  same way as a swamp, rock, ruined settlement or tile of ruined cropland will.
+
+- Trees: Trees cannot be created by anything in the game and are scattered
+  about randomly on the original terrain at the start of each world. Trees
+  cannot be built upon but can be removed easily by cropland or by sinking them
+  into the water. Sinking them into the water shouldn't be necessary unless
+  there are lots of trees grouped together. Trees come in different forms
+  depending upon the landscape of the world.
+
+- Rocks: Rocks are created by volcanoes and are also scattered about randomly
+  on the original terrain at the start of a world much like trees. As
+  settlements cannot remove them with cropland and as settlements cannot be
+  built next to them, it is a good idea to remove them. To do this, lower the
+  terrain on which they lie till they disappear into the water. This can take
+  a long time especially if there are a lot of them but it's the only way to
+  remove them.
+
+- Good Rocks: If you notice, some rocks are darker than others. I call these
+  rocks "Good Rocks" because they need not be sunk in the water to remove them.
+  Simply raise then lower the terrain on which they lie (or vice versa) and
+  they will disappear. Other than that, they still behave like normal rocks in
+  that settlements cannot remove them with cropland and settlements cannot be
+  built next to them. They are not created by volcanoes; instead they're
+  scattered about randomly on the original terrain at the start of a world.
+  They are also created by Evil, who seem to possess the unique ability to
+  transform normal rocks into good rocks.
+
+- Papal Magnet: The Papal Magnet is a unique structure occupying a single tile.
+  Placing the walkers' behaviour button on "Go To Papal Magnet" will cause your
+  leader (Good) to gravitate towards it until he touches it and stays there.
+  Your walkers will gravitate towards and gather with your leader. The Papal
+  Magnet can be placed anywhere - even in the water - and can only be done if
+  you have both enough manna and have a leader. The second condition is
+  sometimes easy to forget. Placing the Papal Magnet upon swamps or ruined
+  cropland will also revert the terrain to normal terrain. Papal Magnets can
+  be placed on top of settlements and can also be built upon.
+
+- Swamps: Swamps are created using the Swamp power. Depending upon the
+  landscape type, swamps can look different but generally they are either
+  speckled tiles or black holes on single tiles. Swamps never occur unless
+  either Good or Evil have created them first. Swamps are tiles of terrain that
+  can kill walkers instantly; if a walker falls in a swamp, he disappears no
+  matter how strong he is and no matter who created the swamp, Good or Evil.
+  There are two types of swamp: bottomless and shallow; shallow swamps
+  disappear when one walker falls in and dies and the swamp will change back
+  into normal flat terrain; bottomless swamps do not disappear. Swamps are not
+  removed by cropland and have also to be removed to allow cropland to spread.
+
+- Ruined Settlements: These are settlements that have lost a battle with a
+  knight. They cannot be removed with cropland and have to be sunk in the water
+  to remove them. However, unlike rocks, settlements can be built next to them.
+
+- Ruined Cropland: Ruined cropland surrounds ruined settlements. Settlements
+  cannot be built upon it but can be be built next to it. Walkers will not be
+  harmed by it but it must be removed so that walkers can build settlements. To
+  remove ruined cropland, simply raise then lower the terrain on which it is
+  (or vice versa).
+
+- Invisible Trees: In the Desert and Rock And Lava landscapes, you might notice
+  tiles of terrain with no cropland on them next to settlement No. 9s. These
+  act like trees in that they cannot be built upon but can be removed by
+  cropland. For some reason, they only exist in these two landscapes.
+ 
+
+-------------------------------------------------------------------------------
+
+
+****** The World Map ******
+
+The World Map is located on the top of the screen and is situated on what looks
+like a page of a book. The book symbolises the huge "book of worlds." On the
+World Map are several symbols:
+
+- The + sign is the current location of the Close Up Map in relation to the
+  World Map.
+- Flashing black dots are Good settlements.
+- Flashing grey dots are Evil settlements.
+- Flashing blue dots are Good walkers.
+- Flashing red dots are Evil walkers.
+
+The terrain is represented by the basic colour of the terrain on the Close Up
+Map. For example: terrain on the Close Up Map for the Grassy Plains landscape
+type is many shades of green and so on the World Map it is a single shade of
+green. The water is represented in the same way; for example, the water on the
+Close Up Map for the Grassy Plains landscape type is many shades of dark blue
+and so on the World Map it is a single shade of dark blue. Relief (hills,
+mountains, lowlands) is shown on the World Map with shading.
+
+The World Map is very useful in locating volcanoes, earthquakes, walkers and
+settlements so it's good practice to refer to it when you need to.
+ 
+
+-------------------------------------------------------------------------------
+
+
+****** The Info-Shield ******
+
+The Info-Shield is located to the right of the Manna Bar and displays
+information on the bearer of the shield be it a walker or a settlement.
+
+The Info-Shield will display different information depending on whether the
+bearer is a walker or a settlement. I will explain the Info-Shield for both
+walkers and Settlements.
+
+*** Walker ***
+
+When the shield bearer is a walker, the strength bars will be displayed in the
+bottom right quarter of the shield. As I explained earlier, walkers gain
+strength by a process called gathering. This is when two walkers combine to
+become one.
+
+All of your walkers at the start of a world will have two black and orange bars
+in the bottom-right quarter of the Info-Shield if you place the Info-Shield on
+any of them. When the right bar is full and becomes completely orange, a notch
+will be placed on the left bar. Slowly but surely with more gathering,
+eventually the left bar will fill and become completely orange. When this
+happens, the right bar will disappear from view, the left bar will move to the
+right and take the right bar's place and in the left bar's former place will be
+a new yellow and black bar. This new bar fills up even more slowly than the
+other bars and walkers with this bar are much stronger than walkers with just
+two orange bars. The yellow bar never gets completely full as a small black
+notch is always visible. Although it will not be shown, walkers with a maximum
+yellow bar can keep gathering and become stronger. Walkers like this are very
+powerful indeed. When a walker has two empty bars, he is about to perish and
+die so try to provide him with some flat terrain as quickly as you can.
+
+The top-left quarter of the Info-Shield will show either an ankh or a skull
+depending on whether the walker is Good or Evil.
+
+The bottom-left quarter will display the walker who currently bears the
+Info-Shield. This walker can be Good, Evil, normal, a knight, or drowning.
+
+The top-right quarter shows a different weapon depending upon the walker that
+bears the Info-Shield. The weapon represents the settlement from which the
+walker originated. A sword will be on a walker that originated from a castle
+and a fist will be on a walker that originated from a tent. Apart from that,
+the weapon appears to be useless. Strength is what determines the outcome of
+fights as I've seen a walker with a fist defeat a walker with a sword simply
+because the winner had more strength.
+
+When a Good and an Evil walker are fighting, the bottom-right quarter which
+normally represents strength will be replaced by two new bars. The bar on the
+left represents the Good walker and the bar on the right represents the Evil
+walker. Depending on who is winning the battle, the Good bar will fill up blue
+and the Evil bar will fill up red. If the walkers are almost evenly matched,
+the bars will both fill up half way and then one will empty and the other fill
+up depending upon the winner. After the battle, the bottom-right quarter will
+again represent the strength of the Info-Shield bearer.
+
+*** Settlement ***
+
+When the shield bearer is a settlement, the bottom-right quarter of the
+Info-Shield will be two bars. The left bar will be yellow and black and the
+right bar will be green and black. These of course can change.
+
+The left bar represents the quality of the settlement. The more yellow there
+is in the bar, the better the settlement. Tents have one notch of yellow while
+large castles have completely yellow bars.
+
+The right bar represents how much population is in the settlement. The more
+green the bar, the more population is inside the settlement. When the bar
+becomes completely green, the settlement will be full and a walker will leave
+the settlement to search for somewhere else to settle.
+
+Both these bars are proportional to one another. The more yellow there is in
+the left bar (thus the better the settlement), the more population the
+settlement can hold which means in a better settlement, it will take longer to
+fill the right bar to maximum green and therefore longer for a walker to leave
+it; conversely, the worse the settlement, the less time it will take for a
+walker to leave it. As better settlements take longer to fill up with
+population, the walker that comes out when it is full will represent more
+population and because of this, will be stronger; conversely, because it takes
+less time for a walker to leave a worse settlement, the walker that comes out
+when the settlement is full will represent less population and will thus be
+weaker. Even though better settlements take longer to fill up and produce a
+walker, they do produce population at a faster rate. This means that having
+lots of settlement No. 9s for example will cause your population to increase
+more quickly and thus the manna bar will increase more quickly too.
+
+The top-left quarter of the Info-Shield will show either an ankh or a skull
+depending on whether the walker is Good or Evil.
+
+The bottom-left quarter of the Info-Shield will show either a red or blue flag
+depending upon whether the settlement is Good or Evil.
+
+The top-right quarter shows a different weapon depending upon the settlement
+that bears the Info-Shield. The weapon represents the advancement of the
+settlement. A sword will be on a settlement that was built by a walker with a
+sword or a settlement that has been undisturbed for a long time; a fist will be
+on a settlement that was built by a walker with a fist or on a settlement that
+is relatively new. Apart from that, the weapon appears to be useless. As with
+walkers, you can play the game not paying any attention to the weapon as it
+doesn't affect anything.
+
+As with walkers, settlements can also fight. When this happens, the Info-Shield
+will go to the fight mode for walkers mentioned above. When the fight is over,
+the shield will represent the winner be it the original bearer or the
+aggressor.
+
+*******************************************************************************
+
+You will notice that the shield gets passed around on its own from time to
+time. This is because when a walker leaves a settlement that bears the shield,
+the walker will take it with him. When a walker gathers with another, the new
+combined walker will bear the shield. When a walker loses a fight, the shield
+will go to the victor be it a walker or a settlement. You can of course give
+the shield to whomever you wish and break the cycle whenever you want. When a
+walker perishes and dies in the water or by wandering, the shield will not be
+passed to anyone and so the Info-Shield will not display any information and be
+blank.
+
+Pressing on the search buttons will cause the object of the search (such as
+a leader or a knight) to be given the shield for a few seconds before it is
+returned to its original bearer or returned to being blank. This is so
+information can be seen quickly about the object of the search without changing
+the shield bearer.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Population Meters ******
+
+You will notice on the sides of the Info-Shield are two bars. These represent
+the amount of population Good and Evil have. The bar on the left will slowly
+fill up with blue as Good population increases and the bar on the right will
+slowly fill up with red as Evil population increases. When a sharp drop in
+population occurs, you will see the amount of blue or red decrease instantly.
+It is good practice to keep an eye on these bars as they determine who is
+currently winning the world. The more population Evil has, the more powerful
+Evil will be. Bear in mind that like strength, the population does not stop
+increasing once the bars hit their maximum. Unfortunately you will never be
+able to discern how much population above the maximum you have.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Landscapes ******
+
+Here is an explanation of the six different types of landscape that appear in
+this version of Populous. I will describe the different appearances of the
+objects and the effect the landscapes will have upon walkers.
+
+Walkers will slowly lose strength as they wander around the terrain: I call
+this perishing. Different landscapes have different perish rates. When the
+water type of a world is harmful, walkers will start drowning when they fall in
+and will slowly lose their strength although at a faster rate than perishing.
+Different landscapes have different drown rates. Please note that the drown
+rate is proportional to the perish rate; generally the faster the perish rate
+is, the faster the drown rate will be.
+
+*** Grassy Plains ***
+ 
+- The terrain is green grassland.
+- The water is blue.
+- The trees look like normal trees.
+- The rocks are white crags.
+- The good rocks are dark grey crags.
+- The Good Papal Magnet is a white ankh.
+- The Evil Papal Magnet is a dark grey skull with horns.
+- The swamps look like speckled green tiles of terrain.
+- Good cropland looks like white dots on tiles of terrain.
+- Evil cropland looks like dark grey dots on tiles of terrain.
+- Ruined cropland looks like white and dark grey dots on tiles of terrain.
+- The perish rate is very slow.
+- The drown rate is slow.
+
+*** Desert ***
+
+- The terrain is yellow sand.
+- The water is blue.
+- The trees look like differently shaped cacti.
+- The rocks are brown pyramids
+- The good rocks are light grey crags.
+- The Good Papal Magnet is a brown cross.
+- The Evil Papal Magnet is a white star.
+- The swamps look like speckled green tiles of terrain.
+- Good cropland looks like white dots on tiles of terrain.
+- Evil cropland looks like dark grey dots on tiles of terrain.
+- Ruined cropland looks like white and dark grey dots on tiles of terrain.
+- The perish rate is fast
+- The drown rate is very fast.
+
+*** Snow And Ice ***
+
+- The terrain is white snow.
+- The water is blue.
+- The trees look like frosty normal trees with no foliage.
+- The rocks are white crags.
+- The good rocks are dark grey crags.
+- The Good Papal Magnet is a frosty white ankh.
+- The Evil Papal Magnet is a frosty dark grey skull with horns.
+- The swamps look like black and white speckled tiles of terrain.
+- Good cropland looks like white dots on tiles of terrain.
+- Evil cropland looks like dark grey dots on tiles of terrain.
+- Ruined cropland looks like white and dark grey dots on tiles of terrain.
+- The perish rate is fast
+- The drown rate is very fast.
+
+*** Rock And Lava ***
+
+- The terrain is dark grey rock.
+- The water is red lava.
+- The trees look like dead black trees with no foliage.
+- The rocks are white crags.
+- The good rocks are dark grey crags.
+- The Good Papal Magnet is a brown wooden cross.
+- The Evil Papal Magnet is a guillotine.
+- The swamps look like small black triangles on tiles of terrain.
+- Good cropland looks like white dots on tiles of terrain.
+- Evil cropland looks like dark grey dots on tiles of terrain.
+- Ruined cropland looks like white and dark grey dots on tiles of terrain.
+- The perish rate is average.
+- The drown rate is fast.
+
+*** Futuristic ***
+
+- The terrain is white and light grey checkered tiles.
+- The water is blue.
+- The trees look like polyhedral pot plants and conifers.
+- The rocks are brown crags.
+- The good rocks are blue crags.
+- The Good Papal Magnet is a blue ankh.
+- The Evil Papal Magnet is a brown skull with horns.
+- The swamps look like single large black squares on tiles of terrain.
+- Good cropland looks like white dots on tiles of terrain.
+- Evil cropland looks like dark grey dots on tiles of terrain.
+- Ruined cropland looks like diagonal lines on tiles of terrain.
+- The perish rate is very slow.
+- The drown rate is slow.
+
+*** Bitmap ***
+
+- The terrain is green and white computer paper.
+- The water is green Tecmagik words in blackness.
+- The trees are coke cans, green pencils and coffee cups.
+- The rocks are blue floppy disks.
+- The good rocks are yellow cigarette packets.
+- The Good Papal Magnet is a white computer mouse.
+- The Evil Papal Magnet is a black and red video game joystick.
+- The swamps look like torn black holes in the computer paper terrain.
+- Good cropland looks like capital letter Gs.
+- Evil cropland looks like capital letter Es.
+- Ruined cropland looks like green and white squares on tiles of terrain.
+- The perish rate is fast.
+- The drown rate is very fast.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Settlements ******
+
+There are 9 types of settlement. Generally, the more flat land that surrounds
+settlements, the more cropland that will be planted and the more cropland a
+settlement has, the better quality the settlement will be.
+
+Just like everything else, the settlements will vary depending upon the type of
+landscape the world has. Here, I will list the 9 types of settlement for each
+landscape in descending order of quality e.g. "1" equals the worst type of
+settlement and "9" equals the best. All settlements occupy one tile of terrain
+except No. 9 which always occupies nine tiles of terrain. Settlement No. 9
+cannot be built on the edge of the world while all the other types can be.
+Settlement No. 9 can only be built where there are twenty-five tiles arranged
+in a 5x5 square. Rocks can be present but must not occupy the corner squares
+otherwise the castle cannot be constructed.
+
+*** Grassy Plains ***
+
+1. A tent.
+2. A brown mud hut.
+3. A tumble-down stone cottage.
+4. A log cabin.
+5. A thatched roof cottage.
+6. A modern brick house.
+7. A round, grey fort.
+8. A white castle turret.
+9. A large castle made from four white castle turrets.
+
+*** Desert ***
+
+1. A small brown tent.
+2. A small white tent.
+3. A white Bedouin tent.
+4. A grey and brown stone house.
+5. A log cabin.
+6. A brown shop.
+7. A white chapel.
+8. A brown castle turret.
+9. A large castle made from four brown castle turrets.
+
+*** Snow And Ice ***
+
+1. A frosty tent.
+2. A frosty brown mud hut.
+3. A frosty tumble-down stone cottage.
+4. A frosty log cabin.
+5. A frosty thatched roof cottage.
+6. A frosty modern brick house.
+7. A frosty round, grey fort.
+8. A frosty castle turret.
+9. A large castle made from four frosty castle turrets.
+
+*** Rock And Lava ***
+
+1. A white Bedouin tent.
+2. A brick mobile.
+3. A small house.	
+4. A grey arch.
+5. A small tower.
+6. A white and pink hotel.
+7. A miniature grey castle.
+8. A round, white castle turret.
+9. A large castle made from four round, white castle turrets.
+
+*** Futuristic ***
+
+1. A gold tent.
+2. A burgundy tent.
+3. A purple pyramid.
+4. A structure made from three green pillars.
+5. A multicoloured pyramid.
+6. A glass pyramid.
+7. A glass cube.
+8. A blue and white sphere.
+9. A large castle made from four blue and white spheres.
+
+*** Bitmap ***
+
+1. A Newton's cradle.
+2. A typewriter
+3. A Sinclair ZX81.
+4. A BBC Micro.
+5. A Sinclair ZX Spectrum.
+6. An Acorn Achimedes with a monitor.
+7. An Apple Macintosh with a monitor.
+8. A Cray-1 supercomputer.
+9. A large castle made from four Cray-1 supercomputers.
+
+*******************************************************************************
+
+*** Ruined Settlements ***
+
+Ruined settlements are created when a settlement has lost a battle with a
+knight. The settlement will then turn into a ruined settlement which looks
+exactly like the settlement it was before except it will either have holes in
+it, be broken, or look flattened. The cropland of the settlement will turn into
+ruined cropland. To remove ruined settlements, lower the terrain underneath
+them until they disappear into the water; to remove the ruined cropland, simply
+raise then lower the terrain (or vice versa). The instruction manual does not
+mention sinking the ruined settlements in the water and simply advises the
+player to ignore them and just to concentrate efforts on removing the ruined
+cropland. I believe it says this because unlike rocks, settlements may still
+be constructed next to ruined settlements and sinking them can take a lot of
+time and effort - especially when there are knights with which to deal first
+and other problems. The best strategy is simply to remove the ruined cropland
+first since this takes the least time, and then when the threat of the knight
+is gone, start tidying up the terrain and remove the ruined settlements too
+because they do hinder settlements - especially settlement No. 9s.
+
+As with any problem, prevention is better than the cure. When a knight is
+about to fight one of your settlements, check the Info-Shield (good practice is
+to place the shield on Evil's knights to keep an eye on them) and try to
+predict whether or not the knight will win (most of the time the knight will
+win). If the knight is going to win, remove your settlement by raising or
+lowering the terrain underneath it BEFORE the battle starts and you won't be
+left with any ruined settlements or ruined cropland.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Walkers ******
+
+Here I will describe and explain the different types of walker found on
+Populous.
+
+*** Regular Walkers ***
+
+Walkers are visible amounts of population that walk around the world searching
+for somewhere to build a settlement. Good walkers (yours) have blonde hair
+while Evil walkers have brown hair. The behavioural modification buttons will
+affect their behaviour towards each other and towards enemy walkers. See above
+for explanations of these buttons. In this section, I hope to describe and
+explain the different types of walker that exist in the game. It is important
+to understand that a walker's strength is relative to the amount of population
+he represents. The stronger a walker is, the more population he represents.
+
+Unless the Go To Papal Magnet behavioural modification button is on, walkers
+will build settlements of various types on tiles of flat terrain. After playing
+for some time, you will notice that fewer and fewer walkers stay in the
+settlement after its creation and instead will walk away and build other
+settlements or do something else. As I explained earlier, walkers represent
+amounts of population and when a walker builds a settlement whose population
+capacity is less than the population the walker who built it represents, the
+walker will leave the settlement. This knowledge can be used to your advantage.
+As I explained earlier, settlement No. 9s (large castles) take a long time to
+fill up to their capacity and thus take a long time to produce a walker;
+however, if you lower the settlement's quality by removing some cropland by
+raising or lowering terrain without removing the actual settlement itself, you
+can lower the population capacity of the settlement and thus a walker will come
+out. To understand this technique better, try it yourself: place the
+Info-Shield on a settlement and keep your eye on the green bar which represents
+the amount of population in the settlement. Lower the quality of the settlement
+and you will see the green bar go higher as the capacity of the settlement
+lowers. When the green bar is at maximum, a walker will come out. Remember also
+to flatten the land again after this technique is employed.
+
+This technique should rarely be used on any settlement of lower quality than a
+settlement No. 9 (large castle) because every walker from any settlement of
+lower quality such as settlement No. 8 (castle turret) will only have orange in
+the right strength bar and will have an empty left bar. Walkers from settlement
+No. 9s will have a lot of orange in the left bar if the settlement is left for
+a while to fill up. Generally, the amount of green in the settlement No. 9 will
+roughly correspond to how much orange is in the left strength bar in a walker
+that is acquired from the settlement using this technique. Walkers with any
+yellow strength bar always represent more population than any settlement can
+hold so don't expect a walker with any yellow strength to come out of a
+settlement.
+
+If this technique is not used, the walker that comes out "naturally" (i.e.
+without using this technique) will only have his left strength bar filled up to
+a quarter with orange and a lot of the population will remain in the settlement
+No. 9. Of course, using this technique almost completely empties the settlement
+No. 9 which of course leaves it quite weak and vulnerable to attack so
+sometimes it's best to leave the population in the settlement No. 9 if it is
+located near a large amount of Evil population.
+
+This technique also works the other way. If a walker that represents a large
+amount of population goes over a settlement that is not at full capacity, some
+of the walker's strength will go inside the settlement. Usually this isn't a
+problem if weak walkers lose a tiny amount of their strength to a weak
+settlement but when a particularly strong walker (your leader that you're
+trying to make strong for example) goes into a settlement No. 9 (which can hold
+a fair amount of population) that isn't at full capacity, the walker will lose
+quite a bit of strength. When this happens, use this technique to get the
+population out again so he can rejoin the leader if you so desire. When a
+walker that represents a smaller amount of population than the current capacity
+of the settlement, the walker will go into the settlement and the population of
+the settlement will be augmented with the population of the walker; this will
+look as though the walker disappeared into the settlement. Sometimes this is a
+good thing because the walker might be close to perishing but other times this
+might be bad because the walker can no longer build a settlement of his own.
+
+When Good (your) walkers fight Evil walkers, the loser will disappear and cease
+to exist. When one of your walkers fights an Evil settlement (or vice versa),
+the winner will take the settlement for his side i.e. in this example, Evil
+will keep the settlement if he wins and Good will take the settlement if he
+wins. As a fight has occurred and population has cancelled each other out and
+if the original occupier wins the fight, the settlement will contain less
+population and so the settlement will be weaker. If no walker of the same side
+enters the settlement in the mean time, each fight will cause the settlement to
+contain less population if the original occupier keeps winning. This continued
+weakening of the settlement will eventually mean it will be taken after many
+fights. The number of fights needed to take the settlement depends of course on
+the amount of population inside it and the strength of the walkers attacking
+it.
+
+When a walker wins a settlement, the same principle above applies. If the
+walker that won the settlement represents more population than the capacity of
+the settlement, the surplus population will walk away in the form of a walker.
+If the walker represents less population than the capacity of the building, the
+walker will not leave the settlement and stay inside.
+
+*** The Leader ***
+
+The leader is a unique walker in that there can only be one Good leader and one
+Evil leader at any one time. The leader is a special walker and having one is
+necessary for doing several things. At the start of every world, no matter with
+how much population you start, you will have a leader. You can see he's a
+leader because he will be carrying a miniature ankh symbol; the Evil leader
+will carry a miniature skull. When leaders are occupying a settlement, the
+symbols they carry will be displayed on the settlement whatever the type. The
+first walker to leave the settlement once it's full will take the symbol and be
+the leader much in the same way that the first walker to leave a settlement
+bearing the Info-Shield will become the new shield bearer.
+
+With the behavioural modification button on Go To Papal Magnet, the leader will
+gravitate towards the Papal Magnet and any walkers will gravitate towards the
+leader. Remember that without a leader, you cannot place the Papal Magnet.
+With this ability of being attracted to the Papal Magnet, the leader can be
+used to build settlements in uninhabited parts of terrain or fight settlements
+belonging to Evil; simply place the Papal Magnet in those places and once the
+leader gets there, switch the behavioural modification button to either Settle
+or Fight Then Settle. If you want, you can place the Papal Magnet on top of
+Evil Settlements and your leader will fight them without your having to
+change the behavioural modification button.
+
+The leader has an effect upon the manna bar. When your leader dies in a fight,
+you will be punished by having some manna taken away; conversely, when the Evil
+leader is defeated in a fight, you will be rewarded with some manna. When
+leaders die, no matter how they died, they will leave the Papal Magnet behind.
+You will be unable to move it to a new location until a new leader is created.
+
+*** Knights ***
+
+Knights are very special walkers that can only be created under special
+circumstances. Knights look different from other walkers in that they wear a
+helmet, a cape (blue for Good, red for Evil) and a suit of armour. They are not
+affected by the behavioural modification buttons so will not settle or go to
+Papal Magnet; they do however, gather with normal walkers which is useful for
+adding some strength to them. Knights fight; they have more intelligence than
+other walkers in that they will know where each and every opposing walker or
+settlement is and can successfully hunt them down even when they're on
+different sides of the world. When knights win a fight against a walker, the
+same will happen as when a walker wins a fight against a walker i.e. the walker
+dies; when a knight wins a fight against a settlement, the settlement will
+become a ruined settlement. Details on how to deal with these can be found
+above.
+
+To create a knight, several conditions must be met:
+
+1. You must be permitted in the World Information Screen to create
+   a knight. Without this permission, creating a knight will be impossible.
+
+2. You must have enough manna; that is, the arrow on the manna bar must be
+   pointing to the knight symbol (a helmet) or to any of the symbols to the
+   right of it.
+
+3. You must have a leader. If you have no leader, you will not be able to
+   create a knight.
+
+If you meet all these conditions, you may create a knight. Before you do
+though, it is good practice to place the Go To Papal Magnet behavioural button
+on and allow your leader to gather with lots of your walkers to make him very
+strong. However, this isn't required and you may create a very weak knight if
+you wish but such an act is foolish since the knight won't be able to win many
+fights and lower Evil's population. Good practice is to create a knight that
+has at least a small amount of yellow in the strength bars found on the
+Info-Shield. Remember that strength and population are relative: the more
+strength a walker has, the more population he has in him and thus if a knight
+has more strength, it means he can fight and cancel out an equivalent amount of
+population in Evil. If you do choose to create a weak knight and your leader is
+occupying a settlement, the settlement will disappear and the knight will
+appear in its place.
+
+If you have met the three conditions above and have created a strong enough
+leader to your liking, press the knight button located to the left of the Close
+Up Map; a "dong" sound effect will happen and you'll see your leader turn into
+a knight. Although your leader has not died per se, he has ceased to exist as a
+leader and so as a result, the Papal Magnet will be placed on the tile of
+terrain on which the knight was created. After the leader has turned into a
+knight, you will no longer have a leader and will have to create a new one to
+make a new knight and to move Papal Magnet so it is a good idea to create a
+knight in an area close to your population so that a new leader can be created
+more easily.
+
+Just because knights look different, they are not invincible; they are only
+as strong as their strength bars and if a knight fights a walker or an opposing
+knight who is stronger than he is, the knight will die and cease to exist which
+is why it is important to make a knight as strong as possible.
+
+As soon as the knight is created, his mission will begin and he will begin
+walking in the general direction of the nearest Evil walker or settlement.
+If water separates the knight from the Evil settlements and walkers he wishes
+to fight, you will have to create a land bridge for him to walk upon. To do
+this, simply raise land for the knight to walk upon and he will eventually wend
+his way to his target.
+
+As stated, knights can gather with walkers to augment their strength. They
+will not specifically go searching for walkers with whom to gather but will do
+so if they pass a walker and the opportunity presents itself. Knights can and
+will gather with your leader which will cause your leader to cease to exist.
+The Papal Magnet will be placed on the tile of terrain on which this happened
+and you will have to create a new leader if you wish to make a knight or move
+the Papal Magnet.
+
+There is nothing stopping you from creating more than one knight. If you have
+another leader who you think is strong enough, you may knight him also and he
+will go off in search of battle. The knights can and will gather into each
+other but will only do so if they fight the same walker or settlement. They
+will not wait for each other and will not deviate from their target in order to
+do so as they do when gathering with walkers.
+
+Knights are subject to the same rules that apply to other walkers in that they
+perish, drown, can fall in swamps etc. A knight can be killed if he falls in
+fatal water and will lose strength via perishing when he wanders. He will also
+lose strength at the same rate as normal walkers if he starts drowning in
+harmful water. Swamps are slightly more complicated. A knight is slightly more
+intelligent than the other walkers and as a result he will never walk into a
+swamp. The knights know of their danger and will attempt to walk around them
+and avoid them in the same way that a walker avoids the water. This does not
+mean they cannot fall in a swamp though; if a swamp is created underneath the
+knight, that is if a swamp is created on the same tile of terrain on which the
+knight is standing, he will fall in and die.
+
+*** Craziness ***
+
+All walkers (walkers, leaders and knights) will go "crazy" from time to
+time and will walk around in circles. This can be quite frustrating -
+especially when the perish rate is depleting their strength rapidly. Walkers do
+this either when they hit the edge of a world or when they reach water. Try to
+prevent walkers from touching the edge of worlds by putting it on Go To Papal
+Magnet and they will turn around and follow the leader. Eventually the
+"craziness" stops and they start behaving normally again but the process will
+start afresh if they touch the edge again. Knights can do this when they reach
+water and there is no bridge for them to cross. Simply create a bridge and wait
+for the craziness to disappear on its own or when an enemy walker appears to
+snap them out of it. The craziness isn't really a problem when your population
+is firmly established and there are several walkers who can build for you; but
+when you only have one active walker, the craziness can cause problems.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Strategies ******
+
+Here I will list various strategies for various actions in the game. The powers
+that are performed in this game all have times when doing them would be
+beneficial and times when they would be a hindrance. Similarly, Evil can also
+perform all these powers and knowing how to deal with the consequences of
+Evil's actions is knowledge necessary to complete worlds.
+
+Generally, as Evil's population rises, their ability to perform powers rises as
+well and the more population they have, the more manna they will have to
+perform powers that require more manna. Evil are still bound by the rules laid
+out in the World Information Screen however, and I can't stress enough how
+important it is to make notes on Evil's abilities and attributes before
+starting the world. Evil can perform all the powers you can except Armageddon
+which is a power reserved only for you (Good).
+
+I will also list strategies and patterns in Evil's behaviour. Depending upon
+Evil's intelligence and the powers Evil may perform, his strategies during the
+game will differ.
+
+*******************************************************************************
+
+*** Raise/Lower Terrain ***
+
+Raising and lowering terrain is the most basic power and the most essential one
+you have. Although raising and lowering terrain is simple enough, there are
+certain techniques of doing it which can save time and effort. When you first
+play the game, you will indubitably raise and lower the terrain one tile at a
+time and you will soon get very tired of this. An easier method to create a lot
+of terrain is to keep the hand cursor stationary and simply create a mountain
+by raising the terrain to two or three levels above water and then to get it
+down again also without moving the hand cursor. You should be able to flatten
+the new terrain completely by only moving the hand cursor up and down and not
+sideways. Only create a small mountain up to a maximum of three levels above
+water level because otherwise you won't be able to flatten the terrain without
+moving the hand cursor sideways. This may seem strange first but keep
+practising with this technique and you'll soon discover it's much more
+efficient. You can also use this technique to lower terrain as well. To lower
+a mountain, simply keep the hand cursor stationary and keep lowering the
+terrain. Because mountains come in different sizes, this probably won't flatten
+the terrain completely but it will make the process much more efficient than
+simply lowering the mountain one piece at a time.
+
+Evil don't know of this technique and will simply raise and lower terrain one
+tile at a time. Depending upon how fast Evil is (on the World Information
+Screen), they will create terrain one tile at a time either shockingly fast or
+extremely slowly.
+
+*******************************************************************************
+
+*** Move Papal Magnet ***
+
+There isn't much to say about this. I've already mentioned that the Papal
+Magnet can be used to remove swamps and ruined cropland. Evil will move their
+Papal Magnet a lot over the course of the game and the sound effect it makes is
+a good clue that Evil are starting to create a strong leader. Evil will usually
+do this just before their population gets to a quarter full.
+
+Another irritating thing Evil do is move the Papal Magnet many times in a row
+in the same location. Because of the way the game works, doing this repeatedly
+slows the game down and it can get quite frustrating.
+
+*******************************************************************************
+
+*** Earthquakes ***
+
+Earthquakes are a weak power. All they do is unflatten and shake up the terrain
+displayed on the Close Up Map. The terrain will be randomly raised and lowered
+in different areas making flat tiles of terrain more scarce and thus making
+settlement building more difficult. You will notice that earthquakes gradually
+lower the land when used repeatedly and because of this, they can be quite
+useful as a tool for lowering terrain and volcanoes. When the Close Up Map
+displays nothing but water, earthquakes do nothing since there is no terrain to
+shake up. Earthquakes can be used to remove single tiles of terrain in the
+water because most of the time, when a single tile of terrain is displayed,
+earthquakes will remove it and just leave water but be careful with this as
+sometimes one tile of terrain is enough to create a lot of terrain.
+
+Evil can also perform earthquakes when permitted. If earthquakes are the only
+power they can perform, then earthquakes will be performed a lot throughout
+that particular world. Evil will earthquake any random areas of terrain that
+have your settlements on it. They will do this at set time stages so when Evil
+hasn't done one for a while, expect one soon. Evil will earthquake settlements
+that are right in the middle of a group of his settlements which is a bit
+stupid but having a single tent far away from your main settlement group might
+be enough to avoid an earthquake on your main settlement group. Evil will also
+earthquake you as a "punishment"; by this I mean that Evil will do one when
+they steal one of your castles or defeat your leader in a fight so a random
+earthquake might be a signal that they have done such an act. Earthquakes are
+visible on the World Map as they change the relief of the terrain so finding
+where Evil did one is not difficult. Most of the time, earthquakes are just an
+annoyance and not really a direct threat to your population; the only time they
+become a problem is when they are all Evil may perform and Evil will perform
+them non-stop throughout the entire world. They perform them so frequently in
+fact that you'll soon be repairing the damage to your flat terrain while they
+do another one. When this happens it's best to strip them of manna which I will
+explain below. If you have it on Go To Papal Magnet and Evil do a volcano,
+immediately switch to settle otherwise all the walkers from the uprooted
+settlements will vacate the terrain and your settlements will be much more
+difficult to get back.
+
+*******************************************************************************
+
+*** Swamps ***
+
+Swamps are a very useful power and if used correctly and expertly, can spell
+the difference between defeat and victory. Like fatal water, swamps have the
+ability to kill a walker without fighting him. I talked earlier about how
+fighting is really population cancelling each other out and that to defeat a
+walker, a walker must represent an equal or larger portion of population than
+the opposing walker. With swamps, this is not necessary and strong walkers such
+as leaders that have been gathering with others can be killed so immediately
+that you can see the population fall in the Population Meters. If you haven't
+much manna and you can do swamps, save up the manna until you are allowed to
+perform them. Don't waste them by swamping on random bits of terrain to get a
+few weak walkers; instead, save it up and when Evil create a strong leader, do
+a swamp to kill the leader and the threat will be eliminated. Swamps are random
+in that doing one on flat terrain will place a random number of swamps on the
+tiles of flat terrain. Swamps inhibit cropland so doing them on areas of
+terrain that have settlements will remove the cropland and thus lower the
+quality of the settlements. This in turn might cause walkers to leave the
+settlements and fall in the swamps. When doing a swamp, bear in mind that they
+can only be created on tiles of flat terrain not occupied by a settlement,
+trees, rocks, good rocks, Papal Magnets and invisible trees. Swamps can also be
+placed in water and walkers will walk into the water to fall in them. Walkers
+do not usually walk in the water and are unable to do so unless a swamp is
+there. Worlds with bottomless swamps are rarer than worlds with shallow swamps
+but it doesn't matter since their best use is to swamp leaders and knights for
+which bottomless swamps make no difference. Bottomless swamps remain after a
+walker falls in and dies in them but since a knight will never fall in one and
+must have a swamp created underneath them for them to fall in and since leaders
+immediately remove the swamp as soon as they fall in them since they leave the
+Papal magnet behind after they die, bottomless swamps make no difference in
+these endeavours.
+
+Evil do swamps too and when they've started doing swamps, they will give up on
+earthquakes for the time being. Swamps are invisible on the World Map and this
+means they are very difficult to find once Evil has done one. The best strategy
+is to press the Pause button as soon as you hear the noise and then go and
+search for the swamps. If you haven't many settlements, finding the swamps
+shouldn't be a problem since the swamps will always be placed upon areas of
+terrain containing your settlements. When you have many settlements, a good
+trick is to use the Swords In Brackets button. As explained earlier, this
+button is used to find fights; when no fights are occurring however, the button
+will cycle randomly through all of your settlements one by one. I find the
+swamps easier to find this way. Remember to keep the Pause button on while
+doing this otherwise your walkers may fall in them. When you've found the
+swamps, press the Pause button to unpause and raise and lower the terrain (or
+vice versa) to remove the swamps. In worlds where one can build near towns
+only, you may find yourself in a situation where one of your walkers is about
+to fall in a swamp and you cannot raise and lower the terrain to remove them.
+There are, of course, other ways to remove them. Placing the Papal Magnet (if
+you can) on swamps will remove them. This may be time consuming but it is
+effective. Using earthquakes and volcanoes too although a bit extreme, will
+remove them as well but you'll be left with the consequences afterwards so
+you'll have to decide whether it be worth it or not. Swamps are not removed by
+performing Armageddon and you will be powerless to remove them after pressing
+the button so make sure you remove any swamps before pressing this button.
+Evil are thankfully oblivious to their usefulness as exterminators of powerful
+walkers and will never purposely swamp your leader or your knight. Like
+earthquakes, swamps will be used as a "punishment" too.
+
+*******************************************************************************
+
+*** Knights ***
+
+Knights can be extremely useful in the right circumstances or the process of
+creating them can be a hindrance to your fortunes. To create the best knights,
+make sure you make him with at least a bit of yellow so that he can eliminate
+as much Evil population as he can. It is important to remember that the amount
+of population you have is approximately proportional to the maximum amount of
+strength you can give your knight. Say for example you have a population meter
+that's a quarter full, if you put the Go To Papal Magnet behavioural button on,
+get as many walkers out of settlement No. 9s as you can, the leader whom you're
+going to turn into a knight will not become stronger than about a quarter bar
+of yellow strength. When the population is at its maximum, you will be able to
+create a leader with maximum yellow strength. Based off this knowledge, I would
+say that the minimum population you need to create a decent knight would be
+slightly less than quarter full on the population meter. Remember that this is
+the minimum I recommend so if you need not make a knight urgently, try and wait
+for a bit of extra population before knighting your leader.
+
+Once you knight your leader, he will go off to battle and will seek out any
+Evil settlements and walkers. If there are Evil settlements near a large number
+of your settlements it would be a good idea to follow your knight and remove
+the settlement just before the knight fights it so as to stop a ruined
+settlement appearing. You can place the shield on your knight if you wish so as
+to monitor his progress. For some reason, if you leave a knight to his own
+devices he will inexplicably become idle. This is a strange phenomenon because
+as soon as you centre the Close Up Map on him, he will be about to fight a
+walker or settlement. Just be advised that you should check up on your knight
+every so often just to see what he's doing. Knights will avoid swamps so there
+is no worry there just be sure to create a bridge for him if he need cross
+water to get to his target otherwise he will go crazy and start going around
+in circles.
+
+You can make more than one knight if you wish but as Evil's population
+diminishes, the knights will target the same settlement and walker and will
+therefore gather into each other. The maximum number of knights with which I've
+ended a world is three so I advise not bothering to create more than this
+number because it won't increase the speed at which they kill Evil population.
+
+Evil can and will make knights if they are permitted to. In fact, they will
+start dedicating their game to the creation of knights once they can and will
+mostly ignore the other powers they have at their disposal. Evil have a
+different way of strengthening their leader which will not work for the you.
+Evil place their Papal Magnet on top of settlements and make their leader enter
+the settlement to gain strength. In theory, this would work for you with small
+settlements but for settlement No. 9s, this would be a problem because they
+hold so much population. Evil walkers will also leave settlement No. 9s and
+other settlements without the green bar being full. So basically, don't expect
+Evil to play the game by the same rules that you play and concentrate on your
+own game. Evil will usually knight their leader by the time he's gotten his
+strength up to about three quarters full of the left orange strength bar.
+Sometimes it's more and sometimes it's slightly less; expect Evil to knight at
+roughly three quarters though. It is a very good idea to keep the Evil leader
+shielded at all times because although you can search for their leader using
+the Papal Magnet In Brackets button, once Evil knight the leader, the knight
+cannot be searched for. Do not attempt to find Evil's knights by pressing the
+search knight (Knight Helmet In Brackets) button because it simply doesn't
+work. With the leader shielded, the knight created will also be shielded and
+can be searched for using the Shield In Brackets Button which locates the
+shield bearer. If you lose the Evil knight, look at the World Map and try to
+spot an anomalous flashing red dot moving towards your settlements. The chances
+are that this dot is the Evil knight. It is good practice to pause the game as
+soon as you hear the "dong" sound effect which signifies that a knight has been
+created. As soon as you hear this sound, pause it and search for the knight.
+Another good way of finding a knight is after you've paused it, search for
+their Papal Magnet. This should find the knight if done quickly since knighting
+the Evil leader will cause their leader to cease to exist and thus the Evil
+Papal Magnet will be placed where the knight was created. Knights are extremely
+destructive and dangerous and dealing with them should become your top priority
+as soon as you hear the sound effect. Ignore Evil knights at your peril.
+
+
+There exist several strategies on dealing with Evil knights. Your goal is to
+kill the knight with as little destruction to your settlements and population
+as possible. The easiest method for killing them is swamping them. If you can
+place swamps, press the swamp button and wait for the knight to walk through an
+area of flat terrain without many settlements, trees or rocks. Press the swamp
+button and with luck the swamp will land underneath the knight and he will die.
+If you were unlucky, the swamp didn't appear underneath him and he carries on
+walking. If the swamp appeared in front of his path, Evil will raise (always
+raise, never lower) the terrain one level to remove the swamp. Try again with
+the swamps until you either get him or run out of manna. If you run out of
+manna or cannot perform the swamp power you will have to try and drown the
+knight in water. This can be tricky because depending upon the world type, you
+will either need a settlement in view or just a walker. Obviously with just a
+walker it's easier. Lower the terrain quickly underneath the knight and try and
+make him fall in the water. This can be quite tricky; the best way for me is
+to wait until the knight is fighting a walker and therefore will be stationary
+and drown both the knight and the walker he's fighting (a necessary sacrifice).
+The drowning process is made much easier if the water is fatal since the knight
+will die immediately and then you can concentrate on doing something else but
+if the water is only harmful, the knight will drown at a rate depending upon
+the landscape type of the world. While the knight is drowning, it's a good idea
+to keep him shielded because depending upon Evil's rating (intelligence), Evil
+will sometimes raise the terrain and the knight will be back fighting your
+settlements. If that happens, simply drown him again and keep the shield on
+him. While he is drowning, if your manna has increased so that you may perform
+the swamp power again, you can try to make a swamp in the little patch of water
+in which he's drowning. If successful, or once the knight has finished
+drowning, raise the terrain and get on with the game.
+
+Another strategy for dealing with knights if they're not too strong and you
+have enough population, is to place the behavioural modification button on Fight
+Then Settle and get some walkers out of settlement No. 9s to fight him. Keep
+the Info-Shield on him and remove any settlements he can defeat just before he
+fights them to avoid the creation of ruined settlements. You can also try to
+position your Papal Magnet near where a knight is so that your strong leader
+can fight and kill him. One of your knights will sometimes target the Evil
+knight and the battle is quite intense. Just make sure that you make your
+knight extra strong so that he can deal with this possible outcome.
+
+Lastly, when Evil makes a knight when another is already around, do not panic.
+Try to deal with the first one quickly and when he's dead or drowning, go for
+the other one. Knights are a consequence of Evil having a large enough
+population. To deal with the knight problem more effectively, steps should be
+taken to lower Evil's population and Evil's ability to make more population.
+Details on how to do this can be found below.
+
+*******************************************************************************
+
+*** Volcanoes ***
+
+Volcanoes are a very strong power. Not only do they raise the terrain high and
+uproot all the settlements on it but they also scatter a number of rocks on the
+terrain for good measure making resettlement difficult even after reflattening
+the terrain. Volcanoes are an excellent way of both lowering Evil's population
+and lowering their ability to make more population. The effect can be
+devastating on landscapes with a faster perish rate. For the best use of
+volcanoes, try to place them in areas where there is a high number of Evil
+settlement No. 9s. While useful, you will find that single volcanoes can be
+gotten down fairly quickly by Evil and so you should find it necessary to
+perform double volcanoes or even triple ones, manna permitting. Try to volcano
+several areas of Evil settlements and uproot most if not all of Evil's
+settlements. You will find that they will have difficulty getting them down and
+that they will lose quite a bit of population and manna because they will
+perform fewer powers and their knight creation scheme will be put on hold.
+Remember though that Evil finds it easier to remove volcanoes because of their
+unique ability to turn rocks into good rocks. Because of this ability, they
+will rarely get the terrain back down to one level above sea level and will
+instead keep the terrain flat but at a higher altitude. This might cause you
+problems if you ever want to drown a leader there or something but apart from
+that it doesn't matter too much.
+
+When Evil do a volcano on you they will sometimes accompany it with three
+earthquakes or a similar number either on the volcano or elsewhere. If they do
+this on the volcano it actually makes it easy to get down because the terrain
+is lower. It was because of this that I discovered how one's own earthquakes
+can be used to one's advantage in this way. If you can perform earthquakes,
+simply earthquake the volcano down as many times as your manna will permit and
+try also to sink the rocks this way too. Once you run out of manna, just remove
+the remaining rocks and flatten the terrain out. If you can't perform
+earthquakes, swiftly lower the volcano manually. Remove most if not all of the
+rocks and get on with what you were doing. If you have it on Go To Papal Magnet
+and Evil do a volcano, immediately switch to Settle otherwise all the walkers
+from the uprooted settlements will vacate the terrain and your settlements will
+be much more difficult to get back.
+
+One of the most difficult scenarios in the game is when Evil are only permitted
+either to do volcanoes or volcanoes and knights. Evil will not of course
+earthquake them down for you and as Evil won't concentrate their efforts on
+much else, volcanoes will be very frequent and can be quite devastating as you
+can't get them down in time before another one is done. As with knights, the
+best solution is to strip them of the ability to create population and thus
+acquire manna. Details on doing this can be found below.
+
+*******************************************************************************
+
+*** Floods ***
+
+Floods are rare occurrences; this is because they require a lot of manna to
+perform and because they are so destructive that they need a lot of preparation
+to perform properly. Floods raise the water level by one level and so terrain
+that was originally two levels above water will become one level above water
+level after a flood. Before you do the flood, unless you want to go around the
+world saving your walkers from drowning and losing a lot of population in the
+process, it's a good idea to start making your terrain two levels above water
+level and encouraging your walkers to build on again at this level. While you
+do this, try and prevent Evil from building on the higher terrain as you want
+all their settlements to be submerged. Once you have enough manna and most of
+if not all of your settlements and walkers are safely on higher terrain, press
+the flood button and a "whoosh" sound effect will occur and the terrain across
+the whole world will lower one level. Your terrain will now be only one level
+above water level and all of Evil's terrain will now be submerged if they were
+only on one level before. Evil will start raising his walkers immediately and
+depending on Evil's rating, will either leave them walking around on small bits
+of terrain or will start creating enough terrain for the walkers to build
+settlements on. Try not to volcano Evil's settlements if you're planning a
+flood because Evil will start creating terrain many levels above water level if
+you do. The only times I perform floods are when I'm finding it very difficult
+to reduce Evil's population because Evil is creating many knights and
+earthquaking me a lot. The trick is to learn how to put the extra level of
+terrain on in readiness.
+
+Evil seem to perform floods very seldom. On the early worlds, floods are all
+they can do and will always do one unless you finish the world very quickly.
+Because Evil's rating in the earlier worlds is so low, Evil will perform floods
+even to their own detriment i.e. they will kill all of their walkers and you
+will win instantly. In these early worlds I would recommend creating terrain
+two levels above water level from the start otherwise you'll have to change it
+all later which takes longer in the long run. In the later worlds, Evil perform
+floods much less frequently and will go through a world without doing one -
+even when that's the only power they can perform. If you want to risk not
+creating terrain two levels above water level, it's up to you but those who
+wish to play safely may want to create two level terrain all the time just for
+peace of mind.
+
+If the worst case scenario occurs and Evil does a flood, water is harmful and
+you didn't prepare for it there are ways to lessen the damage. The best way is
+to pause the game and use the Knight Helmet In Brackets Button to scroll
+randomly through your walkers, most of whom will be drowning. Just find one,
+raise him up and go back to searching. Remember that it scrolls through the
+walkers randomly and so you will likely encounter walkers you've already saved
+before you save them all. If you have a knight, you will not be able to do this
+as the button will scroll through the knights only and ignore the walkers.
+
+*******************************************************************************
+
+*** Armageddon ***
+
+Armageddon will end the world immediately. It places both Papal Magnets in the
+centre of the world (their starting position) and places the behavioural
+modification button on Go To Papal Magnet for both Good and Evil. This means
+that all walkers will gather with their leaders and go to the centre of the
+world to meet one another for one final fight. If your leader wins the fight,
+you win the world (since all the Evil population will be gone); if Evil's
+leader wins the fight, you lose the world (since all your population have been
+wiped out and some Evil population are remaining).
+
+As I state before, walkers represent amounts of population and since during
+Armageddon, all your walkers (including settlements which are removed) gather
+into your leader, your leader represents your entire population and likewise
+Evil's leader will represent the entire Evil population. Because of this, it's
+important to check the population meters before you press the Armageddon button
+because once it's pressed, there is no going back. Because you need a lot of
+manna to do Armageddon (it takes a very long time for the arrow to reach the
+point at the end), you will most likely have more population than Evil but on
+some occasions, when Evil is being quiet and not trying to invade or perform
+powers, Evil might just be ahead on population. Usually this is difficult to
+tell since Evil can be ahead on population when the meters have reached the
+maximum they can show. What I'm trying to say is that although it's very
+uncommon, it is not impossible for Evil to win and you to lose on Armageddon so
+be careful about the population. If you're unsure about population, don't do
+it.
+
+As soon as you press Armageddon, all the settlements will be uprooted and their
+walkers as well as regular walkers will start walking towards the leader in
+order to gather with him. As with regular Go To Papal Magnet, the walkers will
+gather among themselves if they meet too. Knights will instantly transform back
+into normal walkers and will gather with the leader too. After you press the
+button, you will be instantly powerless; all you'll be able to do is search for
+things using the bracket buttons and place the Info-Shield on walkers. You are
+still able to change the behavioural modification buttons but they won't have
+any effect. If any swamps remain, you cannot remove them since you're powerless
+so it's a good idea to remove them before you press Armageddon especially if
+they're near the centre of the world. You do not want your leader to fall in if
+he represents most or all your population or you will lose the world! Although
+you are powerless to raise and lower terrain, bridges will be made
+automatically by the computer if any walkers are cut off by water and any
+drowning walkers will be raised so don't worry that you'll have to wait for the
+walker to drown before the world is finished because that won't happen.
+
+It is important to note that you can perform this power in every world and that
+Evil can never perform this power so don't worry if Evil have more population
+and that they'll do Armageddon because they won't.
+
+Armageddon is a quick way to end a world and is quite useful for this purpose.
+If you're finding it tough to eradicate Evil completely and they keep coming
+back, Armageddon can be an easy way out. Armageddon can also be the solution to
+a particularly tough world on which you're just ahead on population but Evil
+keep making knights for example. Armageddon can end the world quickly - just
+make sure you're ahead on population. Despite its uses, Armageddon can be
+seen as a cheap way out of a world and therefore a form of "cheating" and less
+fun. The hardcore players out there might want to avoid using Armageddon and
+see if they can win the difficult worlds without using this power but it's up
+to you.
+
+*******************************************************************************
+
+*** Reducing Evil's Population ***
+
+As I stated before, the best way to stop Evil performing various powers on your
+settlements and ultimately to win the game is to reduce Evil's population.
+Logically, the best way to do this is not to kill their population with swamps
+but to stop Evil from producing population in the first place. The way Evil
+make population is obviously with their settlements; the more settlements Evil
+have, the more population will be produced and the more manna Evil will have to
+perform annoying earthquakes, swamps, knights and volcanoes.
+
+Earthquakes are good to some degree but you'll quickly find that Evil flatten
+the terrain again too quickly. Multiple earthquakes might slow Evil down a bit
+but still it's too easy to repair them. Swamps don't uproot settlements and
+Evil remove them too quickly as well. Knights can remove settlements but if
+Evil have a lot of population, you'll find that even knights struggle to lower
+Evil's population since Evil have a habit of producing walkers from their
+settlements just before knights fight it when their rating is high. This takes
+up more time which means it will take longer for the knight to destroy all the
+settlements; couple this with the fact that Evil can remove the ruined cropland
+with tremendous speed on difficult worlds and Evil walkers just build
+settlements around them anyway. The best way of removing settlements is with
+volcanoes. Multiple volcanoes can strip Evil of a lot of settlements at once
+and it can take Evil a while to flatten the terrain again - even on the more
+difficult worlds. You will soon notice a drastic reduction in the number of
+powers Evil perform.
+
+There is one snag in the volcano solution though and that's if you can't do
+volcanoes. It's important to remember that all volcanoes are are raised terrain
+with rocks scattered on top. You can't create rocks on their own but you can
+create the mountainous terrain simply by raising the terrain in terrain with
+lots of Evil settlements. To do this you'll either need just a walker if the
+world type is Build Near Towns Or People or you will need a settlement if the
+world type is Build Near Towns Only. Either way, the best way to get one of
+your walkers or settlements in Evil territory is to put the behavioural
+modification button on Fight Then Settle. Eventually, a walker or two will
+stray far enough into their territory for you to do damage with these
+"makeshift volcanoes" or your walkers will win a settlement (all you need is
+simply one small settlement No. 1, a tent) and you can start making makeshift
+volcanoes and uprooting a lot of their settlements. Get as many up as you can
+and keep the terrain up so that they can't build again. Keep your tent their
+for as long as possible before Evil walkers start to attack it. If they do,
+just uproot that as well and go and find another small settlement around which
+you can create makeshift volcanoes.
+
+Combine these makeshift volcanoes with your normal volcanoes when your manna
+runs low or with your knights, after all, the ruined settlements are almost
+like rocks and on mountainous terrain it doesn't matter. Make your makeshift
+volcanoes with makeshift rocks! It doesn't matter, as long as Evil can't settle
+and make population because population is the key to the game. Evil of course
+will never do this trick.
+
+Sometimes, in rare cases, a flood will be the best method of reducing their
+population. You will have tried everything beforehand and are still struggling
+to reduce Evil's population because floods should really be a last resort
+because they're such a pain to carry out. After you do the flood, keep building
+terrain and settlements and try to win as quickly as possible.
+
+*******************************************************************************
+
+*** Go To Papal Magnet ***
+
+You should know by now what Go To Papal Magnet does and how to use it. There
+are a few extra things that need to be said about the function though. Go To
+Papal Magnet can be used to invade Evil settlements, and basically to bring a
+lot of population to a certain area.
+
+Evil will also use Go To Papal Magnet to your disadvantage. For example, Evil
+will do an earthquake or a volcano when you have it on which uproots
+settlements and causes the walkers not to resettle. One way in which Evil will
+use it to your disadvantage is that when Evil have a leader whom they deem to
+have greater strength than your leader (usually they will have more population
+than you too) they will place their Papal Magnet on top of yours in a very
+aggressive move which, if left, will cause your and their leader to fight with
+his leader winning. This can be very frustrating since you cannot move your
+Papal Magnet anywhere without Evil's too and thus can't create a strong leader
+from scratch without being threatened with this action. There are several ways
+to turn this move by Evil to your advantage.
+
+If you have slightly more population or a lot more population, create a strong
+leader very quickly and defeat Evil's leader which will give a boost to your
+manna and will lower Evil's population a bit. This outcome is quite unlikely
+though since Evil probably have more population if they're doing this.
+
+You can keep moving your (and therefore their) Papal Magnet to different
+locations to try and avoid their leader but they'll catch up eventually so I
+recommend placing the Papal Magnets all the way to a distant corner of the
+world preferably with water and then take it off Go To Papal Magnet. Evil's
+leader will always go all the way there and even build bridges to accomplish
+this task which will buy you a bit of time to alter the game in your favour.
+It's quite funny to watch their leader go all the way there too! It should be
+noted that as soon as you take it off Go To Papal Magnet, you won't be able to
+move the Evil Papal Magnet as well so move it quickly while it's still on then
+immediately change to Settle or something.
+
+You can also drown Evil's leader while they're doing this trick or swamp them
+and as soon as their leader is dead or too weak, the Papal Magnet won't be
+moved with yours anymore.
+
+If you can't do swamps and Evil can, a good way to lure their leader into one
+of their own swamps is to move their Papal Magnet into the path of a swamp
+while he's doing this annoying trick. It can be quite tricky but if you line up
+the Papal Magnets perfectly and as long as your leader is ahead of the swamp,
+Evil's leader should fall in and you can start attacking Evil properly. This
+could be construed as a form of cheating but I consider it a valid trick and
+have recovered from tricky situations many times with this method.
+
+When Evil are invading your settlements using their leader and Papal Magnet, be
+sure to uproot every settlement that their leader wins to prevent them from
+gaining a foothold near your settlements and also to stop them getting more
+settlements. You should be trying to drown him or swamp him all the time too.
+If you can't swamp and Evil are preventing you from drowning the Evil leader
+(Evil do this usually when their rating is high), just try to wear him down.
+Do not put it on Fight Then Settle as all your walkers will flock to him and
+will die. Leave it on Settle and let them build; just keep uprooting the
+settlements Evil wins and do not let Evil get a foothold. Eventually, the
+leader will either die or will be weak enough so that Evil recall him to get
+a strength boost in his own territory.
+
+Remember that drowned leaders will be saved by Evil from time to time so keep
+an eye on them with the help of the Info-Shield. Ignore them at your peril!
+
+*******************************************************************************
+
+*** Fight Then Settle ***
+
+Evil will sometimes set their behaviour on Fight Then Settle. You'll know this
+because Evil walkers will come flocking to your settlements. If too many
+flock to the same settlement and you think it will lose, uproot it. If you can
+swamp the walkers, do so; if you can drown the walkers, do so just don't let
+Evil take the settlement or you might set yourself up for a punishment
+earthquake, swamp or volcano and a manna drop penalty.
+
+Evil will put Fight Then Settle on when provoked. Do not go fighting Evil
+settlements when there are lots of Evil Settlements and too few of your walkers
+to fight them. If you do win one and Evil come flocking towards it, do a
+makeshift volcano on their territory, ignore your remaining good walker and get
+on with something else.
+
+A good strategy to stop your walkers and Evil's walkers from meeting too early
+is to "cut off." Usually, you will start a world with Evil on the botton of it
+and you on the top separated by a bit or a lot of water but sometimes you'll
+start on the same bit of terrain and it is a good idea to separate your and
+Evil's settlements with a stretch of water. Try and make it as wide as possible
+and keep monitoring it because Evil will try and join back on when they get
+powerful enough.
+
+For the more daring players, worlds in which Evil and Good start on the same
+bit of terrain might be a blessing. This is because it might be possible to win
+the world very quickly by invading Evil's settlements early on and drowning the
+remaining walkers. Just make sure Evil aren't too far away and that you have
+more population than Evil do at the time. If pulled off, it might save a lot of
+difficulty later on. I've won worlds that get very hard later on by killing off
+Evil early on. Experiment; every world is different and different strategies
+can win different worlds.
+
+*******************************************************************************
+
+*** Gather Then Settle ***
+
+It is a good idea to put this on when the world has a harsh landscape such as
+Snow And Ice. The stronger walkers created by gathering will take longer to
+perish and are thus more likely to find somewhere to settle before they die.
+This behaviour can be annoying when many walkers are present as they will often
+deviate away from flat terrain in order to gather with each other. Put it back
+to Settle if this becomes a nuisance.
+
+*******************************************************************************
+
+*** Settle ***
+
+This should be the most common behaviour you use as settling becomes your
+walkers' priority and the more settlements you have, the more population you
+will get. In harsher landscapes, Gather Then Settle might be a better idea at
+first when most of your walkers are weak. Once you get established, put it back
+to settle because you will have an abundance of walkers.
+
+*******************************************************************************
+
+*** Invading ***
+
+Invading is an excellent way of attacking Evil especially if you can't create
+knights. Simply create a strong leader and place the Papal Magnet in Evil an
+Evil settlement and your leader will win it. Once enough settlements have been
+acquired, place the behaviour on Fight Then Settle. Be careful as your leader
+might get weakened by a repeated onslaught of Evil walkers. If Evil put their
+behaviour on Fight Then Settle, remove their settlements and watch them all
+swarm to your leader who will then kill them all and you will have removed a
+lot of Evil's capability for creating population. Eventually, you should wear
+them down enough so that you are well in the lead on population.
+
+Never be merciful towards Evil and allow them to keep a few settlements or
+walkers if you intend to win the game. Go in for the kill and wipe them all out
+as soon as possible. The object of the game is to win by wiping all of Evil
+out.
+
+*******************************************************************************
+
+*** Continental Shelf ***
+
+As I stated before, settlement No. 9s take a long time to produce a walker but
+they do produce population at a faster rate. If all your settlements are of
+this type, you could not be producing many walkers and not building settlements
+at a fast enough rate. A good way of making sure you have lots of smaller
+settlements which produce more walkers is to build what I call a "continental
+shelf." It's not really a continental shelf in the strictest sense but rather a
+border around the world of two tier terrain which is narrow enough to ensure
+that settlement No. 9s cannot be built. This will produce an abundance of
+walkers who will wander around. Of course, you'll have fewer settlement No. 9s
+as a result but the smaller number won't affect things too much.
+
+
+-------------------------------------------------------------------------------
+
+
+****** FAQs ******
+
+
+This is a section of common problems and how to overcome them quickly. All the
+information in this section is in the main guide but for those who want quick
+answers, here's an FAQ.
+
+- Evil have done an earthquake. What do I do?
+  Flatten the terrain again as quickly as they do. It can be quite annoying
+  when they do lots of them when it is the only thing they can do but you'll
+  just have to keep at it.
+
+- Evil have swamped me.
+  Pause the game and use the Swords In Brackets button to view all your
+  settlements one by one until you find the swamps.
+
+- Evil have made a knight.
+  Don't panic. Pause the game and search for Evil's Papal Magnet. The knight
+  should be nearby. Swamp him or drown him and put the Info-Shield on him to
+  keep an eye on him.
+
+- Evil keep placing their Papal Magnet on mine.
+  Quickly place your Papal Magnet in a distant corner of the world and their
+  Papal Magnet  will be placed with yours. Immediately put the behaviour
+  modification on Settle afterwards to stop your leader following. Their leader
+  will walk all the way to their Papal Magnet. Use this time to reduce their
+  population.
+
+- Evil have volcanoed me.
+  Earthquake it down if you can then remove the remaining rocks and flatten the
+  terrain. If they keep doing them, find a way to reduce their population.
+
+- Evil have done a flood.
+  Use the Helmet In Brackets button to cycle through all your walkers and raise
+  them up one by one. Don't stop till you've found them all. Once you have,
+  rebuild the terrain very quickly and keep the behaviour on Settle.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Bugs/Glitches ******
+
+
+Here I will describe various bugs and glitches in Populous, how they can be
+obtained and how they can be used to your advantage.
+
+*** Landscape Out ***
+
+This is the glitch landscape used on worlds 5995-5999, 6995-6999, 7995-7999
+etc. This is explained in better detail in the Worlds section of this guide
+found below.
+
+*** Leader Knights ***
+
+Normally, when a leader turns into a knight, the leader no longer exists and
+the Papal Magnet is placed where the knight was created to show where the
+leader ceased to exist. Sometimes though, a knight will be created who is also
+a leader. No Papal Magnet will be left behind and the knight will be carrying
+the smaller Papal Magnet symbol with him (either a miniature ankh or skull).
+
+To create a leader knight, place the Papal Magnet inside a settlement No. 9
+(large castle) and when the leader is standing inside the castle, knight him.
+Do not allow the leader to go inside the castle and disappear, simply allow him
+to stand there by making him too strong to go in the castle. Hopefully, if you
+did it right, the knight will be carrying the symbol with him and he'll be a
+leader knight.
+
+The leader knight will not behave like a leader at all and will not gravitate
+towards the Papal Magnet as a regular leader will. Walkers will be attracted to
+him however and as soon as one gathers with the leader knight, the leader
+knight will become a regular knight and the Papal Magnet will be placed to show
+that the leader has ceased to exist.
+
+The only use for them is that they might cause a few walkers to follow the
+knight into battle and fight a few settlements themselves or they might cause
+extra walkers to gather with the knight and make him stronger.
+
+They are very rare but I have spotted Evil leader knights. They disappear very
+quickly though because an Evil walker will usually gather with the knight soon
+after they're created.
+
+*** Unoccupied Settlements ***
+
+Normally, when you uproot a settlement, the settlement disappears and a walker
+replaces it. There is a way for a settlement to become "permanent" i.e. if you
+try to uproot it, it remains in place and no walker replaces it. This can only
+happen when settlement No. 9s (large castles) become unoccupied.
+
+To make a large castle unoccupied you have to drown the walkers in them while
+they're fighting. You will notice that when a settlement is fighting, a walker
+will appear on top of it to fight the invader. While the fight is occurring,
+the settlement is momentarily permanent i.e. you can raise/lower the terrain
+surrounding it and the settlement will not be altered while the fight happens.
+
+If you're quick enough, you can try to drown the two fighting walkers before
+the fight ends and the settlement will become permanent forever. When this
+first happened, I thought I could make a walker "reoccupy" it and tried placing
+the Papal Magnet in there to get the leader to reoccupy it but it didn't work.
+
+The unoccupied large castle behaves in the same way as a ruined settlement and
+the cropland behaves like ruined cropland. Raise and lower the cropland and it
+is removed; sink the parts of the settlement and they will disappear too.
+Settlements can be built next to this unoccupied settlement and it looks very
+strange.
+
+This glitch can only occur with settlement No. 9s because of their size. Other
+settlements only occupy one tile of terrain and so when you drown the walkers
+inside, you also drown the settlement so only the unoccupied cropland remains.
+The unoccupied cropland is interesting but not as much as the settlement.
+
+*** Demoted Knights ***
+
+This is the most useful of the glitches. This will demote a knight back into a
+regular walker and so make them less dangerous. In fact it's an excellent way
+of dealing with knights since if Evil raise them up again, there won't be a
+dangerous knight rampaging around and I recommend this glitch as an effective
+counter-measure for knights. I didn't mention it in the strategies section
+since it is technically a glitch and could be construed as cheating but as it
+works you should use it if you're in trouble.
+
+To change knights back into regular walkers, the water must be harmful and not
+fatal. If the water is fatal, you shouldn't need to use this glitch. When the
+knight is fighting a walker or a settlement, try to drown him and his opponent.
+If you manage to get them both in the water before the fight ends the knight
+will be demoted back to a regular walker. Leave him drowning for as long as
+possible though since he is probably very strong. Evil will sometimes raise him
+up and he'll join back with their leader to make a strong leader whom they'll
+turn into a knight whom you'll then demote and... this can go on for a long
+time. Just keep demoting him as knights are too dangerous to be left alone.
+
+This can be tricky to pull off sometimes when Evil's rating is high because
+they will try to prevent you from drowning the knight. Just keep at it and
+you'll soon prevail.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Worlds ******
+
+
+The game starts at world number 0 GENESIS. Depending upon how well you do at
+the world and if you win, you will jump a number of worlds. The maximum number
+of worlds you can jump is 9 so if you do GENESIS really well you will go on to
+World number 9 BURWILCON. If you win the world badly, you will only jump one
+world so if you do GENESIS badly for example, you will only go on to 1
+HURTOUTORD. The only thing I can't figure out are parameters and rules for
+jumping worlds. For example, I discovered HURTOUTORD because I purposely did
+GENESIS very badly. I let Evil invade me, take a lot of my settlements etc.
+and then fought back only to allow Evil to get me again and again. I think this
+process took at least two hours to accomplish but I was pleased with the
+result. The most common worlds to get after GENESIS are 3 TIMUSLUG and 5
+SCOQUEMET.
+
+*** The Score Screen ***
+
+After a world is either won or lost, you will get a red score screen which
+tells you how you did. The score will be at the bottom and also will be listed
+the number of towns (settlement Nos. 1-8), castles (settlement No. 9), the
+number of knights and the number of fights won for both Good and Evil.
+Obviously the loser of the world will have everything at 0 except for the
+fights. I've never been sure but this list might have something to do with the
+score for the world. Time is certainly irrelevant because I've won some worlds
+within a few minutes and I've only jumped a few worlds. You can play the game
+without worrying too much about the Score Screen and just treat the number of
+worlds you jump as random if you want because you'll keep going to new worlds
+after you win the previous one. The Score Screen itself might have something to
+to with the number of worlds jumped after winning a world. If you have any
+further information about this please e-mail me and tell me about it.
+
+Update: I think having a leader at the time of winning a world affects the
+score a lot. Most of the time when I had a leader and won the game my score was
+above 100000 and most of the time when I had no leader my score was around
+50000. A couple of times this was not the case but most of the time it was.
+
+*** The Blue-Hooded Figure ***
+
+After the red score screen, a blue-hooded figure will tell you which world you
+must do next. In the early worlds, he will say "Well Done Mortal", after 50
+worlds he will say "Well Done Immortal" after 100 worlds he will say "Well Done
+Eternal", after 150 worlds he will say "well Done Deva", after 200 worlds he
+will say "Well Done Greater Being", after 250 worlds he will say "Well Done
+Deity", after 300 worlds he will say "Well Done Greater Deity", after 350
+worlds he will say "Well Done Mortal God", after 400 worlds he will say "Well
+Done Greater God" and finally after 450 worlds he will say "Well Done Eternal
+God." You stay as Eternal God for the rest of the game. After this screen,
+you're taken to the next world's World Information Screen.
+
+*** World Types ***
+
+It is important to understand that World Types will repeat themselves in sets
+of five worlds. For example, consider the World Type GENESIS; GENESIS has
+bottomless swamps, fatal water, Grassy Plains landscape, Evil is very slow,
+Evil rating is very low, both Good and Evil start with three walkers each,
+Good can perform all the powers and Evil can perform none. This world type will
+repeat itself for the next four worlds which, including GENESIS, makes five
+worlds; GENESIS, HURTOUTORD, World No. 2, TIMUSLUG and CALDIEHILL will all have
+the above attributes. The only thing that's different about them is the layout
+of the terrain at the start of the world and the number of trees, rocks and
+good rocks. This is usually enough to make the character and difficulty of the
+world different enough so you won't mind repeating a world type.
+
+A new World Type starts and finishes every five worlds so 0-4 will be the same
+type, 5-9 will be the same type, 10-14 will be the same type, 15-19 will be the
+same type and 20-24 will be the same type etc. ad nauseam.
+
+*** World Name List ***
+
+Here is a long list of world names for this version of Populous. I started a
+complete list of worlds many years ago but never finished it because with world
+jumping it's difficult to start on the precise number you need.
+
+After the 2011 update of this FAQ I discovered that there is a world name
+password generator located at http://www.smspower.org/Cheats/Populous-SMS and
+any world name password up to the last one, 32768 SHISODING, can be obtained
+using this.
+
+This latest update renders this list redundant now but I've kept it as a
+reference. Please note that a few of these might be incorrect.
+
+0 GENESIS         51 BUGWILLIN     106 MOREALL       579 TIMINORD
+1 HURTOUTORD      52 SHADOGODON    111 ALPDIPERT     597 COREAEND
+3 TIMUSLUG        53 COROPERT      112 BADKOPOUT     602 VERYDIICK
+4 CALDIEHILL      54 BINMEOUT      115 BUGGBJOB      820 SHADIOUT
+5 SCOQUEMET       55 SADMPT        117 CORSODDON     823 SADSODER
+6 SWAUER          56 LOWHIPBAR     122 VERYQUEER     826 VERYUSMAR
+8 EOAOZORD        57 QAZOUTER      362 MORADOR       833 HURTINGCON
+9 BURWILCON       58 VERYELIN      390 SWAAING       840 EOAUSCON
+10 MORINGILL      59 MINGBDON      396 BILOZED       848 BADIILL
+11 NIMIHILL       60 HAMINMAR      398 MMPTTOUT      851 BUGSODME
+16 BADACON        61 FUTLOPLUG     404 SHADEHAM      861 FUTINGDOR
+18 HOBDIETORY     62 SUZTT         412 HAMOGOBOY     862 SUZIICK
+19 BUGQUEEND      63 DOUPEBAR      421 SCOLOPPAL     863 DOUCEHOLE
+21 CORBEHAM       64 SHIOZER       422 SWATHOLE      865 HURTHIPAL
+22 BINOZOND       65 HURTIKEING    430 WEAVKOPOUT    871 KILLTLAS
+23 SADWILLOW      66 JOSOGOORD     439 SADIKEBAR     877 RINGMEPERT
+24 LOWINGICK      67 TIMOBAR       447 DOUGBER       880 BADOUTBAR
+25 QAZITORY       68 CALMELUG      452 CALEAHILL     887 SADOZBAR
+26 VERYMEEND      69 SCOMPHILL     456 EOADEORD      899 TIMTLUG
+27 MINMPME        70 SWAHIPMET     457 BURDICON      907 NIMHIPTORY
+28 HAMHIPOLD      71 KILLQAZET     459 NIMQAZTORY    3572 SHADWILCON
+29 FUTOUTBOY      72 EOAEING       462 WEAVASHAM     3662 WEAVQAZAL
+30 SUZALOW        73 BURGBORD      464 BADYCON       4999 KILLOGOAL
+31 DOUUSICK       74 MORINCON      470 BINDFOND      5009 IMMTDOR
+32 SHIDIEHOLD     75 NIMLOPILL     475 MINCEME       5050 VERYSODME
+33 HURTLOPLAS     76 BILTHILL      477 FUTSODBOY     5056 SHIOEND
+34 JOSTME         77 RINGOXMET     481 HURTDIELAS    5063 KILLASLAS
+35 TIMPEOLD       78 WEAVEAED      484 CALDEBOY      5068 BILIKEDAL
+36 CALOZBOY       79 ALPIKEHAM     485 SCODIDOR      5077 CORASOUT
+37 SCOWILDOR      81 IMMOCON       487 KILLINGPERT   5085 FUTDET
+38 SWAINGPAL      82 HOBMEILL      496 BADQUET       5088 SHIQAZING
+39 KILLOHOLE      83 BUGMPTORY     500 SHADWILDON    5093 SCOYBAR
+40 EOAMELAS       86 BINEHAM       511 DOUUBAR       5100 BILDIMET
+41 BURMPAL        87 SADGBOND      518 SWAASMET      5108 SHADAED
+42 MORHIPPIL      88 LOWINGLON     523 NIMDIEHILL    5116 HAMINGOLD
+43 NIMMOUTJOB     93 FUTIKEOLD     532 SHADMPEND     5119 DOUASICK
+44 BILADOR        94 SUZOGOBOY     535 SADAOND       5120 SHISODHOLE
+45 RINGGBPAL      96 SHIMEICK      538 VERYLOPITOLE  5122 JOSAME
+46 WEAVINPERT     97 HURTDIHOLE    541 FUTOZOLD      5125 SCOQUEDOR
+47 ALPLOPOUT      98 JOSKOPLAS     587 NIMMECON      5129 BURWILAL
+48 BADTAL         99 TIMQAZAL      554 MORPEAL       5130 MORINGPILL
+49 IMMPEPIL       103 KILLSODDAL   564 SHADGBLIN     5136 BADAAL
+50 HOBOZJOB       105 BUROXLAS     572 HAMODON       5145 QAZIJOB
+
+I must say that it is not advisable to try and guess world names. The
+chances of finding one this way are very low. I did however find one by
+accident. I accidentally typed 500 SHADWILDON as SHADWILCON and it found a
+completely different world: 3572 SHADWILCON.
+
+4999 KILLOGOAL was mentioned for a long time in magazines and guides as the
+"last world in the game" because of its number. It is not the last world and it
+is certainly not the hardest either. You can do nothing while Evil can do
+earthquakes, swamps and knights while the landscape is Grassy Plains. You also
+both start with 15 population which makes the world not that difficult in my
+opinion especially as volcanoes aren't a problem. I have gotten up to KILLOGOAL
+legitimately and have played the game through the 1000s, 2000s, 3000s and
+4000s to get to it. After KILLOGOAL and other '999 worlds, the game gets a bit
+easier for a while before increasing in difficulty after another 100 worlds or
+so.
+
+*** The End? ***
+
+The game states on the back of the box that there are 5000 worlds to complete.
+This is not strictly true. The game I believe, goes on a lot longer than 5000
+worlds. The trouble is, from World 5120 SHISODHOLE onwards, the game no longer
+accepts the world names as passwords and so unless you play the game without
+switching the game off after this world, you will not be able to use the
+passwords you obtain. This means that world 5119 DOUASICK is the last password
+from which you can continue your game and thus it is the final password that
+works. Because of this, the game does only have approximately 5000 worlds as
+stated on the back of the box. The trouble is the game has no proper ending.
+There is no credits screen, no end to the story or anything like that, only
+passwords that don't work after a certain world.
+
+I once tried not switching it off and got to World 5300 and as it still didn't
+end and as I'd been playing for several hours, I gave up. With modern
+technology however, it is possible to continue the game beyond 5119 DOUASICK
+and turn the game off and continue later. I am of course talking about
+emulators, ROMs and save states. I used an emulator over several weeks to get
+to World 5995 NIMINGTORY and what I saw shocked me: it was glitch-terrain. Some
+screenshot links are below.
+
+*** World 5995 NIMINGTORY ***
+
+The World Information Screen looks normal enough except curiously it says the
+landscape is "Out." This "Out" landscape type is glitch landscape and I don't
+include it with the proper six landscape types. I also don't know whether the
+word "Out" is intended or whether the name itself is also a glitch. I'm
+guessing the name is intended because the rest of the World Information Screen
+is normal (although none of it matters in the glitch landscape).
+
+Press Button 1, and you'll enter a world with a World Map of flashing blue and
+white and a Close Up Map of white flashing pixels. Walkers are visible and
+settlements are only visible with the flags they have. Nine out of ten tries at
+this world type and the game will crash so you'll have to reload the save state
+and try again. Also, the first time I got up to this world, it corrupted the
+save state so be warned. This "Out" landscape seems to have either no rules or
+very strange rules. Your manna bar will increase quickly and you'll be able to
+raise and lower the "terrain" anywhere. I don't know how I won, but simply
+raising the terrain on Evil "settlements" seemed to erase their population and
+I won the game. Other times I lost using this method so a lot of it is trial
+and error I suppose.
+
+Remember that nine out of ten tries, the game will crash and I had to try this
+world about fifty times before I won and it got quite frustrating. Just keep at
+it and you'll "win" the world eventually. Once you do, you'll be taken to world
+6000 and above which are normal worlds again and you can go on to the next
+glitch world which is world 6995!
+
+As I discussed earlier, the World Types repeat themselves in groups of five.
+This means that the "Out" glitch World Type is from worlds 5995-5999,
+6995-6999, 7995-7999 etc. The furthest I ever got was to world 7997. I got up
+to world 7995 and spent ages doing it. Once I did, I ended up on world 7997
+which try as a I might, I could not do: it just kept crashing again and again
+and since I was getting seriously bored with Populous anyway, I decided to call
+it a day at that. I'd spent enough time on it already.
+
+Try it yourself if you want and see if you can get further. Remember that the
+rest of the worlds in the 6000s and 7000s are normal apart from the '995-'999s
+so there are relatively very few glitch worlds. You can probably understand why
+the designers of the game stopped the passwords working!
+
+*** World 5995 NIMINGTORY Screenshot Links ***
+
+The first screenshot is of the World Information Screen and the other two are
+of the Close Up Map.
+
+http://i493.photobucket.com/albums/rr295/edwithmj/5995NIMINGTORYinfoscreen.png
+http://i493.photobucket.com/albums/rr295/edwithmj/5995NIMINGTORYmap.png
+http://i493.photobucket.com/albums/rr295/edwithmj/5995NIMINGTORYmap2.png
+
+As you can see, everything is normal in the World Information Screen except the
+Landscape is "Out." The Close Up Map shows glitch terrain even when it's
+supposed to be showing water. Walkers are visible and a couple of settlement
+flags can just be seen too.
+
+Here's a quote from Maxim, one of the admins of www.smspower.org about this:
+
+"I guess it is a glitch in the game, using an invalid landscape type; it could
+have been something they intended to use (a new landscape type at higher
+levels) or it might just be a bug. It is possible they never tested those level
+numbers, because of the cutoff, so it doesn't matter; or it's possible they
+added the cutoff because of the bug."
+
+So perhaps the "Out" landscape type was originally intended to be a difficult
+landscape type for a later world, maybe to be used as a final world. That would
+make sense seeing as they appear at every x995-x999 World Type from 5995-5999
+onwards. If so, that might've led to a proper ending but we'll never know.
+
+*** New Information ***
+
+Go to http://www.smspower.org/Cheats/Populous-SMS and you will find a complete
+list of worlds. After testing this out, it appears that there are 32768 world
+name passwords. The game designers did indeed stop the passwords from working
+from 5120 SHISODHOLE onwards but the site provides a patch for the Populous
+game ROM which I applied to the ROM using WindHex hex editor. After this is
+successfully applied, any world name password will work when entered and I was
+able to get up to world 32768 SHISODING. It's a good job I never tried to get
+up to this world by playing the game normally as it would've taken me a while!
+
+The first thing I noticed about this world was that the terrain on the World
+Map looked exactly the same as GENESIS except it was Rock And Lava. The World
+Information Screen was different too with different attributes. Good and Evil
+started with one walker each and I completed the world as quickly as I could.
+The game did not end after this and instead I was taken to world 32773
+SCOQUEMET. Does that name ring a bell? Yep, it's world number 5! I entered this
+into the password entry screen and it took me to SCOQUEMET again except this
+time it was the normal SCOQUEMET with Battle Number 5. So I did SHISODING
+again and luckily got back to the 32773 SCOQUEMET again and played it. Again,
+it had different attributes and the landscape was Rock And Lava instead of
+SCOQUEMET's normal landscape Desert but the terrain layout at the start was
+identical to the original SCOQUEMET. I played this one to completion and did
+the next one also until I got to BUGQUEEND which is Battle Number 19 normally
+but this time it was 32787 and instead of being Rock And Lava it was Snow And
+Ice. So the game repeats itself after 32768 worlds? Here's a quote from Maxim,
+one of the admins of www.smspower.org about this:
+
+"I think if you got up to level 65536 (16 bits) the game would display GENESIS
+identically to how it normally looks, because this is the true upper limit for
+the level number representation. It uses the level number to generate the level
+itself, and as you can see there are similarities when you get up to these high
+numbers which were never intended to be available.
+
+When it generates the passwords, it is wrapping over at 15 bits, because it
+uses three five-bit word part sets. In theory, if you were good enough at the
+game, lucky enough and spent way too much time, you could play the original
+game all the way up to level 65536 and wrap around, playing indefinitely."
+
+So in theory the game will loop back to GENESIS with the normal GENESIS
+attributes after 65536 worlds. I have no way of testing this because even the
+ROM hack won't help me as the passwords for worlds above 32768 only take me to
+the original 32768 worlds. So I'd have to complete 32768 worlds from SHISODING
+onwards to test this theory. I think I'll take Maxim's word for it!
+
+The website above renders my list of worlds redundant as any world name can be
+obtained using the site's world name generator although the patch must be
+applied for world name passwords of worlds 5120 and above to work. With the
+generator I was finally able to see the elusive World No. 2 which I now know is
+JOSAMAR. With this generator, the glitch worlds can be completely skipped
+altogether as there's no need to do them to get to the later worlds. I've kept
+my World Name List above as a reference.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Hidden Messages ******
+
+
+There are five extra passwords that can be entered to produce hidden messages
+in the game. Once entered, the messages can be viewed but the game must be
+reset in order to enter new passwords. I shall list the passwords and paste the
+message obtained below them. Screenshots are available on
+http://www.smspower.org/Cheats/Populous-SMS if you want to see them.
+
+SANTIAGO
+
+09 NOV 89
+HELLO TIM AND ROZ
+THANKYOU FOR YOUR LETTERS.
+THEY PARODY MY DRAB
+EXISTENCE WELL.
+FINAL IN 3 DAYS SO ALL IS
+DARK. MUST GO NOW AS I AM
+RUNNING OUT OF SPACE.
+BEST OF LUCK TO YOU BOTH.
+SEE YOU IN RIO.
+REGARDS PETER.
+
+
+STOCKHOLM
+
+DET VAR EN GONG EN SVENSKA
+FLICKA SOM TOG LILLA SIMON
+FUR ALLTID
+
+
+PIXIE
+
+HI NIKKI
+MANY THANKS FOR ALL YOUR
+HELP. THIS IS TO LET YOU
+KNOW THAT YOUR EFFORTS
+REALLY ARE APPRECIATED.
+BYE
+SI.
+
+
+CODETOGO
+
+IT WAS QUITE A CHALLENGE
+EH DAN.
+IT WOULDN'T HAVE HAPPENED
+WITHOUT YOU.
+THANXALOT CTG.
+TIME FOR ME TO GET A LIFE.
+CHEERS
+PEZ FRIO.
+
+
+STEVEANDJO
+
+HEY BRUV AN SIS-IN-LAW
+HAVING A WONDERFUL TIME
+WISH YOU WERE HERE
+MY ROOM MARKED WITH AN X.
+SEE YOU SOON
+BIGBOMBASHER.
+
+
+I have no idea why these were included in the game. If anyone has any
+information about them, please e-mail me at the address below.
+
+
+-------------------------------------------------------------------------------
+
+
+****** Final Notes ******
+
+Thanks to Maxim and everyone else at www.smspower.org for the information in
+the Hidden Messages section, the ROM patch, the additional information about
+the passwords, and the World Name Password generator on their site.
+
+This guide can be found on the following sites:
+
+www.gamefaqs.com
+www.gamewinners.com
+
+If you wish to post this guide on your site, please send me an e-mail first to
+the address below.
+
+I hope you enjoyed reading this. I consider Populous to be the best game on the
+Sega Master System because of its longevity and varied game play.
+
+Having trouble? E-mail me at edwithmj (at) yahoo (dot) co (dot) uk and I will
+respond.
+
+Thanks for reading.
+Good Day.

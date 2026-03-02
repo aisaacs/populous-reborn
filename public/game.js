@@ -31,6 +31,7 @@ let textureOpacity = 1.0;
 
 function getTileTexture(tx, ty) {
   if (swampSet.has(tx + ',' + ty)) return terrainTextures.swamp;
+  if (pebbles.has(tx + ',' + ty)) return terrainTextures.rock;
 
   const t = heights[tx][ty], r = heights[tx + 1][ty];
   const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
@@ -105,6 +106,18 @@ const treeImg = new Image();
 let treeLoaded = false;
 treeImg.src = 'gfx/tree.png';
 treeImg.onload = () => { treeLoaded = true; };
+
+// ── Pebbles Sprite ──────────────────────────────────────────────────
+const pebblesImg = new Image();
+let pebblesLoaded = false;
+pebblesImg.src = 'gfx/pebbles.png';
+pebblesImg.onload = () => { pebblesLoaded = true; };
+
+// ── Ruins Sprite ────────────────────────────────────────────────────
+const ruinsImg = new Image();
+let ruinsLoaded = false;
+ruinsImg.src = 'gfx/ruins.png';
+ruinsImg.onload = () => { ruinsLoaded = true; };
 
 // ── Music System ───────────────────────────────────────────────────
 const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3', 'music/004.mp3'];
@@ -192,18 +205,22 @@ let swamps = [];
 let swampSet = new Set();
 let rocks = new Set();
 let trees = new Set();
+let pebbles = new Set();
+let ruins = []; // {x, y, team}
+let ruinSet = new Set();
 let cropSetBlue = new Set();
 let cropSetRed = new Set();
 let seaLevel = SEA_LEVEL;
 let leaders = [-1, -1];
 let armageddon = false;
-let magnetLocked = false;
+let magnetLocked = [false, false];
 let teamPop = [0, 0];
 let fires = []; // {x, y, a (age in seconds)}
 let fireParticles = []; // client-side particles for rendering
 let targetingPower = null;
 let inspectMode = false;
 let inspectData = null; // {type:'settlement'|'walker', screenX, screenY, ...data}
+let magnetMode = false;
 
 // ── Space Background ────────────────────────────────────────────────
 const STAR_COUNT = 300;
@@ -526,6 +543,59 @@ function drawTile(tx, ty) {
     const sh = treeImg.height * scale;
     ctx.drawImage(treeImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
   }
+
+  // Pebble sprite on pebble tiles
+  if (pebbles.has(tileKey)) {
+    const midX = (pTop.x + pBottom.x) / 2;
+    const midY = (pTop.y + pBottom.y) / 2;
+    const tileW = (pRight.x - pLeft.x);
+    if (pebblesLoaded) {
+      const scale = tileW * 0.5 / pebblesImg.width;
+      const sw = pebblesImg.width * scale;
+      const sh = pebblesImg.height * scale;
+      ctx.drawImage(pebblesImg, midX - sw / 2, midY - sh * 0.5, sw, sh);
+    } else {
+      // Fallback: small grey-brown dots
+      ctx.fillStyle = '#8a7a6a';
+      for (let i = 0; i < 4; i++) {
+        const ox = (i % 2 - 0.5) * tileW * 0.2;
+        const oy = (Math.floor(i / 2) - 0.5) * tileW * 0.1;
+        ctx.beginPath();
+        ctx.arc(midX + ox, midY + oy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Ruins sprite on ruin tiles
+  if (ruinSet.has(tileKey)) {
+    const midX = (pTop.x + pBottom.x) / 2;
+    const midY = (pTop.y + pBottom.y) / 2;
+    const tileW = (pRight.x - pLeft.x);
+    // Find the ruin's team for tinting
+    const ruin = ruins.find(r => r.x === tx && r.y === ty);
+    if (ruinsLoaded) {
+      const scale = tileW * 0.6 / ruinsImg.width;
+      const sw = ruinsImg.width * scale;
+      const sh = ruinsImg.height * scale;
+      ctx.drawImage(ruinsImg, midX - sw / 2, midY - sh * 0.6, sw, sh);
+      // Team-color tint overlay
+      if (ruin) {
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = TEAM_COLORS[ruin.team];
+        ctx.fillRect(midX - sw / 2, midY - sh * 0.6, sw, sh);
+        ctx.restore();
+      }
+    } else {
+      // Fallback: brown rubble marks (deterministic positions)
+      ctx.fillStyle = ruin ? (ruin.team === TEAM_BLUE ? '#4a5a6a' : '#6a4a4a') : '#4a3a2a';
+      const offsets = [[-0.15, -0.06], [0.1, 0.04], [-0.05, 0.08], [0.12, -0.04], [0.0, 0.0]];
+      for (const [fx, fy] of offsets) {
+        ctx.fillRect(midX + fx * tileW - 1, midY + fy * tileW - 1, 3, 2);
+      }
+    }
+  }
 }
 
 function rebuildWalkerGrid() {
@@ -673,10 +743,10 @@ function drawSettlement(s) {
     const img = settlementSprites[key];
     if (img && img.complete) {
       const tileH = pBottom.y - pTop.y;
-      // Fill %: 75% tent/hut, 85% cottage-manor, 95% towerhouse/fortress, 55% castle (3×3)
-      const fillPct = s.sz >= 3 ? 0.55 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
-      // Anchor sprite: small buildings extend above diamond, castle sits centered
-      const centerY = s.sz >= 3 ? pTop.y + tileH * 0.45 : pTop.y + tileH * 0.25;
+      // Fill %: 55% tent, 75% hut, 85% cottage-manor, 95% towerhouse/fortress, 55% castle (3×3)
+      const fillPct = s.sz >= 5 ? 0.55 : s.l === 1 ? 0.55 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
+      // Anchor sprite: tent/small sit lower, castle sits centered
+      const centerY = s.sz >= 5 ? pTop.y + tileH * 0.45 : s.l === 1 ? pTop.y + tileH * 0.35 : pTop.y + tileH * 0.25;
       const dh = tileH * fillPct / 0.75;
       const scale = dh / img.height;
       const dw = img.width * scale;
@@ -703,23 +773,108 @@ function drawSettlement(s) {
   }
 }
 
+// ── Papal Magnet — Beacon ────────────────────────────────────────────
+const BEACON_COLORS = [
+  { core: '130,180,255', glow: '60,120,255', base: '100,160,255' },   // TEAM_BLUE
+  { core: '255,160,130', glow: '255,60,40',  base: '255,100,80' },    // TEAM_RED
+];
+
 function drawMagnetFlag(team) {
   const mp = magnetPos[team];
   const h = heightAt(mp.x, mp.y);
   const p = project(mp.x, mp.y, h);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1;
+  const sx = p.x, sy = p.y;
+  const time = performance.now() / 1000;
+  const isLocked = magnetLocked[team];
+  const colors = BEACON_COLORS[team];
+
+  // Pulse (gentle 0.85–1.0) or locked flicker (stuttery)
+  const pulse = 0.85 + 0.15 * Math.sin(time * 2.5);
+  const flicker = isLocked
+    ? (Math.sin(time * 17) > 0.3 ? 0.4 : 0.15)
+    : pulse;
+  const alpha = flicker;
+
+  const beamHeight = 220;
+  const beamTopW = 1;
+  const beamBotW = 6;
+  const topY = sy - beamHeight;
+
+  // Core beam (bright trapezoid)
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.9;
   ctx.beginPath();
-  ctx.moveTo(p.x, p.y);
-  ctx.lineTo(p.x, p.y - 16);
-  ctx.stroke();
-  ctx.fillStyle = TEAM_COLORS[team];
+  ctx.moveTo(sx - beamTopW, topY);
+  ctx.lineTo(sx + beamTopW, topY);
+  ctx.lineTo(sx + beamBotW, sy);
+  ctx.lineTo(sx - beamBotW, sy);
+  ctx.closePath();
+  const beamGrad = ctx.createLinearGradient(sx, topY, sx, sy);
+  beamGrad.addColorStop(0, `rgba(${colors.core},0)`);
+  beamGrad.addColorStop(0.1, `rgba(${colors.core},0.3)`);
+  beamGrad.addColorStop(0.5, `rgba(${colors.core},0.7)`);
+  beamGrad.addColorStop(1, `rgba(${colors.core},1)`);
+  ctx.fillStyle = beamGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // Outer glow beam (wider, softer)
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.3;
+  const glowW = beamBotW * 3;
   ctx.beginPath();
-  ctx.moveTo(p.x, p.y - 16);
-  ctx.lineTo(p.x + 8, p.y - 13);
-  ctx.lineTo(p.x, p.y - 10);
+  ctx.moveTo(sx - beamTopW * 2, topY);
+  ctx.lineTo(sx + beamTopW * 2, topY);
+  ctx.lineTo(sx + glowW, sy);
+  ctx.lineTo(sx - glowW, sy);
+  ctx.closePath();
+  const glowGrad = ctx.createLinearGradient(sx, topY, sx, sy);
+  glowGrad.addColorStop(0, `rgba(${colors.glow},0)`);
+  glowGrad.addColorStop(0.3, `rgba(${colors.glow},0.1)`);
+  glowGrad.addColorStop(1, `rgba(${colors.glow},0.3)`);
+  ctx.fillStyle = glowGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // Base glow (radial)
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.6;
+  const baseR = 20;
+  const baseGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, baseR);
+  baseGrad.addColorStop(0, `rgba(${colors.base},0.8)`);
+  baseGrad.addColorStop(0.5, `rgba(${colors.base},0.2)`);
+  baseGrad.addColorStop(1, `rgba(${colors.base},0)`);
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(sx - baseR, sy - baseR / 2, baseR * 2, baseR);
+  ctx.restore();
+
+  // Base diamond
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = `rgb(${colors.core})`;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - 4);
+  ctx.lineTo(sx + 5, sy);
+  ctx.lineTo(sx, sy + 3);
+  ctx.lineTo(sx - 5, sy);
   ctx.closePath();
   ctx.fill();
+  ctx.fillStyle = `rgba(255,255,255,${alpha * 0.8})`;
+  ctx.fillRect(sx - 1, sy - 1, 2, 2);
+  ctx.restore();
+
+  // Rising particles (deterministic, no pool needed)
+  ctx.save();
+  ctx.fillStyle = `rgba(255,255,255,0.8)`;
+  for (let i = 0; i < 8; i++) {
+    const phase = (time * 40 + i * 31.7) % beamHeight;
+    const py = sy - phase;
+    const px = sx + Math.sin(time * 3 + i * 2.1) * 3;
+    const pAlpha = Math.sin((phase / beamHeight) * Math.PI);
+    ctx.globalAlpha = alpha * 0.6 * pAlpha;
+    ctx.fillRect(Math.floor(px), Math.floor(py), 1, 1);
+  }
+  ctx.restore();
 }
 
 // ── Fire Particle System ─────────────────────────────────────────────
@@ -1000,9 +1155,11 @@ function updateSidebar() {
     btn.classList.toggle('active', teamMode[myTeam] === m);
   });
 
-  // Inspect button
+  // Tool buttons
   const inspBtn = document.getElementById('btn-inspect');
   if (inspBtn) inspBtn.classList.toggle('active', inspectMode);
+  const magBtn = document.getElementById('btn-magnet');
+  if (magBtn) magBtn.classList.toggle('active', magnetMode);
 
   // Stats
   const otherTeam = myTeam === 0 ? 1 : 0;
@@ -1335,6 +1492,22 @@ function applyStateSnapshot(msg) {
     }
   }
 
+  pebbles = new Set();
+  if (msg.pebbles) {
+    for (let i = 0; i < msg.pebbles.length; i += 2) {
+      pebbles.add(msg.pebbles[i] + ',' + msg.pebbles[i + 1]);
+    }
+  }
+
+  ruins = [];
+  ruinSet = new Set();
+  if (msg.ruins) {
+    for (let i = 0; i < msg.ruins.length; i += 3) {
+      ruins.push({ x: msg.ruins[i], y: msg.ruins[i + 1], team: msg.ruins[i + 2] });
+      ruinSet.add(msg.ruins[i] + ',' + msg.ruins[i + 1]);
+    }
+  }
+
   cropSetBlue = new Set();
   cropSetRed = new Set();
   if (msg.crops) {
@@ -1348,7 +1521,7 @@ function applyStateSnapshot(msg) {
   seaLevel = msg.seaLevel !== undefined ? msg.seaLevel : SEA_LEVEL;
   leaders = msg.leaders || [-1, -1];
   armageddon = msg.armageddon || false;
-  magnetLocked = msg.magnetLocked || false;
+  magnetLocked = msg.magnetLocked || [false, false];
   teamPop = msg.teamPop || [0, 0];
   fires = msg.fires || [];
 }
@@ -1374,6 +1547,14 @@ canvas.addEventListener('mousedown', (e) => {
   // Inspect mode click
   if (inspectMode && e.button === 0) {
     performInspect(e.clientX, e.clientY);
+    return;
+  }
+
+  // Magnet mode click
+  if (magnetMode && e.button === 0) {
+    const { px, py } = screenToGrid(e.clientX, e.clientY);
+    sendMessage({ type: 'magnet', x: px, y: py });
+    magnetMode = false;
     return;
   }
 
@@ -1406,6 +1587,9 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 function activatePower(powerDef) {
   if (armageddon) return;
   if (myMana < powerDef.cost) return;
+  magnetMode = false;
+  inspectMode = false;
+  inspectData = null;
   if (powerDef.targeted) {
     targetingPower = powerDef.id;
   } else {
@@ -1420,6 +1604,7 @@ window.addEventListener('keydown', (e) => {
     targetingPower = null;
     inspectMode = false;
     inspectData = null;
+    magnetMode = false;
     return;
   }
 
@@ -1431,8 +1616,14 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'g' || e.key === 'G') {
     gridMode = (gridMode + 1) % GRID_MODES.length;
   }
+  if (e.key === 'f' || e.key === 'F') {
+    magnetMode = !magnetMode;
+    if (magnetMode) { inspectMode = false; inspectData = null; targetingPower = null; }
+    return;
+  }
   if (e.key === 'i' || e.key === 'I') {
     inspectMode = !inspectMode;
+    if (inspectMode) { magnetMode = false; targetingPower = null; }
     if (!inspectMode) inspectData = null;
     return;
   }
@@ -1558,10 +1749,16 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
   });
 });
 
-// Sidebar: inspect button click handler
+// Sidebar: tool button click handlers
+document.getElementById('btn-magnet').addEventListener('click', () => {
+  if (!gameStarted || armageddon) return;
+  magnetMode = !magnetMode;
+  if (magnetMode) { inspectMode = false; inspectData = null; targetingPower = null; }
+});
 document.getElementById('btn-inspect').addEventListener('click', () => {
   if (!gameStarted) return;
   inspectMode = !inspectMode;
+  if (inspectMode) { magnetMode = false; targetingPower = null; }
   if (!inspectMode) inspectData = null;
 });
 
@@ -1658,6 +1855,19 @@ function drawMinimap() {
   ctx.fillStyle = '#3a5a1a';
   for (const s of swamps) {
     ctx.fillRect(mm.x + s.x * MM_SCALE, mm.y + s.y * MM_SCALE, cs, cs);
+  }
+
+  // Pass 2d: pebbles
+  ctx.fillStyle = '#8a7a6a';
+  for (const key of pebbles) {
+    const [px, py] = key.split(',');
+    ctx.fillRect(mm.x + px * MM_SCALE, mm.y + py * MM_SCALE, cs, cs);
+  }
+
+  // Pass 2e: ruins
+  ctx.fillStyle = '#4a3a2a';
+  for (const r of ruins) {
+    ctx.fillRect(mm.x + r.x * MM_SCALE, mm.y + r.y * MM_SCALE, cs, cs);
   }
 
   // Pass 3: settlements (team-colored squares sized to footprint)
@@ -1829,6 +2039,30 @@ function showPowerBar() {
   // Powers are now in the sidebar, shown when sidebar becomes visible
 }
 
+// ── Performance Tracking ────────────────────────────────────────────
+let perfFrames = 0;
+let perfAccum = 0;
+let perfRenderAccum = 0;
+let perfFps = 0;
+let perfFrameMs = 0;
+
+function updatePerfCounter(dt, renderMs) {
+  perfFrames++;
+  perfAccum += dt;
+  perfRenderAccum += renderMs;
+  if (perfAccum >= 0.5) {
+    perfFps = Math.round(perfFrames / perfAccum);
+    perfFrameMs = (perfRenderAccum / perfFrames).toFixed(1);
+    perfFrames = 0;
+    perfAccum = 0;
+    perfRenderAccum = 0;
+    const elFps = document.getElementById('perf-fps');
+    const elFrame = document.getElementById('perf-frame');
+    if (elFps) elFps.textContent = perfFps;
+    if (elFrame) elFrame.textContent = perfFrameMs;
+  }
+}
+
 // ── Game Loop ───────────────────────────────────────────────────────
 let lastFrame = 0;
 
@@ -1861,7 +2095,10 @@ function gameLoop(now) {
   updateFireParticles(dt);
   spawnWaterfallParticles(dt);
   updateWaterfallParticles(dt);
+  const t0 = performance.now();
   render();
+  const renderMs = performance.now() - t0;
+  updatePerfCounter(dt, renderMs);
   requestAnimationFrame(gameLoop);
 }
 

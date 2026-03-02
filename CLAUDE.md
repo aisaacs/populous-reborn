@@ -16,7 +16,7 @@ This is a Populous-inspired 1v1 multiplayer isometric god game with authoritativ
 - `server.js` — HTTP static server + WebSocket server + game simulation + room management
 - `public/game.js` — Renderer + WebSocket client + walker interpolation + power targeting + music + lobby handlers
 - `public/index.html` — Lobby UI + game canvas + power bar UI + music control
-- `public/music/` — Music tracks (`001.mp3`, `002.mp3`, `003.mp3`)
+- `public/music/` — Music tracks (`001.mp3`, `002.mp3`, `003.mp3`, `004.mp3`)
 - `public/gfx/` — Sprites: settlement sprites (`tent-blue.png`, etc.), `boulders.png`, `tree.png`, terrain textures
 - `historical/` — Reference docs about the original Populous game mechanics (`manual1.txt`, `manual2.txt`, `faq.txt`, `hotkeys.txt`). Consult these when implementing or verifying faithful game mechanics.
 
@@ -84,7 +84,7 @@ Dual-environment: loaded as `<script>` tag on client (globals), `require()` on s
 - **Footprint:** Levels 1-8 occupy 1 tile. Castle occupies 3×3 centered on home tile. Managed by `updateSettlementFootprint`.
 - **Settling:** `settleWalker` creates settlement, auto-clears trees, evaluates initial level from crops. Chain-settling: if walker strength > capacity, deposits capacity and continues with remainder.
 - **No merges:** Settlements don't merge (faithful to Populous).
-- **Crop fields:** Flat tiles in 5×5 zone around settlement. Exclude water, rocks, swamps, settlement footprints. Trees auto-cleared. Competition: higher-level settlement wins contested crops; same level = lower index wins. Computed by `computeCrops()` every tick.
+- **Crop fields (Populous-faithful):** Flat tiles in 5×5 zone (`CROP_ZONE_RADIUS=2`) around settlement. Exclude water, rocks, swamps, settlement footprints. Trees auto-cleared. **Same-team sharing:** multiple same-team settlements in range all count the shared tile. **Enemy blocking:** tiles claimed by both teams are contested and blocked for both (enemy crops hamper like swamps/rocks). Computed by `computeCrops()` every tick in 3 phases: claim, contest, count.
 - **`cropOwnerMap`:** Int32Array mapping tile → settlement index. Prevents new settlements on claimed crop tiles.
 
 #### Population Growth & Ejection
@@ -106,7 +106,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 |-------|------|--------|----------|----------|
 | Swamp | 60 | W | Yes | Place trap on flat tile; enemy walkers die on contact |
 | Knight | 200 | E | No | Leader at a settlement consumes it, becomes knight (3x strength, 1.5x speed, fights only), wrecks terrain |
-| Flood | 500 | T | No | Raise sea level by 1, kill/destroy newly submerged entities |
+| Flood | 500 | T | No | Lower all terrain by 1 (preserves slopes), kill/destroy newly submerged entities |
 | Earthquake | 1500 | Q | Yes | Randomly lower points 0-2 times within radius 7 |
 | Volcano | 5000 | R | Yes | Raise terrain to MAX_HEIGHT with falloff, add rock tiles, kill units in radius 5 |
 | Armageddon | All mana | Y | No | Destroy all settlements (eject as walkers), all march to center and fight |
@@ -141,7 +141,10 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Rendering only:** No simulation. Receives state snapshots from server at 20Hz.
 - **Walker interpolation:** Stores prev/curr walker snapshots, lerps positions by elapsed tick fraction for smooth 60fps rendering. Passes through `isLeader`/`isKnight` flags.
 - **Settlement sprites:** 9 levels × 2 teams = 18 sprites loaded from `gfx/`. `SETT_LEVEL_NAMES = ['tent','hut','cottage','house','largehouse','manor','towerhouse','fortress','castle']`. Sprite sizing varies by level: 75% for tent/hut, 85% for cottage–manor, 95% for towerhouse/fortress, 60% for castle (3×3). Sprites scaled around visual center (`pTop.y + tileH*0.25` for 1×1, midpoint for 3×3).
-- **Drawing pipeline:** Pass 1: terrain tiles (with crop/swamp overlays, boulder/tree sprites). Pass 2: settlements (sorted by depth). Pass 3: walkers via grid (with leader crown / knight cross markers). Then: targeting overlay, magnet flags. Reset to screen space: HUD, power bar update, minimap, population meters, inspect tooltip, armageddon overlay, game over overlay.
+- **Space background:** Dark cosmic void with 300 twinkling stars and 3 nebula glows (cached to offscreen canvas). Stars have random brightness and twinkle speed. Rare diffraction spikes (4-pointed cross) appear on bright stars at peak luminosity (~0.2% chance per cycle, deterministic hash so they hold briefly rather than flicker).
+- **Waterfall particles:** 3000-particle pool. Water tiles on front map edges (x=MAP_W-1, y=MAP_H-1) spawn falling particles. Particles stored in grid coordinates (`gx`, `gy`) with pixel offsets (`ox`, `oy`) so they scroll with the map. Edge mist effect on front water edges.
+- **Fire particles:** Spawned at burning settlement ruins (from `fires[]` in state). Intensity decreases over 5s fire lifetime. Particles rise with random drift, transition orange→red→dark with decreasing alpha.
+- **Drawing pipeline:** Space background (screen space) → zoom transform → terrain tiles (crop/swamp overlays, boulder/tree sprites) → settlements (depth-sorted) → walkers via grid (leader crown / knight cross) → fire particles → targeting overlay → magnet flags → edge mist → waterfall particles → reset to screen space → sidebar update → minimap → population meters → inspect tooltip → armageddon/game over overlays.
 - **Crop overlay:** Blue team: `rgba(100,180,60,0.35)`, Red team: `rgba(160,160,40,0.35)` on crop tiles.
 - **Swamp overlay:** Green-brown semi-transparent (`rgba(80,100,30,0.5)`) on swamp tiles
 - **Rock overlay:** Boulder sprite on rock tiles
@@ -151,22 +154,20 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Targeting mode:** `targetingPower` variable. For earthquake/volcano shows orange-tinted radius overlay. For swamp shows single-tile highlight. Click sends `{type:'power', power, x, y}`, Escape cancels.
 - **Armageddon overlay:** Red "ARMAGEDDON" text, disables all player input except camera
 - **Sea level:** Mutable `seaLevel` variable, updated from server state, replaces `SEA_LEVEL` constant in water checks
-- **State reception:** `applyStateSnapshot` unpacks heights, walkers, settlements, magnetPos, teamMode, mana, swamps (builds `swampSet`), rocks (builds Set), trees (builds Set), crops (builds `cropSetBlue`/`cropSetRed`), seaLevel, leaders, armageddon, magnetLocked, teamPop
+- **State reception:** `applyStateSnapshot` unpacks heights, walkers, settlements, magnetPos, teamMode, mana, swamps (builds `swampSet`), rocks (builds Set), trees (builds Set), crops (builds `cropSetBlue`/`cropSetRed`), fires, seaLevel, leaders, armageddon, magnetLocked, teamPop
 - **Minimap:** 200x200px top-down map in bottom-right corner. Pass 1: terrain. Pass 2a: crops (blue/red tints). Pass 2b: trees (dark green). Pass 2c: swamps. Pass 3: settlements. Pass 4: walkers. Pass 5: magnets. Pass 6: viewport bounds. LMB click scrolls main view.
 - **Population meters:** `drawPopulationMeters()` — two vertical bars (blue/red) centered at top of screen, showing relative team population. Updated from `teamPop` sent by server.
 - **Inspect tool:** `I` hotkey toggles inspect mode. Click on settlement or walker shows tooltip with stats (level, pop/cap, tech, strength, team). Escape dismisses. `performInspect(sx, sy)` hit-tests settlements then walkers, `drawInspectTooltip()` renders info box.
+- **Zoom:** Mouse wheel zoom. Min zoom dynamically calculated to fit entire map: `Math.min(canvas.width / mapScreenW, canvas.height / mapScreenH) * 0.9`.
 - **Input:** LMB raise (or power targeting click, or minimap click, or inspect click), RMB lower, Shift+LMB magnet, 1-4 mode keys, Q/W/E/R/T/Y power hotkeys, I inspect toggle, Escape cancel targeting/inspect, M mute toggle, MMB pan, G grid toggle, mouse wheel zoom, edge pan. Armageddon blocks all non-camera input.
-- **Power bar:** `updatePowerBar()` called each frame toggles `disabled`/`active` CSS classes. `showPowerBar()` on game start. Button click handlers mirror hotkey behavior via `activatePower()`.
-- **Music:** 3 tracks in `public/music/`, shuffled and played sequentially in a loop. Starts on game start. Volume (0-1, default 0.3) and mute state persisted to `localStorage`.
+- **Sidebar:** Left-side panel (160px) with: population bars (blue/red), mana bar, 2×2 mode grid (Settle/Magnet/Fight/Gather), powers list ordered by cost (Swamp→Knight→Flood→Earthquake→Volcano→Armageddon), inspect tool button, team stats, music volume slider. `updatePowerBar()` toggles `disabled`/`active` classes on power buttons via `data-power` attribute.
+- **Music:** 4 tracks in `public/music/`, shuffled and played sequentially in a loop. Starts on game start. Volume (0-1, default 0.3) and mute state persisted to `localStorage`.
 - **Lobby:** Create/Join/AI UI in HTML overlay, hidden when game starts.
 
 ### HTML/CSS (`public/index.html`)
 - Full-viewport canvas with crosshair cursor
 - Lobby overlay: centered box with create/join/AI buttons, room code display, waiting state
-- Power bar: fixed bottom-center flex row of 6 buttons, each showing hotkey, name, cost. Costs: Swamp 60, Knight 200, Flood 500, Quake 1500, Volcano 5000, Armageddon ALL. Dark semi-transparent background. `.disabled` class (opacity 0.35), `.active` class (orange border + glow).
-- Music control: fixed top-right, mute button (note icon) + volume slider (range input). Always visible.
-- Texture opacity slider: adjacent to music controls.
-- Help text bar: fixed top-left showing all controls including powers, I for inspect, Escape, and M for mute
+- Sidebar (`#sidebar`): fixed left panel, 160px wide. Sections: population bars, mana bar, 2×2 mode grid (`.mode-grid`), powers list (`.power-list` with `.power-btn` rows showing hotkey/name/cost), inspect tool button, team stats, music volume slider. `.disabled` (opacity 0.35), `.active` (orange border + glow for powers, green for modes).
 
 ### Key Design Patterns
 - **Authoritative server:** All game logic is server-side. Client is pure renderer + input sender.
@@ -179,7 +180,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Settlement conquest:** Walkers capture (not destroy) enemy settlements. Knights are the exception — they destroy and wreck terrain.
 - **Tech inheritance:** Walkers inherit tech level from their settlement when ejected. Tech affects combat via `TECH_ADVANTAGE_MULT`.
 - **Papal magnet lifecycle:** Magnet drops and locks on leader death, unlocks when new leader assigned. Prevents magnet manipulation without a leader.
-- **localStorage persistence:** Music volume, mute state, texture opacity saved across sessions.
+- **localStorage persistence:** Music volume and mute state saved across sessions.
 
 ### Tuning Philosophy
 Target: ~20 minute games, slow strategic pace. Terrain manipulation is nearly free (1 mana). Population growth is gradual (0.1 per crop/sec). Ejection has 15s dwell time. Walker speed is slow (0.8 tiles/sec, ~80s to cross map). Powers are exponentially spaced: swamp (60) is tactical, knight (200) is an investment, earthquake (1500) is rare, volcano (5000) is once-per-game. Mana generation is slow (0.015/pop/sec) making every power a meaningful decision.
