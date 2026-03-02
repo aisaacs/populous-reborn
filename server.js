@@ -608,17 +608,45 @@ function updateWalkers(state, dt) {
 function settleWalker(state, w, tx, ty) {
   if (isTileInSettlementFootprint(state, tx, ty)) return;
   w.dead = true;
-  const sq = findLargestFlatSquare(state, tx, ty, null);
   const s = {
     team: w.team,
-    level: sq.size,
+    level: 1,
     population: w.strength,
     tx, ty,
-    sqOx: sq.ox, sqOy: sq.oy, sqSize: sq.size,
+    sqOx: tx, sqOy: ty, sqSize: 1,
     dead: false,
+    atCapTicks: 0,
   };
   state.settlements.push(s);
   setSettlement(state, tx, ty, s);
+}
+
+// Find a flat square of exactly the given size containing (tx,ty)
+function findFlatSquareOfSize(state, tx, ty, size, exclude) {
+  const h = state.heights[tx][ty];
+  if (h <= state.seaLevel || !isTileFlat(state, tx, ty)) return null;
+  if (size === 1) {
+    if (!squareOverlapsSettlement(state, tx, ty, 1, exclude)) return { ox: tx, oy: ty };
+    return null;
+  }
+  const oxMin = Math.max(0, tx - size + 1);
+  const oxMax = Math.min(C.MAP_W - size, tx);
+  const oyMin = Math.max(0, ty - size + 1);
+  const oyMax = Math.min(C.MAP_H - size, ty);
+  for (let ox = oxMin; ox <= oxMax; ox++) {
+    for (let oy = oyMin; oy <= oyMax; oy++) {
+      let allFlat = true;
+      for (let dx = 0; dx < size && allFlat; dx++) {
+        for (let dy = 0; dy < size && allFlat; dy++) {
+          if (!isTileFlat(state, ox + dx, oy + dy) || state.heights[ox + dx][oy + dy] !== h) allFlat = false;
+        }
+      }
+      if (allFlat && !squareOverlapsSettlement(state, ox, oy, size, exclude)) {
+        return { ox, oy };
+      }
+    }
+  }
+  return null;
 }
 
 function findLargestFlatSquare(state, tx, ty, exclude) {
@@ -653,79 +681,46 @@ function findLargestFlatSquare(state, tx, ty, exclude) {
 function tryMergeSettlements(state) {
   for (const s of state.settlements) {
     if (s.dead) continue;
-    const h = state.heights[s.tx][s.ty];
-    if (h <= state.seaLevel || !isTileFlat(state, s.tx, s.ty)) continue;
+    // Only merge when settlement is at capacity and ready to grow
+    const cap = C.LEVEL_CAPACITY[s.level];
+    if (s.population < cap || s.level >= 5) continue;
 
-    let bestSq = null;
-    for (let n = 5; n > s.sqSize; n--) {
-      const oxMin = Math.max(0, s.tx - n + 1);
-      const oxMax = Math.min(C.MAP_W - n, s.tx);
-      const oyMin = Math.max(0, s.ty - n + 1);
-      const oyMax = Math.min(C.MAP_H - n, s.ty);
+    const nextLevel = s.level + 1;
 
-      for (let ox = oxMin; ox <= oxMax && !bestSq; ox++) {
-        for (let oy = oyMin; oy <= oyMax && !bestSq; oy++) {
-          let allFlat = true;
-          for (let dx = 0; dx < n && allFlat; dx++) {
-            for (let dy = 0; dy < n && allFlat; dy++) {
-              if (!isTileFlat(state, ox + dx, oy + dy) || state.heights[ox + dx][oy + dy] !== h)
-                allFlat = false;
-            }
-          }
-          if (!allFlat) continue;
+    // Find a square of nextLevel size containing s's home tile
+    const sq = findFlatSquareOfSize(state, s.tx, s.ty, nextLevel, s);
+    if (!sq) continue;
 
-          const absorbed = [];
-          let conflict = false;
-          for (const other of state.settlements) {
-            if (other.dead || other === s) continue;
-            const homeinside = other.tx >= ox && other.tx < ox + n &&
-                               other.ty >= oy && other.ty < oy + n;
-            const sqOverlap = ox < other.sqOx + other.sqSize && ox + n > other.sqOx &&
-                              oy < other.sqOy + other.sqSize && oy + n > other.sqOy;
-            if (homeinside && other.team === s.team) {
-              absorbed.push(other);
-            } else if (sqOverlap) {
-              conflict = true;
-              break;
-            }
-          }
-          if (!conflict && absorbed.length > 0) bestSq = { ox, oy, size: n };
-        }
-      }
-      if (bestSq) break;
-    }
-
-    if (!bestSq) continue;
-
-    // Collect all settlements in the merge area (including s itself)
-    const participants = [s];
+    // Check which same-team settlements would be covered by the new footprint
+    const absorbed = [];
+    let conflict = false;
     for (const other of state.settlements) {
-      if (other.dead || other === s || other.team !== s.team) continue;
-      if (other.tx >= bestSq.ox && other.tx < bestSq.ox + bestSq.size &&
-          other.ty >= bestSq.oy && other.ty < bestSq.oy + bestSq.size) {
-        participants.push(other);
+      if (other.dead || other === s) continue;
+      const homeCovered = other.tx >= sq.ox && other.tx < sq.ox + nextLevel &&
+                          other.ty >= sq.oy && other.ty < sq.oy + nextLevel;
+      if (homeCovered && other.team === s.team) {
+        absorbed.push(other);
+      } else if (homeCovered) {
+        conflict = true; // enemy settlement in the way
+        break;
       }
     }
+    if (conflict || absorbed.length === 0) continue;
 
-    // The biggest settlement (by population) survives at its position
-    participants.sort((a, b) => b.population - a.population);
-    const survivor = participants[0];
-
-    let totalPop = 0;
-    for (const p of participants) totalPop += p.population;
-
-    for (const p of participants) {
-      if (p === survivor) continue;
-      p.dead = true;
-      clearSettlementMap(state, p.tx, p.ty);
+    // Absorb covered settlements and upgrade
+    let totalPop = s.population;
+    for (const a of absorbed) {
+      totalPop += a.population;
+      a.dead = true;
+      clearSettlementMap(state, a.tx, a.ty);
     }
 
-    survivor.population = totalPop;
-    survivor.level = bestSq.size;
-    survivor.sqOx = bestSq.ox;
-    survivor.sqOy = bestSq.oy;
-    survivor.sqSize = bestSq.size;
-    setSettlement(state, survivor.tx, survivor.ty, survivor);
+    s.population = totalPop;
+    s.level = nextLevel;
+    s.sqOx = sq.ox;
+    s.sqOy = sq.oy;
+    s.sqSize = nextLevel;
+    setSettlement(state, s.tx, s.ty, s);
   }
 }
 
@@ -746,18 +741,18 @@ function evaluateSettlementLevels(state) {
   for (const s of state.settlements) {
     if (s.dead) continue;
 
-    if (isSquareStillValid(state, s)) {
-      const sq = findLargestFlatSquare(state, s.tx, s.ty, s);
-      if (sq.size > s.sqSize) {
-        s.level = sq.size;
-        s.sqOx = sq.ox;
-        s.sqOy = sq.oy;
-        s.sqSize = sq.size;
+    if (!isSquareStillValid(state, s)) {
+      // Current square is no longer valid — downgrade until we find a valid level
+      let newLevel = s.level;
+      let sq = null;
+      while (newLevel > 0) {
+        sq = findFlatSquareOfSize(state, s.tx, s.ty, newLevel, s);
+        if (sq) break;
+        newLevel--;
       }
-    } else {
-      const sq = findLargestFlatSquare(state, s.tx, s.ty, s);
 
-      if (sq.size === 0) {
+      if (newLevel === 0 || !sq) {
+        // Can't even hold a level 1 — destroy
         s.dead = true;
         clearSettlementMap(state, s.tx, s.ty);
         if (s.population > 0) {
@@ -769,10 +764,10 @@ function evaluateSettlementLevels(state) {
         continue;
       }
 
-      s.level = sq.size;
+      s.level = newLevel;
       s.sqOx = sq.ox;
       s.sqOy = sq.oy;
-      s.sqSize = sq.size;
+      s.sqSize = newLevel;
     }
 
     const cap = C.LEVEL_CAPACITY[s.level];
@@ -800,12 +795,29 @@ function updatePopulationGrowth(state) {
       if (!s.atCapTicks) s.atCapTicks = 0;
       s.atCapTicks = 0; // reset eject counter while growing
     } else if (cap > 0) {
-      // At capacity — count ticks before ejecting
+      // At capacity — try to upgrade level if terrain supports it
       if (!s.atCapTicks) s.atCapTicks = 0;
       s.atCapTicks++;
       const delay = EJECT_DELAY[s.level] || 1;
       if (s.atCapTicks >= delay) {
         s.atCapTicks = 0;
+
+        // Check if flat terrain supports next level
+        const nextLevel = s.level + 1;
+        if (nextLevel <= 5) {
+          const sq = findFlatSquareOfSize(state, s.tx, s.ty, nextLevel, s);
+          if (sq) {
+            // Upgrade one level, keep half population as base
+            s.level = nextLevel;
+            s.population = Math.floor(cap / 2);
+            s.sqOx = sq.ox;
+            s.sqOy = sq.oy;
+            s.sqSize = nextLevel;
+            continue;
+          }
+        }
+
+        // Can't upgrade — eject walkers
         const ejectStrength = Math.max(1, Math.floor(s.population / 3));
         s.population -= ejectStrength;
         const angle = Math.random() * Math.PI * 2;
