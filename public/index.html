@@ -2,91 +2,207 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Populous</title>
+  <title>Populous Reborn</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Raleway:wght@300;400;600&display=swap');
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #111; overflow: hidden; font-family: monospace; color: #ccc; }
+    body { background: #060611; overflow: hidden; font-family: 'Raleway', sans-serif; color: #ccc; }
     canvas { display: block; cursor: crosshair; }
     #game { display: none; }
 
-    /* Lobby */
+    /* ── Lobby background canvas ─────────────────────────────── */
+    #lobby-bg {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 0;
+    }
+
+    /* ── Lobby ────────────────────────────────────────────────── */
     #lobby {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 10;
     }
     .lobby-box {
-      background: #1a1a2e;
-      border: 1px solid #333;
-      border-radius: 8px;
-      padding: 40px;
+      background: radial-gradient(ellipse at center, rgba(15, 15, 40, 0.92) 0%, rgba(8, 8, 22, 0.96) 100%);
+      border: 1px solid rgba(100, 140, 255, 0.15);
+      border-radius: 16px;
+      padding: 48px 56px;
       text-align: center;
-      min-width: 320px;
+      min-width: 380px;
+      box-shadow: 0 0 60px rgba(40, 60, 120, 0.15), 0 0 120px rgba(30, 50, 100, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+      backdrop-filter: blur(8px);
     }
     .lobby-box h1 {
-      color: #66bb33;
-      font-size: 28px;
-      margin-bottom: 8px;
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-weight: 900;
+      font-size: 48px;
+      letter-spacing: 8px;
+      margin-bottom: 0;
+      line-height: 1.1;
+      background: linear-gradient(180deg, #b8d8ff 0%, #4488ff 40%, #2266cc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(68, 136, 255, 0.4));
+      animation: titlePulse 4s ease-in-out infinite;
+    }
+    @keyframes titlePulse {
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(68, 136, 255, 0.3)); }
+      50% { filter: drop-shadow(0 0 35px rgba(68, 136, 255, 0.6)); }
+    }
+    .lobby-box .title-sub {
+      font-family: 'Raleway', sans-serif;
+      font-weight: 300;
+      font-size: 18px;
+      letter-spacing: 14px;
+      text-transform: uppercase;
+      color: rgba(130, 170, 255, 0.45);
+      margin-bottom: 6px;
+      margin-left: 14px;
     }
     .lobby-box .subtitle {
-      color: #666;
-      font-size: 12px;
-      margin-bottom: 30px;
+      font-family: 'Raleway', sans-serif;
+      font-weight: 300;
+      color: rgba(160, 180, 220, 0.45);
+      font-size: 11px;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      margin-bottom: 36px;
     }
     .lobby-box button {
-      background: #2a7a2a;
-      color: #fff;
-      border: none;
-      padding: 10px 24px;
-      font: bold 14px monospace;
-      border-radius: 4px;
+      background: linear-gradient(180deg, rgba(30, 50, 100, 0.9) 0%, rgba(18, 32, 70, 0.95) 100%);
+      color: rgba(180, 210, 255, 0.9);
+      border: 1px solid rgba(80, 130, 255, 0.25);
+      padding: 12px 28px;
+      font: 600 13px 'Raleway', sans-serif;
+      letter-spacing: 2px;
+      border-radius: 6px;
       cursor: pointer;
-      margin: 4px;
+      margin: 5px;
+      transition: all 0.25s;
+      text-transform: uppercase;
     }
     .lobby-box button:hover {
-      background: #44aa44;
+      background: linear-gradient(180deg, rgba(40, 65, 130, 0.95) 0%, rgba(25, 45, 95, 0.95) 100%);
+      border-color: rgba(100, 160, 255, 0.5);
+      box-shadow: 0 0 25px rgba(68, 136, 255, 0.2);
+      color: #fff;
+    }
+    .lobby-box button:active {
+      transform: scale(0.97);
     }
     .lobby-box input {
-      background: #0a0a1a;
-      color: #ccc;
-      border: 1px solid #444;
-      padding: 8px 12px;
-      font: 16px monospace;
-      border-radius: 4px;
-      width: 100px;
+      background: rgba(5, 5, 20, 0.8);
+      color: #b8d8ff;
+      border: 1px solid rgba(100, 140, 255, 0.25);
+      padding: 10px 14px;
+      font: 600 18px 'Raleway', sans-serif;
+      border-radius: 6px;
+      width: 110px;
       text-align: center;
       text-transform: uppercase;
-      letter-spacing: 4px;
+      letter-spacing: 6px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .lobby-box input:focus {
+      outline: none;
+      border-color: rgba(100, 140, 255, 0.5);
+      box-shadow: 0 0 15px rgba(68, 136, 255, 0.15);
     }
     .lobby-box input::placeholder {
-      color: #444;
-      letter-spacing: 2px;
+      color: rgba(100, 130, 180, 0.35);
+      letter-spacing: 3px;
     }
     .divider {
-      color: #444;
-      margin: 20px 0;
-      font-size: 12px;
+      color: rgba(100, 140, 200, 0.3);
+      margin: 24px 0;
+      font-size: 11px;
+      letter-spacing: 4px;
+      font-weight: 300;
+      position: relative;
     }
+    .divider::before, .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 60px;
+      height: 1px;
+    }
+    .divider::before { right: calc(50% + 36px); background: linear-gradient(90deg, transparent, rgba(100, 140, 255, 0.15)); }
+    .divider::after { left: calc(50% + 36px); background: linear-gradient(-90deg, transparent, rgba(100, 140, 255, 0.15)); }
     #waiting-section {
       display: none;
     }
     .room-code-display {
-      font-size: 32px;
-      color: #4488ff;
-      letter-spacing: 6px;
-      margin: 12px 0;
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-weight: 700;
+      font-size: 36px;
+      color: #6aa8ff;
+      letter-spacing: 10px;
+      margin: 16px 0;
+      text-shadow: 0 0 20px rgba(68, 136, 255, 0.4);
     }
     #waiting-text {
-      color: #888;
+      color: rgba(160, 180, 220, 0.6);
       font-size: 14px;
+      font-weight: 300;
+      letter-spacing: 1px;
+      animation: waitPulse 2s ease-in-out infinite;
+    }
+    @keyframes waitPulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
     }
     #error-text {
-      color: #ff4444;
+      color: #ff6666;
       font-size: 12px;
-      margin-top: 12px;
-      min-height: 16px;
+      font-weight: 400;
+      margin-top: 16px;
+      min-height: 18px;
+    }
+    /* Lobby volume control */
+    .lobby-vol {
+      position: fixed;
+      bottom: 20px;
+      right: 24px;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .lobby-vol:hover { opacity: 1; }
+    .lobby-vol button {
+      background: none;
+      border: none;
+      color: #8ab;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .lobby-vol input {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 80px;
+      height: 3px;
+      background: #334;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    .lobby-vol input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #8ab;
+      cursor: pointer;
     }
 
     /* ── Sidebar ─────────────────────────────────────────────── */
@@ -299,17 +415,19 @@
   </style>
 </head>
 <body>
+  <canvas id="lobby-bg"></canvas>
   <div id="lobby">
     <div class="lobby-box">
       <h1>POPULOUS</h1>
-      <div class="subtitle">1v1 Multiplayer</div>
+      <div class="title-sub">Reborn</div>
+      <div class="subtitle">Multiplayer God Game</div>
 
       <div id="create-section">
         <button id="btn-create">Create Game</button>
         <button id="btn-ai">Play vs AI</button>
       </div>
 
-      <div class="divider">- or -</div>
+      <div class="divider">or join</div>
 
       <div id="join-section">
         <input id="join-code" type="text" maxlength="4" placeholder="CODE">
@@ -323,6 +441,12 @@
 
       <div id="error-text"></div>
     </div>
+  </div>
+
+  <!-- Lobby volume control (visible on title screen) -->
+  <div class="lobby-vol" id="lobby-vol">
+    <button id="lobby-mute-btn">&#9835;</button>
+    <input id="lobby-vol-slider" type="range" min="0" max="100" value="30">
   </div>
 
   <canvas id="game"></canvas>

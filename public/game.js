@@ -217,6 +217,162 @@ document.getElementById('btn-mute').addEventListener('click', () => {
 // Init UI from saved prefs
 syncMusicUI();
 
+// ── Lobby Background Animation ──────────────────────────────────────
+const lobbyBg = document.getElementById('lobby-bg');
+const lobbyCtx = lobbyBg.getContext('2d');
+let lobbyActive = true;
+
+// Lobby stars (separate from game stars)
+const LOBBY_STAR_COUNT = 400;
+const lobbyStars = [];
+for (let i = 0; i < LOBBY_STAR_COUNT; i++) {
+  lobbyStars.push({
+    x: Math.random(),
+    y: Math.random(),
+    size: Math.random() < 0.8 ? 1 : (Math.random() < 0.9 ? 1.5 : 2),
+    brightness: 0.2 + Math.random() * 0.8,
+    twinkleSpeed: 0.3 + Math.random() * 1.5,
+    hue: Math.random() < 0.7 ? 0 : (Math.random() < 0.5 ? 220 : 30),
+  });
+}
+
+// Drifting particles (slow floating motes)
+const LOBBY_MOTE_COUNT = 60;
+const lobbyMotes = [];
+for (let i = 0; i < LOBBY_MOTE_COUNT; i++) {
+  lobbyMotes.push({
+    x: Math.random(), y: Math.random(),
+    vx: (Math.random() - 0.5) * 0.008,
+    vy: -0.002 - Math.random() * 0.006,
+    size: 1 + Math.random() * 2,
+    alpha: 0.1 + Math.random() * 0.3,
+    hue: 200 + Math.random() * 40,
+  });
+}
+
+function resizeLobbyBg() {
+  lobbyBg.width = window.innerWidth;
+  lobbyBg.height = window.innerHeight;
+}
+resizeLobbyBg();
+window.addEventListener('resize', () => { if (lobbyActive) resizeLobbyBg(); });
+
+function renderLobby(now) {
+  if (!lobbyActive) return;
+  requestAnimationFrame(renderLobby);
+
+  const W = lobbyBg.width, H = lobbyBg.height;
+  const t = now / 1000;
+
+  // Dark background with subtle gradient
+  const bg = lobbyCtx.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.4, Math.max(W, H) * 0.7);
+  bg.addColorStop(0, '#0c0c24');
+  bg.addColorStop(1, '#040410');
+  lobbyCtx.fillStyle = bg;
+  lobbyCtx.fillRect(0, 0, W, H);
+
+  // Nebula clouds
+  const nebulae = [
+    { x: 0.25, y: 0.3, r: 0.3, color: [30, 20, 80] },
+    { x: 0.75, y: 0.6, r: 0.35, color: [15, 30, 70] },
+    { x: 0.5, y: 0.15, r: 0.2, color: [20, 40, 60] },
+    { x: 0.6, y: 0.8, r: 0.25, color: [40, 15, 50] },
+  ];
+  for (const n of nebulae) {
+    const nx = n.x * W, ny = n.y * H;
+    const nr = n.r * Math.max(W, H);
+    const drift = Math.sin(t * 0.1 + n.x * 10) * 20;
+    const grad = lobbyCtx.createRadialGradient(nx + drift, ny, 0, nx + drift, ny, nr);
+    grad.addColorStop(0, `rgba(${n.color[0]}, ${n.color[1]}, ${n.color[2]}, 0.12)`);
+    grad.addColorStop(0.5, `rgba(${n.color[0]}, ${n.color[1]}, ${n.color[2]}, 0.04)`);
+    grad.addColorStop(1, `rgba(${n.color[0]}, ${n.color[1]}, ${n.color[2]}, 0)`);
+    lobbyCtx.fillStyle = grad;
+    lobbyCtx.fillRect(0, 0, W, H);
+  }
+
+  // Stars
+  for (const star of lobbyStars) {
+    const sx = star.x * W, sy = star.y * H;
+    const twinkle = 0.5 + 0.5 * Math.sin(t * star.twinkleSpeed + star.x * 100);
+    const a = star.brightness * twinkle;
+    if (a < 0.05) continue;
+    if (star.hue === 0) {
+      lobbyCtx.fillStyle = `rgba(255, 255, 255, ${a.toFixed(2)})`;
+    } else {
+      const r = star.hue === 220 ? 180 : 255;
+      const g = star.hue === 220 ? 200 : 240;
+      const b = star.hue === 220 ? 255 : 200;
+      lobbyCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
+    }
+    lobbyCtx.fillRect(Math.floor(sx), Math.floor(sy), star.size, star.size);
+
+    // Occasional spike on bright stars
+    if (a > 0.85 && star.size >= 1.5) {
+      lobbyCtx.fillStyle = `rgba(255, 255, 255, ${(a * 0.3).toFixed(2)})`;
+      lobbyCtx.fillRect(Math.floor(sx) - 2, Math.floor(sy), 5, 1);
+      lobbyCtx.fillRect(Math.floor(sx), Math.floor(sy) - 2, 1, 5);
+    }
+  }
+
+  // Floating motes
+  for (const m of lobbyMotes) {
+    m.x += m.vx * 0.016;
+    m.y += m.vy * 0.016;
+    if (m.y < -0.05) { m.y = 1.05; m.x = Math.random(); }
+    if (m.x < -0.05) m.x = 1.05;
+    if (m.x > 1.05) m.x = -0.05;
+    const pulse = 0.6 + 0.4 * Math.sin(t * 0.8 + m.x * 20);
+    const a = m.alpha * pulse;
+    lobbyCtx.fillStyle = `rgba(${Math.floor(m.hue - 60)}, ${Math.floor(m.hue - 20)}, 255, ${a.toFixed(2)})`;
+    lobbyCtx.beginPath();
+    lobbyCtx.arc(m.x * W, m.y * H, m.size, 0, Math.PI * 2);
+    lobbyCtx.fill();
+  }
+}
+requestAnimationFrame(renderLobby);
+
+// Start lobby music on first interaction
+let lobbyMusicStarted = false;
+function startLobbyMusic() {
+  if (lobbyMusicStarted) return;
+  lobbyMusicStarted = true;
+  startMusic();
+}
+document.getElementById('lobby').addEventListener('click', startLobbyMusic, { once: false });
+document.getElementById('lobby').addEventListener('keydown', startLobbyMusic, { once: false });
+
+// Lobby volume controls
+const lobbyVolSlider = document.getElementById('lobby-vol-slider');
+const lobbyMuteBtn = document.getElementById('lobby-mute-btn');
+if (lobbyVolSlider) {
+  lobbyVolSlider.value = musicVolume * 100;
+  lobbyVolSlider.addEventListener('input', (e) => {
+    startLobbyMusic();
+    setMusicVolume(e.target.valueAsNumber / 100);
+    if (musicMuted) toggleMusicMute();
+  });
+}
+if (lobbyMuteBtn) {
+  lobbyMuteBtn.addEventListener('click', () => {
+    startLobbyMusic();
+    toggleMusicMute();
+  });
+}
+function syncLobbyVolUI() {
+  if (lobbyMuteBtn) {
+    lobbyMuteBtn.textContent = musicMuted ? '\u266C' : '\u266B';
+    lobbyMuteBtn.style.opacity = musicMuted ? '0.4' : '1';
+  }
+  if (lobbyVolSlider) lobbyVolSlider.value = musicVolume * 100;
+}
+// Patch syncMusicUI to also update lobby controls
+const _origSyncMusicUI = syncMusicUI;
+syncMusicUI = function() {
+  _origSyncMusicUI();
+  syncLobbyVolUI();
+};
+syncLobbyVolUI();
+
 // ── Game State (received from server) ───────────────────────────────
 let heights = [];
 let walkers = [];
@@ -1450,7 +1606,11 @@ function handleServerMessage(msg) {
     case 'start':
       if (myTeam < 0) myTeam = 0; // AI game — default to blue
       gameStarted = true;
+      lobbyActive = false;
       document.getElementById('lobby').style.display = 'none';
+      document.getElementById('lobby-bg').style.display = 'none';
+      const lobbyVol = document.getElementById('lobby-vol');
+      if (lobbyVol) lobbyVol.style.display = 'none';
       document.getElementById('game').style.display = 'block';
       showSidebar();
       showPowerBar();

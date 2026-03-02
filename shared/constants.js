@@ -73,7 +73,7 @@ const EJECT_FRACTION = 0.5;
 const EJECT_MIN_STRENGTH = 2;
 
 // ── Mana ────────────────────────────────────────────────────────────
-const MANA_PER_POP_PER_SEC = 0.015;
+const MANA_PER_POP_PER_SEC = 0.0075;
 const MANA_MAX = 6000;
 
 // ── Combat ──────────────────────────────────────────────────────────
