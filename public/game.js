@@ -31,7 +31,6 @@ let textureOpacity = parseFloat(localStorage.getItem('texOpacity') ?? '0.4');
 
 function getTileTexture(tx, ty) {
   if (swampSet.has(tx + ',' + ty)) return terrainTextures.swamp;
-  if (rocks.has(tx + ',' + ty)) return terrainTextures.rock;
 
   const t = heights[tx][ty], r = heights[tx + 1][ty];
   const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
@@ -65,6 +64,12 @@ let settlementSpritesLoaded = false;
     }
   }
 })();
+
+// ── Boulder Sprite ──────────────────────────────────────────────────
+const boulderImg = new Image();
+let boulderLoaded = false;
+boulderImg.src = 'gfx/boulders.png';
+boulderImg.onload = () => { boulderLoaded = true; };
 
 // ── Music System ───────────────────────────────────────────────────
 const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3'];
@@ -401,16 +406,21 @@ function drawTile(tx, ty) {
     ctx.fill();
   }
 
-  // Rock overlay
-  if (rocks.has(tx + ',' + ty)) {
-    ctx.fillStyle = 'rgba(60, 50, 40, 0.6)';
-    ctx.fill();
-  }
-
   if (GRID_MODES[gridMode]) {
     ctx.strokeStyle = GRID_MODES[gridMode];
     ctx.lineWidth = 1;
     ctx.stroke();
+  }
+
+  // Boulder sprite on rock tiles
+  if (rocks.has(tx + ',' + ty) && boulderLoaded) {
+    const midX = (pTop.x + pBottom.x) / 2;
+    const midY = (pTop.y + pBottom.y) / 2;
+    const tileW = (pRight.x - pLeft.x);
+    const scale = tileW * 0.7 / boulderImg.width;
+    const sw = boulderImg.width * scale;
+    const sh = boulderImg.height * scale;
+    ctx.drawImage(boulderImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
   }
 }
 
