@@ -1,0 +1,489 @@
+NES POPULOUS FAQ/GUIDE
+ver. 0.11 by Jabu-Jabu
+
+----------------------------------------------------------------------------
+
+TABLE OF CONTENTS
+i.	INTRODUCTION
+	a.	What is Populous?
+	b.	Updates
+I. 	CONTROLS
+	A.	CONTROLLER FUNCTIONS
+	B.	THE CONTROL PANEL
+II. 	GENERAL INFO
+	A.	THE MANA BAR
+	B.	POPULATION
+	C.	KNOW THY TERRAIN
+	D.	BEING DR. SPOCK TO YOUR FOLLOWERS
+	E.	DOS AND DON'TS
+III. 	THE WORLDS
+	A.	ABOUT WORLDS
+	B.	THE UNIVERSE AS WE KNOW IT [under construction]
+IV.	FINAL WORDS
+
+	---------------
+	i. INTRODUCTION
+	---------------
+
+a.	What is Populous?
+
+	Populous began as a PC game in 1989, back when VGA graphics were
+okay and you didn't need a superpowerful machine to play.  It was created by
+the gurus at Bullfrog, who were swallowed by the titanic Electronic Arts. In
+1991, Populous was ported to the SNES in perfect form.
+	Populous is notorious for its sheer size.  You assume the role of a
+Good god, and your goal is to battle against Evil on 989 worlds.  Although a
+good player may skip a large number of these worlds, it is still a
+gargantuan task that keeps players busy for days.  I intended this Guide
+originally as a guide to the Universe, but decided to make an all-out Guide
+to fill a gaping void at GameFAQs (and, apparently, the rest of the web).
+
+b.	Updates
+
+	25.11.2000 - Whoa, I forgot this guide existed.  I've been enamoured
+with other projects at the moment.  I finally submitted this to GameFAQs.  I
+also touched it up here and there, taking care of some loose ends.  This is
+my first FAQ, one I intend to complete... after playing through the massive
+library of games I have acquired over the past 7 months. :)
+
+	15.4.2000 - v0.1 complete.  Not published yet.
+
+	-----------
+	I. CONTROLS
+	-----------
+
+A.	CONTROLLER FUNCTIONS (SNES)
+
+	The following is an outline of Populous' difficult control system. I
+took this directly from the manual and starred the most useful shortcuts.
+
+	d-pad - Move cursor
+	R+d-pad - Move cursor at faster speed
+	* L+d-pad - Move cursor one screen in desired direction 
+	A button - Raise selected square by one unit
+	B button - Lower selected square by one unit
+	Y button - Locate settlements that aren't castles
+	* X button - Raise and lower land as needed to turn a settlement to
+a castle, or as far as it will go
+	* L+A - Raise selected square by two units and flatten
+	* L+B - Lower selected square by two units and flatten
+	* L+X - When selecting a castle or other high-level settlement,
+raises land to downgrade the settlement to a lower level
+	L+Y - Locate castles
+	R+A - Selects "Raise/Lower Land" power
+	R+B - Selects "Move Papal Magnet" power
+	R+X - Change follower behavior to "Settle"
+	R+Y - Change follower behavior to "Gather than Settle"
+	* L+R+A - Use Earthquake on selected area if you have enough mana
+	* L+R+B - Use Swamps on selected area if you have enough mana
+	L+R+Y - Change Leader into a Knight if you have enough mana
+	* L+R+X - Use Volcano on selected area if you have enough mana
+	Start button - Pause/unpause game
+	Select button - Enter and switch between control panels
+	
+B.	CONTROL PANEL
+
+	Most of the game's essential functions can be accessed through
+joypad shortcuts, but there are a few neat things and two ultra-powerful
+spells which must be cast through the control panel.
+
+	GAME OPTIONS - Looks like a globe, located at the far right of the 
+panel.
+	CHECK POWERS - Looks like a scale, located near the Game Options.  
+This can be used to set the mana abilities of Good and Evil, or to check
+them.
+
+	SHIELD - Use this to examine a particular walker or settlement.  You
+can use this to find the walker at a later time.  Should someone become a
+leader and nobody holds the shield, the leader - good or evil - will become
+the focus of the shield.
+	FLOOD - Looks like a guy drowning in water.  This power requires
+alot of mana, and isn't always worth it; the flood will raise the water by
+one level.
+	ARMAGEDDON - Looks like a skull.  The ultimate magic power, this 
+brings good and evil together to fight for the fate of the world.  Once this
+is cast, both players lose control and a land bridge is built to the center
+of the earth.  This is a quick way to defeat a vastly inferior opponent, but 
+as a result, all your towns, castles, and knights are destroyed.
+	"SETTLE" BEHAVIOR - Looks like a flag.  This instructs your
+followers to build towns and castles whenever possible.
+	"GATHER THAN SETTLE" BEHAVIOR - Looks like a stick man.  This
+instructs your followers to gather together before settling, so your 
+followers are stronger.
+	"FIGHT THAN SETTLE" BEHAVIOR - Looks like two swords locked in
+conflict.  This instructs your followers to attack enemy settlements before
+building their own.  This skill is necessary for managing an invasion.
+	"COME TO PAPAL MAGNET" BEHAVIOR - Looks like a cross with an arrow
+to the left.  This instructs your followers to meet at the papal magnet,
+joining with your leader to create a powerful warrior.
+	FX, MUSIC - These are fairly obvious, and turn off the 
+love-it-or-hate-it music the game is known for.  Turn off the FX to get rid
+of the heartbeat.
+
+	----------------
+	II. GENERAL INFO
+	----------------
+
+	I'm assuming that you've gone through the tutorial and are familiar
+with the game's controls.  Now that you know how to play, let's go over some
+basic tactics.  We'll start with mana, and work up to a general strategy for
+conquering a standard world.
+
+A.	THE MANA BAR
+
+	The brown bar and gold slider comprise the Mana Bar.  This is the 
+juice that allows you to do your deific deeds, terrific and horrific as they 
+may be.  You might notice, after playing the tutorial, that the graphical 
+increments of the bar are not constant but exponential; the difference 
+between  Earthquake and Swamps is far less than the difference between Flood 
+and Armageddon.  You will require a formidable empire before reaching the 
+scale's end, but at the start, you will only have enough mana to manipulate
+a small lot of land. As your followers build larger settlements, you'll be
+able to gain more mana.
+
+	The bar is seperated into 9 levels.
+
+	Level 0 - Piddily Crap
+	At this level, you are too weak to even raise or lower land.  If you
+are at the edge of this scale, you are as good as dead; alas, you will more 
+than likely drop to level 0 while building your world.  All you can do in 
+this state is wait for your followers to come through and command them
+through behaviors.
+	Level 1 - Raise/Lower Land
+	You start with enough mana to raise a small plot of land.  While
+later the cost of raising and lowering land becomes trivial, at the start
+a misplaced molehill could cost you the world.
+	Level 2 - Papal Magnet
+	At the next level, you'll be able to move your papal magnet (ankh
+for good, skull for evil), provided you have a leader.  This can be used to
+direct your people towards a particular location to settle or attack the 
+enemy. Should you not have a leader, the first person to touch the papal 
+magnet becomes your leader; should your leader perish, in his place will lie 
+the magnet.
+	Level 3 - Earthquake
+	The first "real" power a deity attains, Earthquake will shake the
+selected land, lowering its altitude and creating minor dents in the 
+landscape. Although this can stall a weak rival, earthquakes are best used
+to flatten your own land after being struck by a volcano, as opposed to 
+manually tearing it down.  Earthquakes are essential building tools in
+worlds where you cannot directly raise or lower land.
+	Level 4 - Swamps
+	For such a low-leveled power, swamps are one of your most
+devastating weapons - which is exactly why you're not allowed to use them on
+later worlds. When used, random flat portions of the selected land are
+covered in swamps.  Should anyone - good or evil - step into the swamps,
+they will immediately die.  This is very useful for taking out strong,
+virtually unstoppable targets, the worst of which being the dreaded knight.
+A note of importance - after awhile, a plague will sweep through your world,
+creating a path of deadly swamps.  DO NOT let these remain, since they
+usually hit your territory first.  Many times have great empires fallen to
+a plague.
+	Level 5 - Knight
+	While a Knight is relatively inexpensive to create considering its
+destructive power, they require a large chunk of your population in order to
+be effective.  When used, this power converts your leader into a knight,
+which will seek and destroy enemy targets quickly.  This is the best way to
+finish off your enemies, as they will often prove to you should they have
+the chance.
+	Note that when this power is used, your leader leaves behind the 
+papal magnet.  You'll need to get another leader in order to move it again.
+	Level 6 - Volcano
+	The computer loves these, and both you and him tend to have them. 
+When used, a huge mountain forms on the selected land, destroying all houses
+and leaving a big dent in your empire.  The higher you settle, the less
+damage volcanoes do.  Even if you build up to the maximum height, Volcanoes
+still leave behind rocks, which make it very difficult to rebuild.  A single
+volcano is nothing to fret about; this power is best used rapidly to deplete
+an enemy's mana stores.
+	Level 7 - Flood
+	Probably the most overvalued power; this floods the land as said
+above, raising the water one unit and sinking the infidels living in low 
+lands. Since most worlds that allow floods have harmful water, and the enemy
+has a way of rescuing 90% of its population in such cases, the flood is only
+useful in a few worlds at the beginning.
+	Level 8 - Armageddon
+	Whlie an expensive power, Armageddon doesn't do any more to help;
+however, it is the ultimate time-saver once you have secured victory.  All
+people will leave their homes and join their leaders for a final battle at 
+the center of the world.  Whoever emerges victorious wins the world.  This
+is the coup de grace; winning Armageddon nets the player lots of points,
+allowing him to skip several worlds.
+
+	RAISING MANA
+
+	The best way to raise mana is to give your settlements as much land 
+as possible.  However, this comes with two tradeoffs; first, the mana cost
+to flatten the land, and second, a decrease in population growth.   Larger
+settlements take longer to release new followers into the world, but those
+followers are stronger and the settlements raise more mana.  If you decide
+to make your land all castles, you will never have the chance to expand;
+therefore, it is necessary to strike a balance between castles and lesser 
+settlements.
+
+	Buliding towns near the edges of the world will prevent them from 
+reaching the castle stage, but I find it easier to devolve a castle to a 
+lesser  form in order to churn out new followers; after the followers build
+a few settlements, it is inexpensive to convert the devolved settlement
+back into a castle.  Boom, more people, and lotsa mana.
+
+	Once you have significant mana - level 3 at least - only one rule
+applies; don't let your mana fall unless absolutely necessary, meaning
+never! Unless you have alot of land or are trying to incur on enemy
+territory, do not let a disturbance go unnoticed.  The biggest fear comes
+from Knights,  whodestroy your settlements and cost you mana.
+
+B.	THE POPULATION
+
+	The eventual goal of Populous is to permanently outnumber your rival
+in population on each world.  This is far easier said than done, but people 
+are your most important asset, for they generate mana.  Without people, you 
+won't have mana anyway.  As you probably inferred, larger settlements hold 
+more people, but release less new followers into the world.  Your population
+can be compared to your rival's by the blue and red meters near the info 
+shield.
+
+C.	KNOW THY TERRAIN
+
+	The worlds of Populous cover various kinds of terrain.  Four of
+these are standard fare, and the remaining six cover themes from Japanese
+feudalism to the French Revolution to viruses invading a computer to a
+world of piggies fighting the Big Bad Wolf.  No joke.
+
+	GRASS PLAINS
+	Rate of development: *
+	Severity of terrain: -
+	... ???
+	This environment is best for beginners.  Your walkers can go very
+far before kicking the bucket, which more than makes up for the slow rate
+of population growth.
+
+	DESERT
+	Rate of development: ***
+	Severity of terrain: ***
+	Same as Grassy Plains
+	This terrain is arduous, but your followers develop faster than on
+plains.  This land is mostly flat, allowing easy progression.
+
+	SNOW AND ICE
+	Rate of development: **
+	Severity of terrain: ***
+	Harsh terrain with limited development.  These worlds present a
+challenge to the novice player.
+
+	ROCK AND LAVA
+	Rate of development: ***
+	Severity of terrain: **
+	This land lends itself to fast development, provided you can gather 
+the necessary mana.
+
+	JAPANESQUE
+	Rate of development: *
+	Severity of terrain: **
+	Population growth is slow, but your walkers can handle the
+distance. This world is covered with a heavy Japanese influence; your
+followers are warriors, and your knights samurai.  These worlds are similar
+to desert worlds in structure, but usually include limitations on raising
+and lowering land.
+
+	FRENCHIE WORLD (FRANCAISE)
+	Rate of development: **
+	Severity of terrain: **
+	This world is modeled after European architecture, and is similar to
+grassy plains in appearance.  You usually start with many people.
+	
+	SILLY LAND
+	Rate of development: *
+	Severity of terrain: ***
+	This world looks silly, but the difficulty is no joke!  Your walkers
+are weak and slow to develop.  Your people are green aliens, planting space
+stations on an even more alien terrain.
+
+	BIT PLAINS
+	Rate of development: ****
+	Severity of terrain: *
+	These worlds are very easy to develop, but are quite mountainous.  
+Your followers are computer bugs, and knights are fearsome viruses.
+
+	HELL (PIGLET WORLD)
+	Rate of development: **
+	Severity of terrain: ****
+	Although piglet worlds are built on grassy plains, they tend to be
+the hardest challenges.  Your piggies have no endurance and only moderate
+growth.  You must feverishly work towards winning these games.
+
+	CAKE LAND
+	Rate of development: ***
+	Severity of terrain: **
+	Probably the most boring of worlds.  Your followers are mice, 
+settling a tablecloth with sugary treats.  Tantalizing, ne?
+
+D.	BEING DR. SPOCK TO YOUR FOLLOWERS
+
+	In later worlds - especially those that don't grant you spiffy
+powers - the behavior options for your people become more valuable.
+Unlike later RTS games, Populous does not allow the player to control units
+directly.  Rather, four behavior options control your simple sheep.
+	"SETTLE" is the default mode.  Your followers will search for good
+land and create a settlement; a strong follower can create two or more
+settlements provided he has enough land and energy to let him continue.
+Your followers will try to avoid fights unless enemy territory is the only
+fertile territory.  If you intend to wage a mana war against the enemy,
+this is the best mode.
+	"GATHER THEN SETTLE" commands your followers to join together and
+become stronger.  I usually don't use this until the settlement boom comes
+along, and then only on arduous landscapes.  I suggest using this to
+prepare for an invasion.
+	"FIGHT THEN SETTLE" commands your followers to attack enemy
+settlements before founding their own settlements.  If you lack knights and
+access to your papal magnet, then it is the only path that will prevent
+them from invading you.  If you have a strong presence near their border,
+then attack!
+	"COME TO PAPAL MAGNET" commands all your followers to come to the
+papal magnet or your leader, ignoring all other priorities.  This builds the
+leader's strength to astronomical levels.  After your leader's strength gets
+into the yellow range, you should consider making a knight or directing him 
+to enemy settlements.
+
+E.	DOS AND DON'TS
+
+	DO build up your initial territory as quickly as possible; you might
+have trouble getting a castle up, but the mana boost will allow you to
+settle new places very quickly.
+	DON'T start building at anything more than 3 units above sea level.  
+It will be impossible to build up your land early on, and that's when it 
+really counts.  I suggest starting at 1 or 2 units if you or your enemy has 
+the Flood ability.
+
+	DON'T try moving the papal magnet early in the game.  It won't do
+any good until you've reached level 3 or 4.
+	DO place the papal magnet in a central location of your kingdom once
+you have a definite advantage.  This will let you create knights faster,
+hastening the inevitable.
+
+	DO use earthquakes on worlds where you are not allowed to raise or
+lower land.  This is the only way mountainous regions thrive.
+	DON'T use earthquakes to hinder your opponent early on.  He can
+shrug them off very easily unless you can immediately retort.
+
+	DO use swamps copiously if you have plenty of mana.  At level 6 mana
+you can swamp a large region to death, thus distracting your enemy.
+	DO use swamps to get rid of pesky enemies.  Swamps are the best way
+to get rid of knights and powerful leaders, and if you sink someone with a 
+yellow lifebar, you'll certainly see a drastic effect on the enemy's 
+population.
+	DON'T leave swamps on enemy territory by the time your knights 
+arrive. You DON'T want to lose that much life, no matter what.  Do your 
+swamping before sending in wave after wave of knights, and make sure to get 
+rid of them when your knights arrive.
+	DON'T ever, EVER let a plague go unnoticed.  You'll notice something 
+is wrong when you hear swamp noises.  Immediately pause the game and find
+the source of the problem.
+
+	DO use knights to defeat weaker enemies.  Burnt land is nearly
+impossible to reclaim without a large expense of mana.
+	DO accompany your waves of knights with other natural disasters to
+disrupt the enemy.  Volcanoes will really frustrate an enemy.
+	DON'T ever make a knight with less than a yellow bar of health
+unless you're fighting a very weak enemy.  You want these things to last.
+	DON'T throw a knight at an enemy that vastly overpowers you.  You 
+need to weaken them with other powers first, or else the enemy will quickly
+rebound by sending their leader or knight on you.
+	DO sink your enemy's knight or leader when he approaches your
+territory  if the water is fatal.  This is like swamping, only it costs next
+to no mana.  You'll need this around worlds 50 and 72 in order to survive.
+	DON'T try this if the water is only harmful; if you concentrate on
+whittling down his knight, your enemy will simply send more knights or use
+his powers on you, the worst of which tend to be volcanoes.  In these cases,
+your only hope is to create a knight to rival his.
+
+	DO use volcanoes rapidly if you have lots of mana.  A single volcano
+does nothing, as the enemy will gladly show.  If you cover your enemy's land
+with them, he will have very little mana to compensate.
+	DON'T try returning your land to its normal level if you are hit
+with many volcanoes.  If these become a problem, raise your land with the
+volcanoes. By this time, you should have enough mana to expand your
+territory at higher levels.  Don't go too high; once you reach 3 units of
+height, volcanoes will be alot less troublesome.
+
+	DON'T EVER Flood your own territory if most of your land is only 1
+unit above sea level.  I think this explains itself.
+	DON'T rely on floods under harmful water conditions, especially if
+evil has a high reaction rating.  They don't do much, and using two floods
+at once demands alot of land-building.
+	DON'T build your land at low altitudes if your enemy has floods. You
+take alot more damage than he does, trust me.
+	DO use floods in the rare case that water is fatal, provided that
+your population is safe.  This finishes the game very quickly.  (This is a 
+given in Genesis, after the Biblical story of the flood.)
+
+	DON'T EVER, EVER, EVER use Armageddon if your population is ever
+lower than your enemy's.
+	DO use it if you're considerably  stronger.  I think you get the 
+idea, ne?
+
+	DO always check the Game Options and abliities of Good and Evil 
+before starting a world.  The intro screen does not tell everything!
+
+	DON'T feel too compelled to save the trees.  You can live without
+them, and none of your followers are tree-huggers (or byte-huggers, as the 
+case may be in Bit Plains)
+
+	DO lay thy smackdown! with glee!
+
+	---------------
+	III. THE WORLDS
+	---------------
+
+A.	ABOUT WORLDS
+
+	All this talk about mana and tactics is fun, but the real meat of 
+this game - the source of its fun, notoriety, oneness, and addictive
+qualities - is the large number of worlds.  989 of 'em - count 'em, nine
+hundred and eighty-freaking-nine - await you.  Sounds sweet, eh?
+	Of course, the developers didn't go out of their way to make EVERY
+world by hand.  True, there are 989 worlds, and they're different enough to
+provide frequent challenge.  However, the maps themselves are generated 
+through mathematical equations, with topography dependent on the type or 
+terrain and the whims of the equation.  Also, you do not need to play every
+world; you will skip a number of worlds with each victory, depending on how
+soundly you trounce evil.  Should you flood a weak enemy into oblivion in no
+time flat, you'll skip 6-8 worlds.
+	The 989 worlds are seperated into some 200 series, spanning 5 worlds
+each.  Each world in a series is built with the same terrain and rules, and
+usually have the same strategy.  I won't bother with every single world, and
+give a general strategy for each series.
+	At the start of each world, you are presented a nifty screen of
+information.  In addition to the planet's name and terrain, you are given
+conditions of swamps and water, where you may build (if at all), and a 
+comparison of good and evil in terms of starting population and available 
+deific powers.  Most of the screen is self-explanatory; you'll learn the
+rest after the first few worlds.
+	I should add that after awhile, the difficulty curve ends.  You
+could easily beat the last world with experience from the first 100; but
+we play fair, don't we?  The real challenge is playing through the campaign
+in its entirety.
+	
+B.	WORLD GUIDE [under construction]
+
+	---------------
+	IV. FINAL WORDS
+	---------------
+
+	Legal Info: This FAQ is public domain; no copyrights or strings
+attached.  You can post this on your own site, defecate its metaphysical
+existence, or ploclaim the superiority of your ass to mine and I won't care.
+Populous is a copyright of Bullfrog and Electronic Arts, 1989, 1990, and
+1991.
+	Crap: I modelled this FAQ around the SNES version of the game, so
+there are might be inconsistencies between it and the PC version.  This FAQ
+was created in Winblows Wordpad, (c) 1981-1997 of Microsoft.  Microsoft is
+a registered trademark of voodoo economics.
+	Mad Skillz Purveyors:
+	- Assdongle, my savior
+	- Bullfrog, for making such a spiffy game.
+	- The CBS Evening News, for being completely laughable.
+	- Hippies, for providing all that trippy goodness to the world.
+	- My brain, for remembering that this FAQ existed on my HD
+
+	Other FAQs by Jabu-Jabu: None, at least not yet.  Look for
+Battleclash and Metal Combat: Falcon's Revenge guides real soon.

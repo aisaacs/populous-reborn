@@ -94,6 +94,10 @@ function createGameState() {
     mana: [200, 200],
     swamps: [],
     rocks: new Set(),
+    trees: new Set(),
+    crops: [],
+    cropCounts: [],
+    cropOwnerMap: new Int32Array(C.MAP_W * C.MAP_H).fill(-1),
     seaLevel: C.SEA_LEVEL,
     leaders: [-1, -1],
     armageddon: false,
@@ -247,6 +251,19 @@ function generateTerrain(state) {
       }
     }
 
+    // Scatter trees on land tiles (avoid spawn zones)
+    state.trees.clear();
+    for (let x = 0; x < C.MAP_W; x++) {
+      for (let y = 0; y < C.MAP_H; y++) {
+        if (isTileWater(state, x, y)) continue;
+        if (state.rocks.has(x + ',' + y)) continue;
+        const d0 = Math.abs(x - 10) + Math.abs(y - 10);
+        const d1 = Math.abs(x - 50) + Math.abs(y - 50);
+        if (d0 < 8 || d1 < 8) continue;
+        if (Math.random() < C.TERRAIN_TREES) state.trees.add(x + ',' + y);
+      }
+    }
+
     // Validate: both spawn zones must have a 5x5 flat area nearby
     if (hasSpawnFlat(state, 10, 10) && hasSpawnFlat(state, 50, 50)) return;
 
@@ -317,13 +334,35 @@ function isTileInSettlementFootprint(state, tx, ty, exclude) {
   return false;
 }
 
-function squareOverlapsSettlement(state, ox, oy, size, exclude) {
-  for (let dx = 0; dx < size; dx++) {
-    for (let dy = 0; dy < size; dy++) {
-      if (isTileInSettlementFootprint(state, ox + dx, oy + dy, exclude)) return true;
+// Physical footprint size per level: 1 tile for levels 1-4, 3×3 for castle (level 5)
+const LEVEL_SQ_SIZE = [0, 1, 1, 1, 1, 3];
+
+function getLevelFromCropCount(count) {
+  for (let l = 5; l >= 1; l--) {
+    if (count >= C.CROP_LEVEL_THRESHOLDS[l]) return l;
+  }
+  return 1;
+}
+
+function updateSettlementFootprint(s) {
+  s.sqSize = LEVEL_SQ_SIZE[s.level];
+  s.sqOx = s.tx - Math.floor((s.sqSize - 1) / 2);
+  s.sqOy = s.ty - Math.floor((s.sqSize - 1) / 2);
+}
+
+// Check that the 3×3 area centered on home tile is all flat and unoccupied
+function isCastleAreaValid(state, s) {
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const cx = s.tx + dx, cy = s.ty + dy;
+      if (!isTileFlat(state, cx, cy)) return false;
+      // Check no other settlement's home tile is in this 3×3
+      if (dx === 0 && dy === 0) continue;
+      const idx = state.settlementMap[cy * C.MAP_W + cx];
+      if (idx >= 0 && idx !== state.settlements.indexOf(s)) return false;
     }
   }
-  return false;
+  return true;
 }
 
 // ── Terrain Modification ────────────────────────────────────────────
@@ -379,6 +418,14 @@ function invalidateRocks(state) {
   for (const key of state.rocks) {
     const [x, y] = key.split(',').map(Number);
     if (isTileWater(state, x, y)) state.rocks.delete(key);
+  }
+}
+
+// Remove trees on tiles that are now underwater
+function invalidateTrees(state) {
+  for (const key of state.trees) {
+    const [x, y] = key.split(',').map(Number);
+    if (isTileWater(state, x, y)) state.trees.delete(key);
   }
 }
 
@@ -458,10 +505,17 @@ function pickRandomTarget(state, w) {
   }
 }
 
+function isTileSettleable(state, tx, ty) {
+  if (!isTileFlat(state, tx, ty)) return false;
+  if (isTileInSettlementFootprint(state, tx, ty)) return false;
+  if (state.cropOwnerMap[ty * C.MAP_W + tx] >= 0) return false;
+  return true;
+}
+
 function pickSettleTarget(state, w) {
   const cx = Math.floor(w.x), cy = Math.floor(w.y);
 
-  if (isTileFlat(state, cx, cy) && !isTileInSettlementFootprint(state, cx, cy)) {
+  if (isTileSettleable(state, cx, cy)) {
     settleWalker(state, w, cx, cy);
     return;
   }
@@ -472,7 +526,7 @@ function pickSettleTarget(state, w) {
     for (let dy = -searchR; dy <= searchR; dy++) {
       const tx = cx + dx, ty = cy + dy;
       if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
-      if (isTileFlat(state, tx, ty) && !isTileInSettlementFootprint(state, tx, ty)) {
+      if (isTileSettleable(state, tx, ty)) {
         const d = dx * dx + dy * dy;
         if (d < bestDist) { bestDist = d; bestTx = tx; bestTy = ty; }
       }
@@ -628,12 +682,11 @@ function updateWalkers(state, dt) {
 
 // ── Settlement System ───────────────────────────────────────────────
 function settleWalker(state, w, tx, ty) {
-  if (isTileInSettlementFootprint(state, tx, ty)) return;
-  w.dead = true;
+  if (!isTileSettleable(state, tx, ty)) return;
   const s = {
     team: w.team,
     level: 1,
-    population: w.strength,
+    population: 0,
     tx, ty,
     sqOx: tx, sqOy: ty, sqSize: 1,
     dead: false,
@@ -642,198 +695,97 @@ function settleWalker(state, w, tx, ty) {
   state.settlements.push(s);
   setSettlement(state, tx, ty, s);
 
-  // Immediately upgrade if population warrants it and terrain supports it
-  while (s.level < 5 && s.population > C.LEVEL_CAPACITY[s.level]) {
-    const sq = findFlatSquareOfSize(state, s.tx, s.ty, s.level + 1, s);
-    if (!sq) break;
-    s.level++;
-    s.sqOx = sq.ox;
-    s.sqOy = sq.oy;
-    s.sqSize = s.level;
+  // Auto-clear tree on home tile
+  state.trees.delete(tx + ',' + ty);
+
+  // Immediately evaluate level from surrounding crop fields
+  const cropCount = countSettlementCrops(state, s);
+  let level = getLevelFromCropCount(cropCount);
+  if (level >= 5 && !isCastleAreaValid(state, s)) level = 4;
+  s.level = level;
+  updateSettlementFootprint(s);
+
+  // Deposit population: cap at capacity, walker keeps remainder (chain-settling)
+  const cap = C.LEVEL_CAPACITY[s.level];
+  if (w.strength <= cap) {
+    s.population = w.strength;
+    w.dead = true;
+  } else {
+    s.population = cap;
+    w.strength -= cap;
+    // Push walker out so it walks on to find more land
+    const angle = Math.random() * Math.PI * 2;
+    w.x = tx + 0.5 + Math.cos(angle) * 1.5;
+    w.y = ty + 0.5 + Math.sin(angle) * 1.5;
+    w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, w.x));
+    w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, w.y));
+    // Don't call pickSettleTarget here — let the walker's next tick handle it
+    pickRandomTarget(state, w);
   }
+
+  // Recompute crops so new settlement's claims are immediately visible
+  computeCrops(state);
 }
 
-// Find a flat square of exactly the given size containing (tx,ty)
-function findFlatSquareOfSize(state, tx, ty, size, exclude) {
-  const h = state.heights[tx][ty];
-  if (h <= state.seaLevel || !isTileFlat(state, tx, ty)) return null;
-  if (size === 1) {
-    if (!squareOverlapsSettlement(state, tx, ty, 1, exclude)) return { ox: tx, oy: ty };
-    return null;
-  }
-  const oxMin = Math.max(0, tx - size + 1);
-  const oxMax = Math.min(C.MAP_W - size, tx);
-  const oyMin = Math.max(0, ty - size + 1);
-  const oyMax = Math.min(C.MAP_H - size, ty);
-  for (let ox = oxMin; ox <= oxMax; ox++) {
-    for (let oy = oyMin; oy <= oyMax; oy++) {
-      let allFlat = true;
-      for (let dx = 0; dx < size && allFlat; dx++) {
-        for (let dy = 0; dy < size && allFlat; dy++) {
-          if (!isTileFlat(state, ox + dx, oy + dy) || state.heights[ox + dx][oy + dy] !== h) allFlat = false;
-        }
+// Count crop fields in fixed 5×5 zone around a settlement (for instant evaluation)
+function countSettlementCrops(state, s) {
+  let count = 0;
+  const r = C.CROP_ZONE_RADIUS;
+  for (let dx = -r; dx <= r; dx++) {
+    for (let dy = -r; dy <= r; dy++) {
+      if (dx === 0 && dy === 0) continue; // settlement's own tile
+      const cx = s.tx + dx, cy = s.ty + dy;
+      if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
+      if (!isTileFlat(state, cx, cy)) continue;
+      if (state.settlementMap[cy * C.MAP_W + cx] >= 0) continue;
+      const key = cx + ',' + cy;
+      // Swamps block crops
+      let blocked = false;
+      for (const sw of state.swamps) {
+        if (sw.x === cx && sw.y === cy) { blocked = true; break; }
       }
-      if (allFlat && !squareOverlapsSettlement(state, ox, oy, size, exclude)) {
-        return { ox, oy };
-      }
+      if (blocked) continue;
+      // Trees are auto-cleared by settlements
+      if (state.trees.has(key)) state.trees.delete(key);
+      count++;
     }
   }
-  return null;
-}
-
-function findLargestFlatSquare(state, tx, ty, exclude) {
-  const h = state.heights[tx][ty];
-  if (h <= state.seaLevel || !isTileFlat(state, tx, ty)) return { ox: tx, oy: ty, size: 0 };
-
-  for (let n = 5; n >= 2; n--) {
-    const oxMin = Math.max(0, tx - n + 1);
-    const oxMax = Math.min(C.MAP_W - n, tx);
-    const oyMin = Math.max(0, ty - n + 1);
-    const oyMax = Math.min(C.MAP_H - n, ty);
-
-    for (let ox = oxMin; ox <= oxMax; ox++) {
-      for (let oy = oyMin; oy <= oyMax; oy++) {
-        let allFlat = true;
-        for (let dx = 0; dx < n && allFlat; dx++) {
-          for (let dy = 0; dy < n && allFlat; dy++) {
-            const cx = ox + dx, cy = oy + dy;
-            if (!isTileFlat(state, cx, cy) || state.heights[cx][cy] !== h) allFlat = false;
-          }
-        }
-        if (allFlat && !squareOverlapsSettlement(state, ox, oy, n, exclude)) {
-          return { ox, oy, size: n };
-        }
-      }
-    }
-  }
-
-  return { ox: tx, oy: ty, size: 1 };
-}
-
-function tryMergeSettlements(state) {
-  for (const s of state.settlements) {
-    if (s.dead || s.level >= 5) continue;
-    const h = state.heights[s.tx][s.ty];
-    if (h <= state.seaLevel || !isTileFlat(state, s.tx, s.ty)) continue;
-
-    const n = s.level + 1;
-    const oxMin = Math.max(0, s.tx - n + 1);
-    const oxMax = Math.min(C.MAP_W - n, s.tx);
-    const oyMin = Math.max(0, s.ty - n + 1);
-    const oyMax = Math.min(C.MAP_H - n, s.ty);
-
-    let bestSq = null, bestAbsorbed = null;
-
-    for (let ox = oxMin; ox <= oxMax && !bestSq; ox++) {
-      for (let oy = oyMin; oy <= oyMax && !bestSq; oy++) {
-        // Check all tiles in the square are flat and same height
-        let allFlat = true;
-        for (let dx = 0; dx < n && allFlat; dx++) {
-          for (let dy = 0; dy < n && allFlat; dy++) {
-            if (!isTileFlat(state, ox + dx, oy + dy) || state.heights[ox + dx][oy + dy] !== h)
-              allFlat = false;
-          }
-        }
-        if (!allFlat) continue;
-
-        // Check settlements inside: same-team = absorb, other = conflict
-        const absorbed = [];
-        let conflict = false;
-        for (const other of state.settlements) {
-          if (other.dead || other === s) continue;
-          const homeCovered = other.tx >= ox && other.tx < ox + n &&
-                              other.ty >= oy && other.ty < oy + n;
-          const sqOverlap = ox < other.sqOx + other.sqSize && ox + n > other.sqOx &&
-                            oy < other.sqOy + other.sqSize && oy + n > other.sqOy;
-          if (homeCovered && other.team === s.team) {
-            absorbed.push(other);
-          } else if (homeCovered || sqOverlap) {
-            conflict = true;
-            break;
-          }
-        }
-        if (!conflict && absorbed.length > 0) {
-          bestSq = { ox, oy };
-          bestAbsorbed = absorbed;
-        }
-      }
-    }
-
-    if (!bestSq) continue;
-
-    // Absorb covered settlements and upgrade
-    let totalPop = s.population;
-    for (const a of bestAbsorbed) {
-      totalPop += a.population;
-      a.dead = true;
-      clearSettlementMap(state, a.tx, a.ty);
-    }
-
-    s.population = totalPop;
-    s.level = n;
-    s.sqOx = bestSq.ox;
-    s.sqOy = bestSq.oy;
-    s.sqSize = n;
-    setSettlement(state, s.tx, s.ty, s);
-  }
-}
-
-function isSquareStillValid(state, s) {
-  const h = state.heights[s.tx][s.ty];
-  if (h <= state.seaLevel || !isTileFlat(state, s.tx, s.ty)) return false;
-  for (let dx = 0; dx < s.sqSize; dx++) {
-    for (let dy = 0; dy < s.sqSize; dy++) {
-      const cx = s.sqOx + dx, cy = s.sqOy + dy;
-      if (!isTileFlat(state, cx, cy) || state.heights[cx][cy] !== h) return false;
-    }
-  }
-  if (squareOverlapsSettlement(state, s.sqOx, s.sqOy, s.sqSize, s)) return false;
-  return true;
+  return count;
 }
 
 function evaluateSettlementLevels(state) {
-  for (const s of state.settlements) {
+  for (let si = 0; si < state.settlements.length; si++) {
+    const s = state.settlements[si];
     if (s.dead) continue;
 
-    if (!isSquareStillValid(state, s)) {
-      // Current square is no longer valid — downgrade until we find a valid level
-      let newLevel = s.level;
-      let sq = null;
-      while (newLevel > 0) {
-        sq = findFlatSquareOfSize(state, s.tx, s.ty, newLevel, s);
-        if (sq) break;
-        newLevel--;
+    // Home tile must still be flat (covers water, rock, non-flat terrain)
+    if (!isTileFlat(state, s.tx, s.ty)) {
+      s.dead = true;
+      clearSettlementMap(state, s.tx, s.ty);
+      if (s.population > 0) {
+        const angle = Math.random() * Math.PI * 2;
+        spawnWalker(state, s.team, s.population,
+          s.tx + 0.5 + Math.cos(angle) * 1.2,
+          s.ty + 0.5 + Math.sin(angle) * 1.2);
       }
+      continue;
+    }
 
-      if (newLevel === 0 || !sq) {
-        // Can't even hold a level 1 — destroy
-        s.dead = true;
-        clearSettlementMap(state, s.tx, s.ty);
-        if (s.population > 0) {
-          const angle = Math.random() * Math.PI * 2;
-          spawnWalker(state, s.team, s.population,
-            s.tx + 0.5 + Math.cos(angle) * 1.2,
-            s.ty + 0.5 + Math.sin(angle) * 1.2);
-        }
-        continue;
-      }
+    // Level from crop count (computed by computeCrops each tick)
+    const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
+    let newLevel = getLevelFromCropCount(cropCount);
 
+    // Castle (level 5) requires a valid 3×3 flat area around home tile
+    if (newLevel >= 5 && !isCastleAreaValid(state, s)) {
+      newLevel = 4;
+    }
+
+    if (newLevel !== s.level) {
       s.level = newLevel;
-      s.sqOx = sq.ox;
-      s.sqOy = sq.oy;
-      s.sqSize = newLevel;
+      updateSettlementFootprint(s);
     }
 
-    // Try upgrading while over capacity and terrain supports it
-    while (s.level < 5 && s.population > C.LEVEL_CAPACITY[s.level]) {
-      const sq = findFlatSquareOfSize(state, s.tx, s.ty, s.level + 1, s);
-      if (!sq) break;
-      s.level++;
-      s.sqOx = sq.ox;
-      s.sqOy = sq.oy;
-      s.sqSize = s.level;
-    }
-
+    // Eject if over capacity
     const cap = C.LEVEL_CAPACITY[s.level];
     if (s.population > cap) {
       const excess = s.population - Math.floor(cap / 2);
@@ -846,42 +798,80 @@ function evaluateSettlementLevels(state) {
   }
 }
 
+// ── Crop Computation ────────────────────────────────────────────────
+// Fixed 5×5 zone around each settlement. Flat tiles at any height count.
+// Trees auto-cleared. Swamps block.
+// Competition: higher level wins, same level = first-created (lower index) wins.
+function computeCrops(state) {
+  // Build swamp set for O(1) lookup
+  const swampSet = new Set();
+  for (const sw of state.swamps) swampSet.add(sw.x + ',' + sw.y);
+
+  // Reset crop owner map
+  state.cropOwnerMap.fill(-1);
+
+  const cropMap = {}; // "x,y" → {team, level, settIdx}
+  const r = C.CROP_ZONE_RADIUS;
+
+  for (let si = 0; si < state.settlements.length; si++) {
+    const s = state.settlements[si];
+    if (s.dead) continue;
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (dx === 0 && dy === 0) continue; // settlement's own tile
+        const cx = s.tx + dx, cy = s.ty + dy;
+        if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
+        if (!isTileFlat(state, cx, cy)) continue;
+        // Exclude tiles that are home tiles of other settlements
+        if (state.settlementMap[cy * C.MAP_W + cx] >= 0) continue;
+        const key = cx + ',' + cy;
+        if (swampSet.has(key)) continue;
+        // Auto-clear trees in crop zones
+        if (state.trees.has(key)) state.trees.delete(key);
+        const existing = cropMap[key];
+        // Higher level wins; same level = first-created (lower index) wins
+        if (!existing || s.level > existing.level ||
+            (s.level === existing.level && si < existing.settIdx)) {
+          cropMap[key] = { team: s.team, level: s.level, settIdx: si };
+        }
+      }
+    }
+  }
+  const cropCounts = new Array(state.settlements.length).fill(0);
+  const cropList = [];
+  for (const key in cropMap) {
+    const c = cropMap[key];
+    cropCounts[c.settIdx]++;
+    const [x, y] = key.split(',').map(Number);
+    cropList.push({ x, y, t: c.team });
+    // Populate crop owner map
+    state.cropOwnerMap[y * C.MAP_W + x] = c.settIdx;
+  }
+  state.crops = cropList;
+  state.cropCounts = cropCounts;
+}
+
 // ── Population Growth ───────────────────────────────────────────────
 // Eject delay: bigger settlements take more growth ticks at cap before spawning
 const EJECT_DELAY = [0, 1, 2, 3, 4, 5]; // indexed by level
 
 function updatePopulationGrowth(state) {
-  for (const s of state.settlements) {
+  for (let si = 0; si < state.settlements.length; si++) {
+    const s = state.settlements[si];
     if (s.dead) continue;
     const cap = C.LEVEL_CAPACITY[s.level];
-    if (s.population < cap) {
-      s.population += s.level; // growth scales with level
-      if (!s.atCapTicks) s.atCapTicks = 0;
-      s.atCapTicks = 0; // reset eject counter while growing
-    } else if (cap > 0) {
-      // At capacity — try to upgrade level if terrain supports it
-      if (!s.atCapTicks) s.atCapTicks = 0;
-      s.atCapTicks++;
+    const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
+
+    if (cropCount > 0 && s.population < cap) {
+      const growth = Math.max(1, Math.floor(cropCount * C.CROP_GROWTH_FACTOR));
+      s.population = Math.min(cap, s.population + growth);
+      s.atCapTicks = 0;
+    } else if (s.population >= cap && cap > 0) {
+      // At capacity — eject walkers
+      s.atCapTicks = (s.atCapTicks || 0) + 1;
       const delay = EJECT_DELAY[s.level] || 1;
       if (s.atCapTicks >= delay) {
         s.atCapTicks = 0;
-
-        // Check if flat terrain supports next level
-        const nextLevel = s.level + 1;
-        if (nextLevel <= 5) {
-          const sq = findFlatSquareOfSize(state, s.tx, s.ty, nextLevel, s);
-          if (sq) {
-            // Upgrade one level, keep half population as base
-            s.level = nextLevel;
-            s.population = Math.floor(cap / 2);
-            s.sqOx = sq.ox;
-            s.sqOy = sq.oy;
-            s.sqSize = nextLevel;
-            continue;
-          }
-        }
-
-        // Can't upgrade — eject walkers
         const ejectStrength = Math.max(1, Math.floor(s.population / 3));
         s.population -= ejectStrength;
         const angle = Math.random() * Math.PI * 2;
@@ -960,6 +950,7 @@ function handleWalkerCollisions(state) {
           }
           invalidateSwamps(state);
           invalidateRocks(state);
+          invalidateTrees(state);
           evaluateSettlementLevels(state);
           pickFightTarget(state, w); // find next target
         }
@@ -1072,6 +1063,21 @@ function serializeState(state, team) {
     rockData.push(+parts[0], +parts[1]);
   }
 
+  // Trees: flat array [x1,y1,x2,y2,...]
+  const treeData = [];
+  for (const key of state.trees) {
+    const parts = key.split(',');
+    treeData.push(+parts[0], +parts[1]);
+  }
+
+  // Crops: flat array [x1,y1,t1,x2,y2,t2,...] (x, y, team triplets)
+  const cropData = [];
+  if (state.crops) {
+    for (const c of state.crops) {
+      cropData.push(c.x, c.y, c.t);
+    }
+  }
+
   return {
     type: 'state',
     heights: flatHeights,
@@ -1083,6 +1089,8 @@ function serializeState(state, team) {
     team,
     swamps: swampData,
     rocks: rockData,
+    trees: treeData,
+    crops: cropData,
     seaLevel: state.seaLevel,
     leaders: state.leaders,
     armageddon: state.armageddon,
@@ -1104,6 +1112,7 @@ function executePowerEarthquake(state, team, px, py) {
   }
   invalidateSwamps(state);
   invalidateRocks(state);
+  invalidateTrees(state);
   evaluateSettlementLevels(state);
 }
 
@@ -1178,6 +1187,7 @@ function executePowerVolcano(state, team, px, py) {
   }
   invalidateSwamps(state);
   invalidateRocks(state);
+  invalidateTrees(state);
   evaluateSettlementLevels(state);
 }
 
@@ -1200,6 +1210,7 @@ function executePowerFlood(state, team) {
   }
   invalidateSwamps(state);
   invalidateRocks(state);
+  invalidateTrees(state);
   evaluateSettlementLevels(state);
 }
 
@@ -1292,11 +1303,13 @@ function startGame(room) {
     // AI update (if vs AI room)
     if (room.ai) updateAI(state, room, dt);
 
+    // Compute crops every tick for rendering + growth
+    computeCrops(state);
+
     if (!state.armageddon) {
       state.levelEvalTimer += dt;
       if (state.levelEvalTimer >= 1.0) {
         state.levelEvalTimer = 0;
-        tryMergeSettlements(state);
         evaluateSettlementLevels(state);
       }
 
@@ -1437,6 +1450,7 @@ wss.on('connection', (ws) => {
         raisePoint(state, px, py);
         invalidateSwamps(state);
         invalidateRocks(state);
+        invalidateTrees(state);
         evaluateSettlementLevels(state);
         break;
       }
@@ -1453,6 +1467,7 @@ wss.on('connection', (ws) => {
         lowerPoint(state, px, py);
         invalidateSwamps(state);
         invalidateRocks(state);
+        invalidateTrees(state);
         evaluateSettlementLevels(state);
         break;
       }

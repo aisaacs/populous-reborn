@@ -40,6 +40,14 @@ const VOLCANO_RADIUS = 5;
 const KNIGHT_STRENGTH_MULT = 3;
 const KNIGHT_SPEED_MULT = 1.5;
 
+// ── Terrain ──────────────────────────────────────────────────────────
+const TERRAIN_TREES = 0.06; // fraction of land tiles with trees
+
+// ── Crops ────────────────────────────────────────────────────────────
+const CROP_ZONE_RADIUS = 2;  // 5×5 evaluation zone (center ± 2)
+const CROP_LEVEL_THRESHOLDS = [0, 0, 4, 8, 13, 18]; // crop count to reach level (indexed by level)
+const CROP_GROWTH_FACTOR = 0.5; // population growth per crop tile per growth tick
+
 // ── Tick ────────────────────────────────────────────────────────────
 const TICK_RATE = 20;
 const TICK_INTERVAL = 50;
@@ -52,6 +60,7 @@ if (typeof module !== 'undefined') {
     MODE_SETTLE, MODE_MAGNET, MODE_FIGHT, MODE_GATHER, MODE_NAMES,
     WALKER_SPEED, LEVEL_CAPACITY,
     POWERS, EARTHQUAKE_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT,
+    TERRAIN_TREES, CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, CROP_GROWTH_FACTOR,
     TICK_RATE, TICK_INTERVAL,
   };
 }

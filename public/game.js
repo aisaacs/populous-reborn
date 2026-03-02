@@ -71,6 +71,12 @@ let boulderLoaded = false;
 boulderImg.src = 'gfx/boulders.png';
 boulderImg.onload = () => { boulderLoaded = true; };
 
+// ── Tree Sprite ─────────────────────────────────────────────────────
+const treeImg = new Image();
+let treeLoaded = false;
+treeImg.src = 'gfx/tree.png';
+treeImg.onload = () => { treeLoaded = true; };
+
 // ── Music System ───────────────────────────────────────────────────
 const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3'];
 let musicQueue = [];
@@ -162,6 +168,9 @@ let walkerGrid = new Array(MAP_W * MAP_H);
 let swamps = [];
 let swampSet = new Set();
 let rocks = new Set();
+let trees = new Set();
+let cropSetBlue = new Set();
+let cropSetRed = new Set();
 let seaLevel = SEA_LEVEL;
 let leaders = [-1, -1];
 let armageddon = false;
@@ -400,8 +409,18 @@ function drawTile(tx, ty) {
     ctx.closePath();
   }
 
+  // Crop overlay
+  const tileKey = tx + ',' + ty;
+  if (cropSetBlue.has(tileKey)) {
+    ctx.fillStyle = 'rgba(100, 180, 60, 0.35)';
+    ctx.fill();
+  } else if (cropSetRed.has(tileKey)) {
+    ctx.fillStyle = 'rgba(160, 160, 40, 0.35)';
+    ctx.fill();
+  }
+
   // Swamp overlay
-  if (swampSet.has(tx + ',' + ty)) {
+  if (swampSet.has(tileKey)) {
     ctx.fillStyle = 'rgba(80, 100, 30, 0.5)';
     ctx.fill();
   }
@@ -413,7 +432,7 @@ function drawTile(tx, ty) {
   }
 
   // Boulder sprite on rock tiles
-  if (rocks.has(tx + ',' + ty) && boulderLoaded) {
+  if (rocks.has(tileKey) && boulderLoaded) {
     const midX = (pTop.x + pBottom.x) / 2;
     const midY = (pTop.y + pBottom.y) / 2;
     const tileW = (pRight.x - pLeft.x);
@@ -421,6 +440,17 @@ function drawTile(tx, ty) {
     const sw = boulderImg.width * scale;
     const sh = boulderImg.height * scale;
     ctx.drawImage(boulderImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
+  }
+
+  // Tree sprite on tree tiles
+  if (trees.has(tileKey) && treeLoaded) {
+    const midX = (pTop.x + pBottom.x) / 2;
+    const midY = (pTop.y + pBottom.y) / 2;
+    const tileW = (pRight.x - pLeft.x);
+    const scale = tileW * 0.7 / treeImg.width;
+    const sw = treeImg.width * scale;
+    const sh = treeImg.height * scale;
+    ctx.drawImage(treeImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
   }
 }
 
@@ -481,7 +511,7 @@ function drawWalker(w) {
 function drawSettlement(s) {
   const h = heights[s.tx][s.ty];
 
-  // Colored diamond (covering area) at 50% opacity — always drawn
+  // Diamond footprint: 1 tile for levels 1-4, 3×3 for castle (level 5)
   const cx = s.ox + s.sz * 0.5;
   const cy = s.oy + s.sz * 0.5;
   const he = s.sz * 0.5;
@@ -508,19 +538,18 @@ function drawSettlement(s) {
   ctx.stroke();
   ctx.restore();
 
-  // Sprite on top, sized to 50% of the footprint
+  // Sprite: center at top corner of diamond, bottom-center at bottom corner
   if (settlementSpritesLoaded && s.l >= 1 && s.l <= 5) {
     const team = s.t === TEAM_BLUE ? 'blue' : 'red';
     const key = SETT_LEVEL_NAMES[s.l - 1] + '-' + team;
     const img = settlementSprites[key];
     if (img && img.complete) {
-      const he2 = s.sz * 0.5 * 0.5;
-      const pSprTop = project(cx - he2, cy - he2, h);
-      const pSprBot = project(cx + he2, cy + he2, h);
-      const scale = (pSprBot.y - pSprTop.y) / (img.height / 2);
+      const tileH = pBottom.y - pTop.y;
+      const margin = tileH * 0.25;
+      const dh = tileH; // center-to-bottom = tileH*0.5, full height = tileH
+      const scale = dh / img.height;
       const dw = img.width * scale;
-      const dh = img.height * scale;
-      ctx.drawImage(img, pSprTop.x - dw / 2, pSprTop.y - dh / 2, dw, dh);
+      ctx.drawImage(img, pTop.x - dw / 2, pTop.y - margin, dw, dh);
     }
   }
 }
@@ -877,6 +906,23 @@ function applyStateSnapshot(msg) {
     }
   }
 
+  trees = new Set();
+  if (msg.trees) {
+    for (let i = 0; i < msg.trees.length; i += 2) {
+      trees.add(msg.trees[i] + ',' + msg.trees[i + 1]);
+    }
+  }
+
+  cropSetBlue = new Set();
+  cropSetRed = new Set();
+  if (msg.crops) {
+    for (let i = 0; i < msg.crops.length; i += 3) {
+      const key = msg.crops[i] + ',' + msg.crops[i + 1];
+      if (msg.crops[i + 2] === TEAM_BLUE) cropSetBlue.add(key);
+      else cropSetRed.add(key);
+    }
+  }
+
   seaLevel = msg.seaLevel !== undefined ? msg.seaLevel : SEA_LEVEL;
   leaders = msg.leaders || [-1, -1];
   armageddon = msg.armageddon || false;
@@ -1129,7 +1175,28 @@ function drawMinimap() {
     }
   }
 
-  // Pass 2: swamps
+  // Pass 2a: crops
+  for (let ty = 0; ty < MAP_H; ty++) {
+    for (let tx = 0; tx < MAP_W; tx++) {
+      const key = tx + ',' + ty;
+      if (cropSetBlue.has(key)) {
+        ctx.fillStyle = '#5a8a3a';
+        ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
+      } else if (cropSetRed.has(key)) {
+        ctx.fillStyle = '#8a8a2a';
+        ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
+      }
+    }
+  }
+
+  // Pass 2b: trees
+  ctx.fillStyle = '#2a6a2a';
+  for (const key of trees) {
+    const [tx, ty] = key.split(',');
+    ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
+  }
+
+  // Pass 2c: swamps
   ctx.fillStyle = '#3a5a1a';
   for (const s of swamps) {
     ctx.fillRect(mm.x + s.x * MM_SCALE, mm.y + s.y * MM_SCALE, cs, cs);

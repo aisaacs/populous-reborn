@@ -1,0 +1,1898 @@
+BULLFROG BIOGRAPHY 
+
+
+Peter Molyneux 
+
+Peter is the backbone of the programming team and is an all round good egg. He 
+masterminds the innovative technology used in most of our games and keeps track 
+of all the projects currently on the boil. Peter’s main interest is in the strategy as¬ 
+pect of our games; he’s spent a long time building up a large library of routines for 
+use in our planned range of strategically-based games. 
+
+Glenn Corpes 
+
+Glenn is our resident graphics and Atari specialist who originally joined our com¬ 
+pany to head our graphics team, but who now refuses to do any graphics because he 
+prefers programming. Glenn’s attitude towards work is to treat all suggested im¬ 
+provements to the game as totally impossible until nobody’s looking. Then he 
+sneaks away and does it. 
+
+Les Edgar 
+
+Les takes care of all the boring jobs that have to be done in the company, like get¬ 
+ting up in the morning and writing out the pay checks. It’s his job to keep the Team 
+topped up with enthusiasm. He can often be heard saying, “Isn’t that bloody thing 
+finished yet?” Les’s main interest in the company is bringing together all the differ¬ 
+ent parts that go into making a brilliant game. 
+
+Kevin Donkin 
+
+Kevin programs computers. He’s only happy when he’s at a keyboard. Sometimes 
+we have to bodily drag him away from cash dispenser machines. Kevin has done a 
+lot of the unseen coding in our products; that’s the stuff he tells us he’s done, but 
+can never be found. 
+
+Andy Jones 
+
+Andy does a lot of our graphics work, like creating impossible levels and strange 
+looking characters. These are generally based on hallucinations he’s had while lis¬ 
+tening to incredibly loud heavy metal music. Andy’s main interest is adding small 
+details to the graphics in the games and spending a lot of time testing out new ideas 
+as they pour forth from the Team. 
+
+Sean Cooper 
+
+Sean does all of our beta testing. He’s the person who takes the stick for finding any 
+bugs that may have slipped past the Team. 
+
+Dave Hanlon 
+
+Dave writes most of the music for our games and complains when we only allow 
+him 256 bytes to put it in. Dave has been a musician for several years and uses a 
+complex Amiga setup to produce his excellent results. 
+
+
+
+
+
+
+TABLE OF CONTENTS 
+
+
+Loading the Game 
+
+1 
+
+Game Play Screen 
+
+2 
+
+Tutorial 
+
+3 
+
+Conquest 
+
+6 
+
+Custom 
+
+6 
+
+Closeup Map 
+
+7 
+
+Information Shield 
+
+9 
+
+Command Icons 
+
+10 
+
+Direction and Object Icons 
+
+10 
+
+Divine Intervention Icons 
+
+11 
+
+Influence Behavior Icons 
+
+13 
+
+Zoom Icons 
+
+14 
+
+Game Control Icons 
+
+15 
+
+Two Player Game 
+
+20 
+
+Questions and Answers 
+
+26 
+
+
+
+
+
+
+
+AS A DIVINE BEING... 
+
+
+you have a group of followers from whom you derive 
+your power. The more followers you have and the 
+greater their achievements, the more power you wield. 
+Unfortunately, there is another group of people who 
+follow a different deity. Since there is barely enough 
+room in the world for your own magnificence, you 
+must rid yourself of the opposition. To do this, you 
+must use your great power to alter the face of the 
+world so your devout followers can crush the mis¬ 
+guided. 
+
+
+LOADING THE GAME 
+
+
+FOR THE AMIGA: 
+
+You will need to have a blank, formatted disk handy in case you later want 
+to save your game. 
+
+1. Turn on your computer. (Amiga 1000 owners, insert Kickstart 1.2 or 
+1.3 at the prompt.) 
+
+2. When you’re asked to insert your Workbench disk, insert the Populous 
+disk instead. Double click on the Populous disk icon. 
+
+3. When you see a picture of a hut, double click on the picture to 
+continue. 
+
+4. Next you see three options: TUTORIAL, CUSTOM, and CON¬ 
+QUEST. Click on the option you want. 
+
+If you do not choose an option right away, your title screen is replaced with 
+a demo and the program credits. To return to the title screen and your 
+options, click the left mouse button. 
+
+
+
+
+
+
+
+
+
+
+GAME PLAY SCREEN 
+
+
+
+Book of Worlds . Information Shield 
+
+
+Command Icons 
+
+
+Closeup Map 
+
+
+Manna 
+
+Bar 
+
+
+This screen contains all the tools you’ll need to impose dominion over any 
+world. The screen is divided into five parts: Book of Worlds, Manna Bar, 
+Closeup Map, Information Shield, and Command Icons. 
+
+
+Book of Worlds: This shows you the entire world you’re trying to conquer. 
+
+
+Manna Ban The Manna Bar shows a series of icons that are your 
+
+Divine Intervention icons. You have the power to 
+invoke any command to the left of the arrow. 
+
+Closeup Map: This is the area of the world you can directly influence 
+using many of your Command icons. 
+
+
+Information The shield can give specific information on the Good 
+Shield: and Evil populations. 
+
+
+Command Icons:These icons let you control game play. 
+
+
+
+
+
+
+
+
+
+TUTORIAL 
+
+
+For an overview of the major functions and strategies of Populous, follow 
+the steps of this tutorial. 
+
+Note: Right-click means to click the right mouse button; left-click means to 
+click the left mouse button. When it doesn’t matter which mouse button 
+you press, click will be used. Select means to left-click on an option. 
+
+□ Select Tutorial on the title screen once the game loads. The tutorial 
+begins in Pause mode to give you a chance to look around before things 
+start happening. 
+
+□ On the open page of the Book of Worlds is a small map of the entire 
+world that you want to conquer. The crosshair shows you what area is 
+being displayed on the Closeup Map. The red dots are Evil walkers, 
+and the dark grey dots are Evil settlements. The blue dots are Good 
+walkers, and the white dots are Good settlements. Light grey dots are 
+rocks. Click on any spot on the Book of Worlds to view that immediate 
+area on the Closeup Map. 
+
+□ Left-click on the Zoom to Leader icon < I> f K1 >. This displays your leader 
+on the Closeup Map; he’s the one carrying an ankh (since you are 
+Good). Your leader is vital to the control of your people since he’s the 
+central figure of your population. (Your leader might be inside a build¬ 
+ing, which will have the ankh attached to it.) 
+
+□ Let’s locate the leader of the Evil population. Find some red dots on 
+the Book of Worlds; these are Evil walkers. Click on a red dot to view 
+enemy territory. The Evil leader carries a skull with him. Once you 
+find him, select the Query icon ? and your cursor becomes a shield. 
+Position this shield on the Evil leader and click. When you do this, you 
+“tag” him with the shield. (The Evil leader might be inside a building, 
+which has the skull attached to it. Tag the building with the shield, and 
+when the leader leaves the building, the shield will stay with him.) 
+
+□ To check on the enemy leader’s power, look at the Information Shield 
+at the top right corner of the screen. The lower right quadrant of the 
+Information Shield contains two colored bars. The higher the level of 
+
+
+
+
+
+
+orange on the bars, the stronger the walker. Yellow represents an even 
+stronger character. You can find more details on the Shield and its con¬ 
+tents in the Information Shield section. 
+
+□ Go back to your leader by left-clicking on the Zoom to Leader icon. 
+Now it’s time to work on the landscape. Click on the Pause icon zZ 2 
+to start the action. Notice how the people begin to move (instead of 
+walking in place) and build structures. 
+
+□ Now you’re going to do some landscaping. Click on the Raise and Lower 
+Land icon Jjf ; this turns your cursor into a hand pointer. You’re going to 
+flatten out a piece of land so your people can build. As you move the hand 
+pointer over the Closeup Map, a crosshair jumps from point to point. This 
+is the point of land that will be affected. Left-click to raise the land; right- 
+click to lower the land. Try to create a flat area. Once you do, nearby people 
+expand settlements on the flattened area. The more flat land you make 
+around a settlement, the more crops they can grow and the more advanced 
+they become. Note: You can only raise or lower land when there are people 
+or settlements on the Closeup Map. 
+
+4 □ Click on the Zoom to Shield icon < ® > to see what the Evil people 
+
+are doing. Like you, they’re going to build as much as they can so their 
+population can grow. 
+
+□ Click on the Place Papal Magnet icon ^; you should see an ankh with 
+a small arrow followed by a crosshair. Place the crosshair at the bottom 
+corner of an evil building and left-click. This should place your papal 
+magnet in that building. 
+
+□ Now click on the Go to Papal Magnet icon <=> D= J =3 . Your people will 
+now walk toward your leader as he treks to the papal magnet. 
+
+□ Go back to your leader by clicking on the Zoom to Leader icon < >. 
+
+Follow him by scrolling the Closeup Map with the Directional icons 
+£7 • As he walks along, people join up with him (they bump into him 
+and disappear, giving the leader their strength). 
+
+□ When your leader gets halfway to the papal magnet, click on the Settle 
+
+icon ■=> . Your people will search for the nearest flat land and build. 
+
+Raise and lower land as necessary to help them build. Your leader is in 
+the building with the ankh next to it. 
+
+
+□ Check the Manna Bar. If the pointer is to the right of the Knight icon 
+
+on the Manna bar, click on the Knight icon at the bottom of your 
+Game Play screen. Your leader turns into a knight and the building dis¬ 
+appears (if your leader was in a building). Your knight is not under your 
+control; he’s a fighting machine who will destroy everything in his path. 
+
+□ Click on the Zoom to Knight icon < > to find out how your knight is 
+
+doing. If he has reached an enemy setdement, he should be cutting a path of 
+destruction. When a knight destroys a building, he also destroys the land 
+surrounding it, as shown by the “patchwork” land that remains. 
+
+□ Now that you no longer have a leader (he became a knight), click on the 
+Go to Papal Magnet icon so your walkers again walk toward the Papal 
+Magnet. The first walker to touch the papal magnet becomes your new 
+leader. Remember, this new leader will carry a miniature ankh. 
+
+□ Once you have a new leader, click on the Settle icon so your people can 
+start cultivating land again. Help your people by raising and lowering 
+land as necessary. Creating usable land for your people is a vital part of 
+the game. If your population doesn’t grow, neither will your power. 
+
+□ Find an area that the Evil people have covered with their buildings. If 
+
+you have enough power to use the Earthquake icon ((())) , click on it 
+
+and watch the hapless Evil settlements shake to the ground. Instant 
+destruction! 
+
+□ Click on the Go to Papal Magnet icon so your leader resumes his trek 
+into enemy territory. When your people get into enemy territory, click 
+on the Fight then Settle icon *=> X to make your people attack the 
+enemy and then build houses (if your people are strong enough to beat 
+the enemy in battle). 
+
+You now have a basic idea of how to play Populous. It’s a process of build¬ 
+ing up your population while destroying your opponent’s population. 
+
+When you’re ready for a game, click on the Game Setup icon 0) , and 
+
+then select Conquest. Soon you’ll wonder why you haven’t mastered the 
+
+universe long ago! 
+
+
+CONQUEST 
+
+
+When you choose Conquest (either from the Game Setup screen or the 
+title screen), you’re taken to Genesis. This is the first and easiest world for 
+you to conquer. You’re first shown a brief description of the world and 
+your enemy’s capabilities. If you want to fight for Genesis, select Start 
+Game. Once you’ve conquered Genesis, you’re taken to another, more 
+challenging world. 
+
+If you’ve played Populous before, and have conquered many worlds, you 
+can go directly to any of the worlds you’ve previously visited. Select New 
+Game and then type in the name of the world you want to conquer. Then 
+select Start Game to begin. 
+
+
+CUSTOM 
+
+
+When you select Custom you can change the parameters of a world before 
+you attempt to conquer it. If you select Custom from the title screen, you’re 
+taken to a random world which you can modify. If you select Custom on 
+the Game Setup screen, you can modify your current world. Choosing 
+Custom takes you out of Conquest mode, and you can’t resume the Con¬ 
+quest series of worlds without restarting by selecting Conquest. 
+
+In Custom mode, you’re free to change all of the game parameters as well 
+as design your own world. Use the Paint Map option (see Command Icons 
+for details) to create the surface of your custom world. Then select Game 
+Options to change the laws by which your world exists; e.g., whether water 
+is fatal, swamps bottomless, etc. 
+
+If you don’t like the changes you’ve made, select Restart Map to restore 
+the world to its original form. Or if you want a completely different world, 
+select Move to Next Map for a new random world for you to modify. 
+
+When you’re satisfied with your new world, select Play Game and then 
+OK. When your world appears, click on the Game Balance icon ^ (see 
+the Command Icons section for details) and decide which powers you and 
+your opponent can have. Then select OK. Now you’re ready to battle for 
+dominion over your own custom world. 
+
+
+
+
+
+
+
+
+
+
+CLOSEUP MAP 
+
+
+«■ Use the icons described in the Command Icons section to af¬ 
+fect the Closeup Map. 
+
+Here are the things you can see on your Closeup Map: 
+
+□ Papal Magnet — The papal magnet is your sacred symbol. If you’re 
+Good, the papal magnet is an ankh. If you’re Evil, it’s a skull. The papal 
+magnet is the focal point through which you control your followers. 
+
+□ People — There are three types of people in Populous. To find out the 
+status of a character, use the Query icon to tag him with the shield. 
+
+Walkers: Walkers are your primary population. Walkers do what¬ 
+ever you tell them: follow the papal magnet, fight the enemy, setde 
+in an area, etc. Use the Influence Behavior icons (described in the 
+Command Icons section) to tell them what to do. When two walkers 
+of the same faith bump into each other, they combine to make one 
+stronger walker. The strength of this new walker depends on the 
+strength of the original two walkers and how advanced they were. 
+
+Leader: You can only have one leader at a time. This is the first 
+walker to touch the papal magnet; he’s identified by a miniature 
+version of the papal magnet. Think of him as your high priest. 
+
+Knight: If you have enough energy, you can turn a leader into a 
+knight. Knights are fighting machines. They look for the nearest 
+enemy setdement, kill whoever is there, and burn it down. The 
+knight will continue to systematically destroy enemy settlements 
+and people until he’s killed. 
+
+Although a knight has many times the strength of a leader (from 
+whom he came), there are still strong knights and weak knights. A 
+knight gradually weakens with each battle, and a knight can die 
+quickly when greatly outnumbered. You can have as many knights 
+as you have the strength to make. 
+
+
+
+
+
+
+□ Miniature Papal Magnet — A miniature papal magnet (the ankh or 
+the skull) is always attached to your leader so you can identify him. 
+
+□ Settlements — Once a walker settles, he builds a structure and plants 
+crops. Your population growth is strictly governed by the number of 
+crop fields you own on the world. The larger the number of contiguous 
+crop fields, the larger the structure built by the settlers. 
+
+Settlements range from primitive huts to intricate castles. Castles are 
+erected in areas of at least 5x5 contiguous fields. Castles increase your 
+population the quickest, but they also take the longest to fill. Walkers, 
+your ever-important pioneers, will not emerge from a settlement until 
+it is full. (Use the Query icon to determine the size of the population in 
+a settlement by tagging the flag of the settlement with the shield.) As 
+long as walkers do not emerge, you’ll have no one searching for new 
+flat lands to settle on. You must decide what your status is and what’s 
+the best move to make. 
+
+□ Terrain — Terrain varies from world to world. Worlds range from 
+hot deserts to frozen tundra; sometimes surrounded with water, some¬ 
+times lava. Often the terrain is littered with rocks, trees, and the rubble 
+from destroyed settlements, all of which hinder your population’s ef¬ 
+forts to use the land. Each terrain type affects game play in different 
+ways. For instance, walkers die faster in the desert, while populations 
+increase slower on ice worlds. 
+
+
+INFORMATION SHIELD 
+
+
+Use the Query icon described in the Command Icons section to assign 
+the Shield. 
+
+
+Here is an explanation of all the parts of the Information Shield: 
+
+
+
+This shows which side the information is for: ankh for 
+Good, skull for Evil. 
+
+The more primitive the settlement, the more primitive 
+the weapon that the walkers carry. A fist or a club is 
+primitive, while a crossbow or a sword is more advanced. 
+Expect larger settlements to be more advanced. 
+
+This is the subject that the shield is attached to: walker, 
+settlement, or combatants. 
+
+The information here depends on the subject: 
+
+
+Quadrant 1 — 
+Quadrant 2 — 
+
+Quadrant 3 — 
+Quadrant 4 — 
+
+
+If you’re viewing a settlement, the left bar (yellow) represents its 
+size/strength and defensive value compared to a full castle. The 
+right bar (green) shows how close the settlement is to creating a 
+new walker. 
+
+
+If you’re viewing a walker, the bars represent the strength of the 
+walker. There are three bars representing a walker’s strength; only 
+two of these bars are shown at any one time. Each time the right 
+orange bar fills up, the left orange bar increases one notch and the 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+right bar empties. When both the orange bars fill up, the display 
+switches to show you a yellow bar and an orange bar; these work in 
+a similar manner except they are now higher in value. Think of the 
+three bars as representing a number with a ones place, a tens place, 
+and a hundreds place, where the yellow bar represents the hun¬ 
+dreds place. A walker with a full yellow and orange bar is one tough 
+walker. 
+
+If you’re looking at someone in combat, the bars show the relative 
+strengths of the two combatants. Blue is the strength of Good; red 
+is the strength of Evil. 
+
+The large blue and red bars on either side of the shield represent the popu¬ 
+lations: blue for Good, red for Evil. The higher the level, the higher the 
+population. 
+
+A small shield icon stays attached to your selected walker or settlement to 
+remind you what the Information Shield represents. If a walker with a shield 
+enters a building, the shield transfers to that building. If a walker leaves a 
+building, the shield transfers to that walker. If a walker dies, the shield 
+vanishes. If he dies in combat, the shield transfers to his opponent. 
+
+
+COMMAND ICONS 
+
+
+Use these icons to control game play. To activate a command, click on the 
+icon. When a command is on, the square is highlighted. 
+
+
+Direction and Object Icons 
+
+These commands let you control the movement of your Closeup Map and 
+find out information on that map. 
+
+<57 Directions 
+
+Click on any of the Direction icons to scroll the Closeup Map 
+in the direction of the arrow. You cannot scroll off the edge of 
+the world. You can use your numeric keypad in place of the 
+direction icons, but the keypad response is slower. 
+
+
+
+
+
+
+^ Query 
+
+
+Selecting this icon turns your cursor into a shield that you can 
+use to find out information about people or settlements. To do 
+so, point with the top left corner of the shield at a walker or at 
+a flag flying by a settlement, and then left-click. The Informa¬ 
+tion Shield now fills with information on that walker or settle¬ 
+ment. For a complete description of the Information Shield, 
+see the Information Shield section. 
+
+
+Divine Intervention Icons 
+
+These are the same items that are shown on your Manna Bar. Click on the 
+Command icon to activate the option. Which options you can execute 
+depends on the amount of energy you have; you can perform any divine 
+intervention that is to the left of the arrow marker. Remember that each of 
+these actions require you to use manna. Each time you use manna, the 
+marker drops to the left. 
+
+*sr Each of the following options are available unless you turned it off 
+under Game Setup. 
+
+
+Raise and Lower Land 
+
+This is the default selection. Move the cursor over the Closeup 
+Map and a crosshair follows it. Left-click to raise the land one 
+increment; right-click to lower the land one increment. The 
+land is affected at the point where the crosshair is positioned. 
+You must have a walker or a settlement (depending on which 
+you chose under Game Setup) visible on the Closeup Map for 
+this to work. 
+
+
+
+Place Papal Magnet 
+
+
+This lets you place your papal magnet (an ankh for Good or a 
+skull for Evil) anywhere on the Closeup Map. The papal mag¬ 
+net acts as a beacon for your followers. They will head toward 
+it anytime you tell them to. 
+
+Click on the Place Papal Magnet icon and your cursor becomes 
+a small papal magnet with an arrow. Click anywhere on the 
+Closeup Map to place it, and the papal magnet moves to the 
+new location. 
+
+
+You must have a leader to relocate the papal magnet. The first 
+walker to touch the papal magnet becomes your leader. If your 
+leader dies, the papal magnet moves to the spot where he died. 
+
+Earthquake 
+
+This shakes up the area in the Closeup Map, often destroying 
+buildings and drowning people. Be sure not to devastate your 
+own people or settlements. 
+
+Swamp 
+
+This creates a swamp in any flat area (it won’t work on a slope) 
+and destroys crops planted in that area. Click on the Swamp 
+icon and your cursor becomes a small swamp. Click anywhere 
+on the Closeup Map to swamp the landscape. Anyone falling 
+into the swamp will drown. If you selected the “swamps bot¬ 
+tomless” option under Game Setup, the swamp remains after it 
+swallows somebody. If you selected “swamps shallow,” the 
+swamp disappears after someone falls into it. The only way to 
+get rid of a swamp is to bury it by raising the land or dig it out 
+by lowering the land. 
+
+Knight 
+
+This turns your leader into a knight. As a knight, he looks for 
+the nearest enemy settlement, kills whoever is there, and then 
+burns it down. The knight will continue to systematically de¬ 
+stroy the enemy until he’s killed. You can have as many knights 
+as you have the manna to make. 
+
+Although a knight has many times the strength of a leader, 
+there are still strong knights and weak knights. A knight will 
+die when greatly outnumbered in battle. 
+
+Remember, when you knight your leader, you no longer have a 
+leader. Be sure to have a walker touch the papal magnet to get 
+a new leader. 
+
+Volcano 
+
+This raises the area in the Closeup Map to a considerable 
+height, destroying settlements and creating rocks over the af¬ 
+fected area. You need a great deal of time and energy to repair 
+
+
+the effects of a volcano. In order to get rid of rocks, you must 
+remove terrain until you get down to water; then you can re¬ 
+build. 
+
+FIood 
+
+Raises the sea level one increment over the entire landscape. If 
+water is set on “fatal” under Game Options, every walker 
+caught in the deluge will die. If not, you have the chance to 
+work quickly to save your drowning population. 
+
+Armageddon 
+
+Both papal magnets are moved to the center of the world, and 
+both populations uproot their homes and head toward the 
+magnets, building land if necessary to cross water. Once there, 
+they fight until one side is obliterated. 
+
+Once you select Armageddon, you cannot alter the flow of 
+events in any way. Make sure your population heavily outnum¬ 
+bers your enemy’s before invoking this command. 
+
+Influence Behavior Icons 
+
+Use these commands to control your followers. Click on the icon to acti¬ 
+vate the option. 
+
+^ c ^ 3 Go to Papal Magnet 
+
+This makes your walkers join your leader as he goes to the papal 
+magnet. If you don’t have a leader, your walkers head directly 
+for the papal magnet, and the first one to touch it becomes your 
+new leader. 
+
+■=> Settle 
+
+This commands your walkers to look for unsettled flat land. 
+Once there, the walkers build the largest settlement they can. 
+
+•=> (§) Gather then Settle 
+
+This makes your walkers look for other walkers. When a walker 
+bumps into another walker of the same faith, they turn into a 
+single, stronger walker. If no other walkers are in the immedi¬ 
+ate area, the walkers just settle. 
+
+
+
+
+Fight then Settle 
+
+Tells your walkers to first look for enemies to attack, and then 
+settle. If no enemies are in the immediate area, the walkers just 
+settle. 
+
+
+Zoom Icons 
+
+These commands let you go straight to a particular subject on the map. 
+Each time you go to a new subject, the Information Shield shows informa¬ 
+tion on the subject that you asked to see for about three seconds. After that, 
+the Information Shield goes back to showing information for the shield 
+hearer (that’s the walker or settlement that^ow put the shield on by using 
+the Query icon). If you don’t have a shield bearer, the Information Shield is 
+blank. 
+
+< c= J a > Zoom to Leader or Papal Magnet 
+
+Left-click on this icon to show your leader on the Closeup 
+Map. If you have no leader, you’ll go to the papal magnet in¬ 
+stead. 
+
+Right-click to view your papal magnet on the Closeup Map. 
+
+< > Zoom to Knight or Settlements 
+
+Left-click to show your knight on the Closeup Map. If you have 
+more than one knight, left-click repeatedly to cycle through all 
+your available knights. If you have no knights, nothing hap¬ 
+pens. 
+
+Right-click repeatedly to cycle through all of your settlements. 
+
+< ^ > Zoom to Battle 
+
+Left-click repeatedly to see each battle. If no battles are taking 
+place, nothing happens. 
+
+< W > Zoom to Shield 
+
+Click to show the walker or settlement currently carrying the 
+shield. Nothing happens if you haven’t assigned the shield to a 
+walker or settlement. To assign the shield, use the Query icon. 
+
+
+Game Control Icons 
+
+These commands let you set general game play options. 
+
+
+FX Sound Effects 
+
+Turns the sound effects on or off. The beating you hear repre¬ 
+sents your heartbeat. The slower the beat, the stronger you are. 
+
+J]J1 Music 
+
+Turns the music on or off. 
+
+zZZ Pause 
+
+Pauses or resumes the game. 
+
+0) Game Setup 
+
+Click on this icon to bring up your game play options. Next to 
+each of the following options is a square button. To turn on a 
+button, click on it. 
+
+Q When the button is out, the option is off. 
+
+□ When the button is in, the option is on. 
+
+Note: When you’re in Conquest mode, there are many 
+options you can’t select. Select Custom to change 
+these options. 
+
+One Player — Play against the computer or watch the 
+computer play against itself. 
+
+Two Players — Play against another player via modem or 
+datalink. See the Two Player Game section for complete 
+details. 
+
+Play Game — Select this and then select OK to start the 
+game. 
+
+Paint Map — This puts the game in paint mode. When 
+you use this option, the game pauses and your Raise 
+and Lower Land icon is activated. When you move the 
+cursor over the Closeup Map, a crosshair follows. You 
+can alter an area where the crosshair indicates by press- 
+
+
+ing different keys. Here is a listing of the keys you can 
+press: 
+
+
+FI 
+
+Place a Good walker. 
+
+F2 
+
+Place an Evil walker. 
+
+F3 
+
+Place a tree or a plant; press F3 
+again on the same spot to cycle 
+through the selection of trees 
+and plants. 
+
+F4 
+
+Place rocks; press F4 again on 
+the same spot to cycle through 
+the selection of rocks. 
+
+F5 
+
+Remove an object or walker 
+from the screen. 
+
+F6 
+
+Increase Good’s manna. 
+
+F7 
+
+Increase Evil’s manna. 
+
+F8 
+
+Mirror the landscape (make 
+symmetrical). 
+
+Del 
+
+Remove all the land from the 
+world, leaving only water. 
+
+Shift-Fl 
+
+Place the Good leader. 
+
+Shift-F2 
+
+Place the Evil leader. 
+
+Shift-F6 
+
+Decrease Good’s manna. 
+
+Shift-F7 
+
+Decrease Evil’s manna. 
+
+1 
+
+Grass terrain 
+
+2 
+
+Sand terrain 
+
+3 
+
+Ice terrain 
+
+4 
+
+Ash terrain (and lava instead 
+of water) 
+
+
+You can also use volcanos and earthquakes to quickly 
+modify your land. 
+
+Good — You control the Good population. 
+
+Evil — You control the Evil population. 
+
+Human vs Computer — You play against the computer. 
+Computer vs Computer — The computer battles itself. 
+You still must pick a side; this is the side whose actions 
+you can affect if you choose. Although the computer is 
+
+
+set to fight itself, you can intervene at any time. Just 
+issue a command the same way you would in a regular 
+game. The computer moves pretty fast, so don’t be 
+surprised if you move the papal magnet and the com¬ 
+puter immediately moves it somewhere else. 
+
+Conquest — Play the Conquest game. This brings up the 
+World to Conquer requester. Select Start Game to 
+accept the current world or select New Game, type in 
+another name, and press Return. You won’t know the 
+names of other worlds until you win and advance 
+through the Book of Worlds. 
+
+Custom — Play a Custom game. Choose this if you want 
+to create your own maps or experiment with the vari¬ 
+ous options. See the Custom section for details on cre¬ 
+ating a custom game. 
+
+Game Options — This brings up a requester with six 
+options. The option you choose affects both players: 
+
+Water is fatal/harmful. “Water is fatal” automatically 
+kills everybody in water (usually after a flood); 
+“water is harmful” gives you the opportunity to 
+save people that are treading water by raising land 
+beneath them. 
+
+Swamps shallow/bottomless. After one walker falls 
+in a “shallow” swamp, the swamp disappears. “Bot¬ 
+tomless” swamps don’t disappear after a walker 
+falls into it. 
+
+Can/Cannot build. With “cannot build” selected, nei¬ 
+ther side can raise or lower terrain. This overrides 
+the following two build options. 
+
+Build up and down/Only build up. “Build up and 
+down” lets you add and remove terrain. “Only 
+build up” means you can only add terrain. 
+
+Build near people/towns. “Build near towns” means 
+you can only build when the flag of one of your 
+settlements is on the Closeup Map. “Build near 
+people” means you can also build when one of your 
+walkers is on the Closeup Map. 
+
+
+Save a Game — First replace the Populous disk with a 
+blank, formatted disk. Then select Save a Game. This 
+brings up a save game requester, which catalogues the 
+disk and lists any saved games. Click in the File Name 
+box and type in the file name, then press Return; or 
+click on a file name from the list. Click on the Save box 
+to save the game to disk. If you’re using a second drive 
+or want to use a directory other than the root direc¬ 
+tory, then click on the Directory box and type in that 
+directory. Once the game is saved, you are prompted 
+to return the Populous disk to the drive. 
+
+Load a Game — First replace the Populous disk with the 
+disk your saved game is on. Then select Load a Game. 
+This brings up a load game requester, which catalogues 
+the disk and lists any saved games. Click on the File 
+Name box and type in the file name, then press 
+Return; or click on the name from the list. Click the 
+Load box to load the game. If you’re using a second 
+drive or want to use a directory other than the root 
+directory, then click on the Directory box and type in 
+that directory. Once the game is loaded, you are 
+prompted to return the Populous disk to the drive. 
+
+Move to Next Map — This brings up a random map you 
+and your opponent can fight over. The map is unre¬ 
+lated to those in your Conquest series. Selecting this 
+option while in Conquest mode is equivalent to select¬ 
+ing Restart This Map. 
+
+Restart this Map — This starts the game over again for 
+the current map. It starts with the original map; any al¬ 
+terations that you’ve made with the Custom option do 
+not appear. 
+
+Surrender this Game — In Conquest mode, this lets you 
+surrender the game. You must replay the world again 
+before you can continue to the next world. In all other 
+modes, Surrender This Game lets you quit the current 
+game and go to a new world. 
+
+Game Balance 
+
+Left-click to bring up the options for Good; right-click to 
+
+bring up the options for Evil. You can make each of the 
+
+
+following options available or unavailable by clicking 
+on the square next to it: 
+
+When the button is in, the option is available. 
+
+When the button is out, the option is not available. 
+
+Can modify land 
+Can attack towns 
+Can attack leader 
+Can use earthquakes 
+Can use swamp 
+Can use knight 
+Can use volcano 
+Can use flood 
+Can use Armageddon 
+
+At the bottom of the screen are the settings for Aggression 
+and Rate. Click anywhere inside the bar to reset the level. 
+
+Aggression. The higher the setting, the more aggressively 
+the computer attempts to invade your land. Aggression 
+has no effect on a human player since you obviously 
+can’t dictate how aggressively he plays. 
+
+Rate. This sets the rate of how quickly population grows 
+in settlements. The higher the setting, the faster the 
+population proliferates and gains energy. The com¬ 
+puter is almost impossible to beat when its rate is set to 
+maximum. 
+
+Select OK to accept these options and to continue with the 
+game. 
+
+Send Message 
+
+If you’re playing a two player game, either by modem or 
+datalink, use this to send messages. Choosing this icon 
+brings up a requester; type in the message you want to send 
+to the other player (up to a maximum of 20 characters) and 
+press Return. A similar requester containing the message 
+appears on your opponent’s screen. See the Two Player 
+Game section for more details on playing against a human 
+opponent. 
+
+
+□ 
+
+□ 
+
+
+TWO PLAYER GAME 
+
+
+There are two ways to play against a human opponent: using a modem to 
+connect to a remote player, or using a null modem cable to connect the 
+serial ports of two computers (this is “datalink mode”). 
+
+Because the format of the information exchanged between the two comput¬ 
+ers is fixed, you can play against an opponent who is playing Populous on a 
+different kind of computer. The speed of the game is related to the baud 
+rate, so setting a higher baud rate makes the action proceed more quickly. 
+To play in Two Player mode, both players need original copies of Popu¬ 
+lous. 
+
+Connecting in Datalink Mode 
+
+1. Get a null modem cable. You can probably find one at your local 
+computer store. 
+
+2. Disconnect both machines from their power supplies. 
+
+3. Connect the cable between the serial ports of the two computers. 
+
+4. Reconnect both machines to their power supplies. 
+
+5. Load the game on both machines and select Custom. When the 
+Game Play screen appears, click on the Game Setup icon, and then 
+select Two Players. You’ll see the Two Player mode requester. 
+The default baud rate is 9600. 
+
+6. If you want to use a different baud rate for the two computers, click 
+on the Baud Rate box; a flashing cursor appears. Backspace over 
+9600, enter a new baud rate (do not use commas), and press Re¬ 
+turn. The baud rate must be the same for each computer. For iden¬ 
+tical computers, use the fastest baud rate possible (i.e. 19200 for 
+two Amigas). For two different computer types, determine the 
+highest baud rate for both computers; then choose the lower value 
+of the two. See your modem manual for details on baud rates. A 
+good value to use is 9600 — most computers support this rate. 
+
+7. Now skip forward to “Starting the Two Player Game.” 
+
+Preparing Modems in Voice Mode 
+
+If you and your opponent can plug phones into your modem, then you can 
+connect in voice mode. 
+
+
+
+
+
+
+1. Find a modem opponent. 
+
+2. Disconnect both machines from their power supplies. 
+
+3. Connect the modem’s serial cable to the computer. 
+
+4. Connect the modem to the phone line; your phone should be con¬ 
+nected to the modem. 
+
+5. Reconnect the power supply to each machine. 
+
+6. Call your friend on the phone and load the game on both machines. 
+Select Custom. 
+
+7. When the Game Play screen appears, click on the Game Setup icon, 
+and then select Two Players. You’ll see the Two Player mode 
+requester. Select Datalink and it changes to “Modem.” 
+
+8. A text input box appears above the Baud Rate that says “Send 
+Login.” You also see a new button that says “Full Serial Checking.” 
+Don’t worry about these for now. 
+
+9. The default baud rate is 9600. To enter a different baud rate for 
+the two modems, click on the Baud Rate box and a flashing cursor 
+should appear. Backspace over 9600, enter a new baud rate (do not 
+use commas), and press Return. Set the baud rate the same for each 
+modem. Determine the highest baud rate available for each mo¬ 
+dem; then choose the /overvalue of the two. Typical baud rates are 
+300, 1200, and 2400. See your modem manual for details on baud 
+rates. 
+
+You can use the Send Login box to send commands to your modem. To 
+establish a data connection between the two computers (if you’re talking on 
+the telephone), click in this box. One player should type ATA and press 
+Return. This makes his modem send a carrier. When the other player hears 
+the carrier, he should type ATD and press Return. Once the CD light on 
+the modem (if it exists) lights up, the connection is established and both 
+players can put the phone down. If you don’t have a CD light, wait a few 
+seconds before putting the phone down. Now skip forward to “Starting the 
+Two Player Game.” 
+
+
+Preparing Modems in Non-Voice Mode 
+
+If you or your opponent can’t plug a phone into your modem, then you 
+need to have your modems make the call and establish the connection. 
+
+1. Set the baud rate to that of your modem. Click on the Baud Rate box 
+and a flashing cursor should appear. Backspace over 9600, enter a new 
+
+
+baud rate (do not use commas), and press Return. Set the baud rate the 
+same for each modem. 
+
+2. One player must set his modem to “Auto Answer.” To do this, click on 
+the Send Login box, type ATS0=1, and press Return. This modem 
+will now answer the next incoming call and attempt to establish a con¬ 
+nection with the other computer. 
+
+3. The other player makes the call by clicking in the Send Login box and 
+typing \TT)T\phone number ] and pressing Return. If you need to dial 
+with a pulse phone, use ATDP instead of ATDT. Now the computer 
+will dial the phone number and attempt to connect with the other 
+computer. If you have to redial, click in the Send Login box (so the 
+cursor appears at the end of the phone number) and press Return. 
+
+4. Once the modems are connected (you will hear a squeal), click in the 
+Connect Me box. 
+
+5. Now skip forward to “Starting the Two Player Game.” 
+
+
+Starting the Two Player Game 
+
+First decide who is Evil and who is Good (there is no advantage to either). 
+If you want to be Evil, click on the button next to “I Am Good” and it 
+changes to “I Am Evil.” Unless you use a saved game, both players start on 
+the landscape which the Evil player is currently using. The game options 
+are the same on both machines; the options set for Evil are the ones both 
+players use. 
+
+Two features are disabled in the two player game: Loading a Game and 
+Conquest mode. Messages are also sent to your opponent if you’ve changed 
+any of the game options or if you’ve entered Paint Map mode. 
+
+Establishing the Data Connection 
+
+To connect, click on the Connect Me button on both computers. A re¬ 
+quester shows that the computer is trying to connect. “Received Game” 
+flashes briefly on the screen, and then the game starts. 
+
+Using a Saved Landscape 
+
+If you want to use a saved landscape, both players must have a copy of that 
+landscape. If you’re playing with two identical computers connected via 
+datalink, just swap the disk from one computer to the other. Put the disk 
+containing the landscape you want to use into the drive and select Use This 
+Landscape. Use the file requester that appears to select the landscape and 
+
+
+load it. If you’re playing via modem or with two different computers, you’ll 
+have to first transfer the landscape file over your modem to the other com¬ 
+puter using terminal software if both players do not have the same land¬ 
+scape saved to disk. 
+
+If you use the normal Populous maps, one player may have a slight advan¬ 
+tage because of the terrain his population initially occupies. This inequity 
+evens out over many games. If you want to play on equal terrain, create 
+your own map using the Paint Map mode (see the “Paint Map” on page 15 
+for more details), and then choose Mirror The Landscape. This lets you 
+create landscape that’s symmetrical. 
+
+Using a Saved Game 
+
+If you want to use a saved game, both players must have a copy of that 
+game. Since the Load a Game option is not available in Two Player mode, 
+a game can be loaded as a landscape. Select Use This Landscape as de¬ 
+scribed above, and select the name of the saved game instead of a landscape. 
+You will then be able to continue the game where you left off. 
+
+Computer Assistance 
+
+If you’re an inexperienced player, you may want computer assistance. To 
+play alongside the computer, click on the Game Setup icon to bring up the 
+Game Setup options, and then select Computer vs Computer (e.g. Amiga 
+vs Amiga). The computer will now help you play against your opponent 
+over the modem. 
+
+Pausing 
+
+Click on the Pause icon to pause both players’ games. This can confuse 
+your opponent if he doesn’t notice the illuminated Pause icon. When you 
+play, keep an eye on this icon. 
+
+Communicating with your Opponent 
+
+You can send a message to your opponent by clicking on the Send Message 
+icon at any point during the game. This brings up “Send a Message.” Type 
+your message in the box and press Return. The game pauses until your 
+opponent reads the message and selects OK. 
+
+You can also talk to your opponent on the phone after a game has begun. 
+Click on the globe to get the Game Setup menu and then select Load 
+Game. You’ll both see the message “Pick Up Phone” — both of you should 
+
+
+pick up the phone at this point. If it’s hard to hear your opponent, type 
+ATH in the Send Login box and press Return; this turns off the modem’s 
+carrier. (Note: If your opponent hasn’t picked up the phone at this point, 
+the phone connection will be lost.) To re-establish the link after talking, 
+one player must type ATA and the other must type ATD in your Send 
+Login boxes. Then you can proceed as described above in “Starting the 
+Two Player Game.” 
+
+Game Over 
+
+After somebody wins, you’ll see the Game Lost or Game Won information. 
+To continue with the next game, both players must select Next Game. 
+
+Possible Communication Problems 
+
+If you’re using a modem and you get the message “He’s Trying To Be Evil/ 
+Good” even after you’ve tried selecting both die I AM GOOD and I AM 
+EVIL options, your modem has not established a connection to the remote 
+modem. Your modem is merely echoing back to your computer whatever 
+selection you made. You can stop the echoing by typing ATEO in the Send 
+2 Login box, but to fix the problem you have to redial your opponent. 
+
+4 During communicadon, the program checks the data to see if it has been 
+corrupted. If it is corrupted, it sends the same data a few more times before 
+giving up and informing you that there is a Serial Checksum error. 
+
+If you only have a low-speed modem, it’s possible to increase the speed of 
+the game by switching off this checking altogether. To do this, select Full 
+Serial Checking and it changes to “No Serial Checking.’’ Even in this 
+mode, the program checks every couple of seconds to see that the land¬ 
+scapes have not gone out of sync. By turning off serial checking, you run a 
+greater risk of having your data get corrupted. If this happens, you are in¬ 
+formed that there is an Incompatible Landscape error. Both players should 
+select the same Serial Checking mode. 
+
+Mouse Response Time 
+
+Playing in Two Player mode is similar to One Player mode. You may no¬ 
+tice at low baud rates a very slight delay between clicking your mouse and 
+seeing the results. This can be a little frustrating if you’re used to the fast 
+response of higher baud rates or the one player game. To overcome this 
+problem, don’t move the mouse until the mouse click has activated your 
+command. 
+
+
+Messages in Two Player Mode 
+
+
+CHECKSUM SERIAL ERROR 
+
+The data being sent between the two machines has become corrupted. 
+This may be due to a damaged lead in datalink mode or a bad line in 
+modem mode. The game pauses and each player should save the game. 
+Reconnect using that saved game and a different line. 
+
+INCOMPATIBLE LANDSCAPE ERROR 
+
+You get this message when the landscape is in any way different on 
+each machine — this means the machines are out of sync. This error 
+only happens when you turn off error checking to speed up data com¬ 
+munication. If this error occurs, the game is paused and each player 
+should save the game. Because these two games are out of sync, one of 
+you should make a copy of your game and give it to the opponent. This 
+way you can resume the game with the same version — one that’s not 
+out of sync. 
+
+MESSAGE FROM GOOD/EVIL 
+Select OK after you read the message. 
+
+OTHER PLAYER HAS SWITCHED TO ONE PLAYER MODE 
+You’re also placed in One Player mode. 
+
+OTHER PLAYER HAS SELECTED PAINT MAP 
+
+The other player has gone into Paint Map mode. You’re now also in 
+
+Paint Map mode and are free to alter the landscape. 
+
+OTHER PLAYER HAS TURNED ON/OFF COMPUTER ASSIS¬ 
+TANCE. 
+
+This means the other player has turned the computer player on or off. 
+If he turned it on, the computer will assist him. 
+
+OTHER PLAYER HAS CHANGED HIS GAME OPTIONS 
+The other player has changed his game options. 
+
+OTHER PLAYER HAS CHANGED YOUR GAME OPTIONS 
+The other player has changed your game options. 
+
+
+OTHER PLAYER HAS CHANGED THE GAME OPTIONS 
+The other player has changed options that affect the both of you. 
+
+OTHER PLAYER HAS SAVED HIS GAME DO YOU WISH TO 
+SAVE ALSO? 
+
+Select OK to bring up the Save Game requester; select Cancel if you 
+don’t want to save. 
+
+OTHER PLAYER HAS CHANGED SIDE 
+You will both switch sides. 
+
+STARTUP SERIAL 
+
+You see this if the other player has selected Two Players from the Game 
+Setup options. Pick up your phone and type ATH into the Send Login 
+Box and press Return if you want to talk to your opponent. 
+
+Unnoticed Activities 
+
+You can do three things that won’t make a message appear on your oppo- 
+2 nent’s screen. If you want your opponent to know you’re going to do any of 
+these actions, use the Send Message option. 
+
+6 
+
+1. Move to the next map. 
+
+2. Restart the game. The landscape is cleared and the original map 
+(before any modifications were made) is loaded. 
+
+3. Surrender. 
+
+
+QUESTIONS AND ANSWERS 
+
+
+Q Do I have to play all the worlds of Conquest in one sitting? 
+
+A No. You can save games at any time and load them later to continue. 
+Just write down the names of the worlds you conquer so you can start 
+from the last world next time. 
+
+Q Why do my people die as they walk around? 
+
+A Like real people, walkers grow tired from exhaustion and lack of vital 
+supplies; eventually they die. Terrain makes a difference. A grassy and 
+fertile landscape does less damage to a walker than hostile desert ter¬ 
+rain. 
+
+
+
+
+
+
+Q How do I get a strong leader? 
+
+A You can increase the strength of your leader by selecting the Go To 
+Papal Magnet icon, placing the papal magnet in a friendly castle, and 
+waiting for the leader and his followers to arrive. The people will gather 
+and combine with your leader to make him stronger. The side effect of 
+this is that your lands will not expand since everybody is busy walking 
+instead of settling. 
+
+Q Why do my lands keep getting cleared? 
+
+A Your lands can be emptied by incorrect use of the Go to Papal Magnet 
+mode. If a situation arises that causes your people to leave their homes 
+(like an earthquake or a volcano), they won’t resettle since people don’t 
+settle in Go to Papal Magnet mode. 
+
+Q Why does the ankh jump when my leader dies? 
+
+A The papal magnet moves to the point where the leader dies or is 
+knighted. You can’t move the papal magnet from that spot until a new 
+leader is created. 
+
+Q What do I do to land that’s been burned by a knight? 
+
+A Raise and lower it so you can build on it again. 
+
+Q How do I remove a swamp? 
+
+A To remove a swamp, raise and lower that same point. 
+
+Q What effect do the rocks and trees have? 
+
+A Rocks and trees affect you by limiting the amount of land that can be 
+used for crops. Some rocks disappear when you raise and lower them, 
+others stay until you “drown” them in the sea (lower the land around 
+them until you hit water, and then raise the land again). 
+
+Q How do I get people out of their houses to become walkers? 
+
+A You can get people out of their houses by decreasing the size of the 
+usable land that surrounds a settlement (e.g. with a hill). This reduces 
+the size of that house and the number of people that can live in it, there¬ 
+fore creating a walker. 
+
+Q Why should I build castles? 
+
+A Castles have three main things going for them: they produce people 
+faster than any other type of building; they produce more manna than 
+any other building; and they have the highest technology level of any 
+building. The walkers fresh out from castles are the strongest around. 
+
+
+The problem with castles is that they take a large area of land to sup¬ 
+port them and they are so big that they take a long time to fill up to 
+produce one of these tough walkers. Different landscapes have differ¬ 
+ent advantages and disadvantages, so the benefits of a castle may not 
+apply on certain landscapes. 
+
+Q What does the shield do? 
+
+A The shield provides you with details about the various people and 
+buildings. The shield also lets you gauge how strong your attacker is 
+compared to a defender. The bars in Quadrant 4 of the shield shows 
+the balance of power during battles, with the blue (Good) and red (Evil) 
+bars showing relative strength. See Information Shield for details. 
+
+Q Why can’t I lower land? 
+
+A There is an option under Game Options that only lets you raise land. 
+There’s also a mode that allows no building at all. It’s also possible that 
+you just don’t have enough manna to build. 
+
+Q Why can’t I build? 
+
+A There are a number of possible reasons: you may not have enough 
+manna, you may have selected “Build near people” and not have a 
+walker on the Closeup Map, or you may have the “Cannot build” op¬ 
+tion switched on. 
+
+Q Why can’t I raise land without flags? 
+
+A You may have the “Cannot build” option on, or you may not have 
+enough manna. 
+
+Q Why can’t I use a divine intervention command like earthquake, vol¬ 
+cano, swamp, etc.? 
+
+A You may not have enough manna to use the command. Check the 
+Manna Bar; you can only use the effects to the left of the arrow marker. 
+Another explanation is that the particular option may be turned off for 
+this game. 
+
+Q Why can’t I knight somebody? 
+
+A To create a knight, you must have a leader and enough manna to use 
+the effect. 
+
+Q How do I make a new leader? 
+
+A To create a new leader, you must get a walker to touch the papal mag¬ 
+net. To do this, click on the Go to Papal Magnet icon. 
+
+
+Q Why do several things happen to the land when I just click once? 
+
+A The other player may be working on the land in the same region. You 
+can never tell where the enemy is since you can’t see the other player’s 
+cursor. 
+
+Q How do I win a game? 
+
+A To win a game (conquer a world) you must destroy all of the enemy’s 
+walkers and settlements. 
+
+Q How do I stop my opponent from winning? 
+
+A By winning yourself. A useful technique is to keep the enemy busy long 
+enough for you to build yourself up. Why not try a triple volcano? 
+
+Q Why do different sized buildings appear? 
+
+A The size of the building depends on the amount of flat land that sur¬ 
+rounds it. The more flat, usable land there is, the larger the buildings. 
+
+Q How do I know how strong someone is? 
+
+A Use the shield to tell you roughly how strong someone is. See “Query” 
+under Command Icons for details. 
+
+Q What does the skull do to me? 
+
+A The skull doesn’t affect you in any way. It’s the Evil player’s papal 
+magnet. 
+
+Q How can I get rid of the Skull? 
+
+A The skull only moves if the Evil player moves it, or if the Evil player’s 
+leader dies or is knighted. You can’t do anything to it. 
+
+Q Why does the arrow marker by my Manna Bar go up so slowly? How 
+can I improve its rate of increase? 
+
+A The more followers you have, the larger your manna source. You can 
+increase your Manna by increasing your population. At first it’s a slow 
+process, but as you learn the best strategy for building and populating, 
+you’ll do better. Conserve manna by using it wisely. Don’t repeatedly 
+raise and lower the same chunk of terrain; it doesn’t get you anywhere 
+and it burns up your manna. 
+
+Q Why does my castle disappear when I knight my leader? 
+
+A When you create a knight, you take the leader and the building that 
+he’s currently in and turn them into the knight. 
+
+Q Do the types of landscape make any difference? 
+
+
+A Yes. Each landscape type affects the way the game plays. You need dif¬ 
+ferent tactics to beat your opponent on different landscapes. 
+
+Q What is the speckled area surrounding a settlement? 
+
+A This area holds your crops. The land that your building is on may in¬ 
+terweave with the land your enemy’s on. Larger buildings tend to take 
+crop fields from smaller buildings. 
+
+Q How do I get the papal magnet in a building? 
+
+A Place the crosshair on the bottom corner of the building and click. 
+
+Q How do I talk to my modem opponent without exiting the game? 
+
+A Let your opponent know what you’re doing by using the Send Message 
+icon. See page 19 for details. 
+
+Q How do I restart a saved landscape in Two Player mode? 
+
+A Enter the Game Setup options and select Two Players. This puts the 
+modem (if present) into command mode. If using a modem, re-estab¬ 
+lish connection by both players typing AT01 in the Send Login box 
+and pressing Return. Click on the Use This Landscape button to 
+bring up the Load Game requester. Select the game that was originally 
+loaded. Select the Connect Me button to restart that game. 
+
+Q Why has the game paused? 
+
+A Occasionally, the game freezes for no apparent reason in two player 
+mode. There are five possible reasons why: 
+
+1. You’ve sent a message and your opponent hasn’t selected OK. 
+
+2. Your opponent paused the game (your Pause icon will be lit up in 
+this case). 
+
+3. Your opponent selected either the Game Setup icon or the Game 
+Balance icon and might be making changes. 
+
+4. Data is becoming corrupt in Full Serial Checking mode and the 
+computer is attempting to resend it. This could be caused by a bad 
+line. 
+
+5. The modem was reset, or the carrier was lost due to a bad line. 
+
+Q I have a low speed modem. Is there any way of increasing the speed of 
+the game? 
+
+A In the Startup Serial requester, select Full Serial Checking and it 
+changes to “No Serial Checking.’’ Both players must do this. Remem¬ 
+ber that turning off your serial checking increases your risk of getting 
+corrupted data. 
+
+
+ICON AND KEY SUMMARY 
+
+
+These are all the icons you can select in Populous: 
+
+
+Direction and Object Icons: Game Control Icons: 
+
+
+£7 
+
+Directions 
+
+FX 
+
+Sound Effects 
+
+? 
+
+Query 
+
+flji 
+
+zZZ 
+
+Music 
+
+Pause 
+
+Divine Intervention Icons: 
+
+i 
+
+Game Setup 
+Game Balance 
+
+M 
+
+c f a 
+
+«n» 
+
+w 
+
+X 
+
+Raise and Lower Land 
+
+Place Papal Magnet 
+Earthquake 
+
+Swamp 
+
+Knight 
+
+Volcano 
+
+Flood 
+
+Armageddon 
+
+s 
+
+Send Message 
+
+
+Influence Behavior Icons: 
+
+
+^ ^ Go to Papal Magnet 
+
+■=> Settle 
+
+•=> (gj) Gather then Settle 
+
+«=> X Fight then Settle 
+
+
+Zoom Icons: 
+
+< C T a > Zoom to Leader or Papal Magnet 
+
+< I© > Zoom to Knight or Settlements 
+
+< X > Zoom to Battle 
+
+< ^ > Zoom to Shield 
+
+
+
+
+
+
+TECHNICAL SUPPORT 
+
+
+If you have questions about the program, our Technical Support Depart¬ 
+ment can help. If your question isn’t urgent, please write to us at: 
+
+Electronic Arts Technical Support 
+
+P.O. Box 7578 
+
+San Mateo, CA 94403-7578 
+
+Please be sure to include the following information in your letter: 
+
+• Product name 
+
+• Type of computer you own 
+
+• Any additional system information (like type and make of monitor, 
+video card, printer, modem etc.) 
+
+• Type of operating system or DOS version number 
+
+• Description of the problem you’re having 
+
+If you need to talk to someone immediately, call us at (415) 572-ARTS 
+Monday though Friday between 8:30 am and 4:30 pm, Pacific Time. 
+Please have the above information ready when you call. This will help us 
+answer your question in the shortest possible time. 
+
+If you live outside of the United States, you can contact one of our other 
+offices. 
+
+In the United Kingdom, contact: Electronic Arts Limited, P.O. Box 835, 
+Slough SL3 8XU, UK. Phone (044) 753 46465 
+In Australia, contact: ECP/EA, 4/18 Lawrence Drive, Nerang, Gold 
+Coast, QLD 4211. Phone: (75) 963-488. 
+
+
+LIMITED WARRANTY 
+
+
+Electronic Arts (“EA”) provides to the original purchaser of the computer 
+software product, for a period of ninety (90) days from the date of original 
+purchase (the “Warranty Period”), the following limited warranties: 
+Media — EA warrants that, under normal use, the magnetic media and the 
+packaging provided with it are free from defects in materials and workman¬ 
+ship. 
+
+
+
+
+
+
+
+
+
+
+Software — EA warrants that the software, as originally purchased, will 
+perform substantially in conformance with the specifications set forth in 
+the packaging and in the user manual. 
+
+
+WARRANTY CLAIMS 
+
+
+To make a warranty claim under this limited warranty, please return the 
+product to the point of purchase, accompanied by proof of purchase, your 
+name, your return address, and a statement of the defect. OR send the 
+disk(s) to us at the above address within 90 days of purchase. Include a copy 
+of the dated purchase receipt, your name, your return address, and a state¬ 
+ment of the defect. EA or its authorized dealer will, at our option, repair or 
+replace the product and return it to you (postage prepaid) or issue you with 
+a credit equal to the purchase price. 
+
+
+To replace defective media after the 90-day warranty period has expired, 
+send the original disk(s) to the above address. Enclose a statement of the 
+defect, your name, your return address, and a check or money order for 
+$7.50. 
+
+THE FOREGOING STATES THE PURCHASER’S SOLE AND EX¬ 
+CLUSIVE REMEDY FOR ANY BREACH OF WARRANTY WITH 
+RESPECT TO THE SOFTWARE PRODUCT. 
+
+Warranty Exclusions: EA EXPRESSLY DISCLAIMS ANY IMPLIED 
+WARRANTIES WITH RESPECT TO THE MEDIA AND THE SOFT¬ 
+WARE, INCLUDING WARRANTIES OF MERCHANTABILITY OR 
+FITNESS FOR A PARTICULAR PURPOSE. ANY WARRANTIES 
+IMPLIED BY LAW ARE LIMITED IN DURATION TO THE WAR¬ 
+RANTY PERIOD. SOME STATES DO NOT ALLOW LIMITATIONS 
+ON THE DURATION OF AN IMPLIED WARRANTY, SO THE 
+ABOVE LIMITATIONS MAY NOT APPLY TO YOU. THIS WAR¬ 
+RANTY GIVES YOU SPECIFIC LEGAL RIGHTS. YOU MAY ALSO 
+HAVE OTHER RIGHTS WHICH VARY FROM STATE TO STATE. 
+
+
+
+
+
+
+LIMITATION ON DAMAGES 
+
+
+EA SHALL NOT IN ANY CASE BE LIABLE FOR INCIDENTAL, 
+CONSEQUENTIAL, OR OTHER INDIRECT DAMAGES ARISING 
+FROM ANY CLAIM UNDER THIS AGREEMENT, EVEN IF EA OR 
+ITS AGENTS HAVE BEEN ADVISED OF THE POSSIBILITY OF 
+SUCH DAMAGES. SOME STATES DO NOT ALLOW THE EXCLU¬ 
+SION OR LIMITATION OF INCIDENTAL OR CONSEQUENTIAL 
+DAMAGES, SO THE ABOVE LIMITATION OR EXCLUSION MAY 
+NOT APPLY TO YOU. 
+
+Unless indicated otherwise, all software and documentation is 
+© 1988, 1989 Electronic Arts. All Rights Reserved. 
+
+NOTICE 
+
+ELECTRONIC ARTS RESERVES THE RIGHT TO MAKE IM¬ 
+PROVEMENTS IN THE PRODUCT DESCRIBED IN THIS MAN¬ 
+UAL AT ANY TIME AND WITHOUT NOTICE. 
+
+THIS MANUAL, AND THE SOFTWARE DESCRIBED IN THIS 
+MANUAL, IS COPYRIGHTED. ALL RIGHTS ARE RESERVED. NO 
+PART OF THIS MANUAL OR THE DESCRIBED SOFTWARE MAY 
+BE COPIED, REPRODUCED, TRANSLATED OR REDUCED TO 
+ANY ELECTRONIC MEDIUM OR MACHINE-READABLE FORM 
+WITHOUT THE PRIOR WRITTEN CONSENT OF ELECTRONIC 
+ARTS, P. O. BOX 7578, SAN MATEO, CALIFORNIA 94403-7578, 
+ATTN: CUSTOMER SERVICE. 
+
+ELECTRONIC ARTS MAKES NO WARRANTIES, EXPRESS OR IM¬ 
+PLIED, WITH RESPECT TO THIS MANUAL, ITS QUALITY, MER¬ 
+CHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE. 
+THIS MANUAL IS PROVIDED “AS IS.” ELECTRONIC ARTS 
+MAKES CERTAIN LIMITED WARRANTIES WITH REGARD TO 
+THE SOFTWARE AND THE MEDIA FOR THE SOFTWARE. 
+PLEASE SEE THE ELECTRONIC ARTS LIMITED WARRANTY 
+BELOW. 
+
+SOFTWARE © 1989 BULLFROG PRODUCTIONS 
+ALL RIGHTS RESERVED. 
+
+© 1989 ELECTRONIC ARTS. ALL RIGHTS RESERVED. 
+
+
+
+
+
+
+
+ELECTRONIC ARTS® 
+Customer Service 
+P.O. Box 7578 
+San Mateo, CA 94403-7578 
+
+
+345205 
