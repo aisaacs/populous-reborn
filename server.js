@@ -107,6 +107,7 @@ function createGameState() {
 }
 
 // ── Terrain Generation ──────────────────────────────────────────────
+const TERRAIN_FLATNESS = 0.3; // 0 = very mountainous, 1 = very flat
 
 // 2D value noise with smoothstep interpolation
 function makeNoise2D() {
@@ -151,48 +152,96 @@ function enforceAdjacency(state) {
   }
 }
 
-function generateTerrain(state) {
-  const noise = makeNoise2D();
-  const W = C.MAP_W, H = C.MAP_H;
-  const period = 24; // large features
-
-  for (let x = 0; x <= W; x++) {
-    for (let y = 0; y <= H; y++) {
-      // 3 octaves of noise
-      const nx = x / period, ny = y / period;
-      let v = noise(nx, ny) * 0.6 + noise(nx * 2.1, ny * 2.1) * 0.25 + noise(nx * 4.3, ny * 4.3) * 0.15;
-
-      // Island mask — smooth falloff, gentle enough that noise shapes the coastline
-      const dx = (x / W) * 2 - 1;
-      const dy = (y / H) * 2 - 1;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const mask = Math.max(0, 1 - dist * 0.9);
-
-      v = (v * 0.7 + 0.5) * mask; // normalize and apply mask
-      state.heights[x][y] = Math.round(v * C.MAX_HEIGHT);
-    }
-  }
-
-  // Clamp to valid range
-  for (let x = 0; x <= W; x++) {
-    for (let y = 0; y <= H; y++) {
-      state.heights[x][y] = Math.max(0, Math.min(C.MAX_HEIGHT, state.heights[x][y]));
-    }
-  }
-
-  enforceAdjacency(state);
-
-  // Validate: check flat tile percentage
-  let flat = 0, land = 0;
-  for (let tx = 0; tx < W; tx++) {
-    for (let ty = 0; ty < H; ty++) {
-      if (!isTileWater(state, tx, ty)) {
-        land++;
-        if (isTileFlat(state, tx, ty)) flat++;
+// Check if a 5x5 flat area exists near a position
+function hasSpawnFlat(state, cx, cy) {
+  for (let r = 0; r < 15; r++) {
+    for (let ox = cx - r; ox <= cx + r; ox++) {
+      for (let oy = cy - r; oy <= cy + r; oy++) {
+        if (Math.abs(ox - cx) !== r && Math.abs(oy - cy) !== r) continue;
+        if (ox < 0 || ox + 5 > C.MAP_W || oy < 0 || oy + 5 > C.MAP_H) continue;
+        let flat = true;
+        const h = state.heights[ox][oy];
+        if (h <= state.seaLevel) continue;
+        for (let dx = 0; dx <= 5 && flat; dx++) {
+          for (let dy = 0; dy <= 5 && flat; dy++) {
+            if (state.heights[ox + dx][oy + dy] !== h) flat = false;
+          }
+        }
+        if (flat) return true;
       }
     }
   }
-  // If less than 40% flat, we accept it — the period is tuned to produce good results
+  return false;
+}
+
+function generateTerrain(state) {
+  const W = C.MAP_W, H = C.MAP_H;
+  const spawns = [{ cx: 10, cy: 10 }, { cx: 50, cy: 50 }];
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const noise = makeNoise2D();
+
+    // Randomize parameters each game
+    const freq = 0.03 + Math.random() * 0.05;
+    const heightMul = (2.0 - TERRAIN_FLATNESS * 1.5) * (0.85 + Math.random() * 0.3);
+    const numCenters = 2 + Math.floor(Math.random() * 4); // 2–5
+    const centers = [];
+
+    // Always include centers near spawn zones so both teams have land
+    for (const sp of spawns) {
+      centers.push({
+        x: sp.cx + (Math.random() - 0.5) * 10,
+        y: sp.cy + (Math.random() - 0.5) * 10,
+        r: 0.4 + Math.random() * 0.25, // radius as fraction of map
+      });
+    }
+
+    // Additional random centers, biased away from edges
+    for (let i = centers.length; i < numCenters; i++) {
+      centers.push({
+        x: 8 + Math.random() * (W - 16),
+        y: 8 + Math.random() * (H - 16),
+        r: 0.2 + Math.random() * 0.35,
+      });
+    }
+
+    // Generate height field
+    for (let x = 0; x <= W; x++) {
+      for (let y = 0; y <= H; y++) {
+        // 3 octaves of noise
+        const nx = x * freq, ny = y * freq;
+        let v = noise(nx, ny) * 0.6 + noise(nx * 2.1, ny * 2.1) * 0.25 + noise(nx * 4.3, ny * 4.3) * 0.15;
+
+        // Multi-center island mask — take max influence from all centers
+        let mask = 0;
+        for (const c of centers) {
+          const dx = (x - c.x) / (W * c.r);
+          const dy = (y - c.y) / (H * c.r);
+          const d = Math.sqrt(dx * dx + dy * dy);
+          mask = Math.max(mask, Math.max(0, 1 - d));
+        }
+
+        // Edge fade — ensure nothing spawns at map borders
+        const ex = Math.min(x, W - x) / 5;
+        const ey = Math.min(y, H - y) / 5;
+        mask *= Math.min(1, ex, ey);
+
+        v = (v * 0.7 + 0.5) * mask;
+        state.heights[x][y] = Math.max(0, Math.min(C.MAX_HEIGHT, Math.round(v * C.MAX_HEIGHT * heightMul)));
+      }
+    }
+
+    enforceAdjacency(state);
+
+    // Validate: both spawn zones must have a 5x5 flat area nearby
+    if (hasSpawnFlat(state, 10, 10) && hasSpawnFlat(state, 50, 50)) return;
+
+    // Reset heights for retry
+    for (let x = 0; x <= W; x++) {
+      for (let y = 0; y <= H; y++) state.heights[x][y] = 0;
+    }
+  }
+  // Fallback: last attempt is kept even if validation fails
 }
 
 // ── Utility Functions ───────────────────────────────────────────────
