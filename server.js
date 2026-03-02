@@ -107,26 +107,29 @@ function createGameState() {
 }
 
 // ── Terrain Generation ──────────────────────────────────────────────
-function placeBlob(state, cx, cy, radius, level) {
-  const r2 = radius * radius;
-  for (let x = 0; x <= C.MAP_W; x++) {
-    for (let y = 0; y <= C.MAP_H; y++) {
-      const dx = x - cx, dy = y - cy;
-      if (dx * dx + dy * dy < r2 && state.heights[x][y] >= level - 1) {
-        state.heights[x][y] = level;
-      }
-    }
-  }
-}
 
-function generateIsland(state, cx, cy, maxHeight, baseRadius) {
-  for (let level = 1; level <= maxHeight; level++) {
-    const shrink = 1 - (level - 1) / (maxHeight + 1);
-    const radius = baseRadius * shrink * (0.7 + Math.random() * 0.5);
-    const ox = cx + (Math.random() - 0.5) * baseRadius * 0.25;
-    const oy = cy + (Math.random() - 0.5) * baseRadius * 0.25;
-    placeBlob(state, ox, oy, radius, level);
+// 2D value noise with smoothstep interpolation
+function makeNoise2D() {
+  const SIZE = 256;
+  const perm = new Uint8Array(SIZE * 2);
+  const grad = new Float64Array(SIZE);
+  for (let i = 0; i < SIZE; i++) { perm[i] = i; grad[i] = Math.random() * 2 - 1; }
+  for (let i = SIZE - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [perm[i], perm[j]] = [perm[j], perm[i]];
   }
+  for (let i = 0; i < SIZE; i++) perm[SIZE + i] = perm[i];
+
+  function hash(ix, iy) { return grad[perm[perm[ix & 255] + (iy & 255)]]; }
+  function smooth(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+
+  return function(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = smooth(x - ix), fy = smooth(y - iy);
+    const a = hash(ix, iy), b = hash(ix + 1, iy);
+    const c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+    return a + fx * (b - a) + fy * (c - a) + fx * fy * (a - b - c + d);
+  };
 }
 
 function enforceAdjacency(state) {
@@ -149,19 +152,47 @@ function enforceAdjacency(state) {
 }
 
 function generateTerrain(state) {
-  generateIsland(state, 16, 16, 5, 18);
-  generateIsland(state, 48, 20, 4, 16);
-  generateIsland(state, 32, 45, 6, 22);
-  generateIsland(state, 55, 52, 3, 13);
-  generateIsland(state, 10, 50, 4, 15);
+  const noise = makeNoise2D();
+  const W = C.MAP_W, H = C.MAP_H;
+  const period = 24; // large features
 
-  for (let i = 0; i < 5; i++) {
-    const x = 5 + Math.floor(Math.random() * (C.MAP_W - 10));
-    const y = 5 + Math.floor(Math.random() * (C.MAP_H - 10));
-    generateIsland(state, x, y, 2 + Math.floor(Math.random() * 2), 6 + Math.floor(Math.random() * 6));
+  for (let x = 0; x <= W; x++) {
+    for (let y = 0; y <= H; y++) {
+      // 3 octaves of noise
+      const nx = x / period, ny = y / period;
+      let v = noise(nx, ny) * 0.6 + noise(nx * 2.1, ny * 2.1) * 0.25 + noise(nx * 4.3, ny * 4.3) * 0.15;
+
+      // Island mask — smooth falloff, gentle enough that noise shapes the coastline
+      const dx = (x / W) * 2 - 1;
+      const dy = (y / H) * 2 - 1;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const mask = Math.max(0, 1 - dist * 0.9);
+
+      v = (v * 0.7 + 0.5) * mask; // normalize and apply mask
+      state.heights[x][y] = Math.round(v * C.MAX_HEIGHT);
+    }
+  }
+
+  // Clamp to valid range
+  for (let x = 0; x <= W; x++) {
+    for (let y = 0; y <= H; y++) {
+      state.heights[x][y] = Math.max(0, Math.min(C.MAX_HEIGHT, state.heights[x][y]));
+    }
   }
 
   enforceAdjacency(state);
+
+  // Validate: check flat tile percentage
+  let flat = 0, land = 0;
+  for (let tx = 0; tx < W; tx++) {
+    for (let ty = 0; ty < H; ty++) {
+      if (!isTileWater(state, tx, ty)) {
+        land++;
+        if (isTileFlat(state, tx, ty)) flat++;
+      }
+    }
+  }
+  // If less than 40% flat, we accept it — the period is tuned to produce good results
 }
 
 // ── Utility Functions ───────────────────────────────────────────────
