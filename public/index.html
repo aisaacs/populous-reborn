@@ -7,16 +7,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #111; overflow: hidden; font-family: monospace; color: #ccc; }
     canvas { display: block; cursor: crosshair; }
-    #game, #ui { display: none; }
-    #ui {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      color: #ccc;
-      font: 14px monospace;
-      pointer-events: none;
-      user-select: none;
-    }
+    #game { display: none; }
 
     /* Lobby */
     #lobby {
@@ -98,12 +89,189 @@
       min-height: 16px;
     }
 
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    #sidebar {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 160px;
+      height: 100vh;
+      background: rgba(10, 10, 20, 0.85);
+      border-right: 1px solid #333;
+      z-index: 20;
+      user-select: none;
+      overflow-y: auto;
+      padding: 8px;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #sidebar.visible { display: flex; }
+
+    .sb-section {
+      border-bottom: 1px solid #282828;
+      padding-bottom: 6px;
+      margin-bottom: 2px;
+    }
+    .sb-section:last-child { border-bottom: none; }
+
+    .sb-label {
+      font: bold 9px monospace;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 3px;
+    }
+
+    /* Population bars */
+    .pop-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 5px;
+    }
+    .pop-label {
+      font: bold 10px monospace;
+      width: 14px;
+      text-align: center;
+    }
+    .pop-bar-bg {
+      flex: 1;
+      height: 12px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .pop-bar-fill {
+      height: 100%;
+      transition: width 0.15s;
+    }
+    .pop-val {
+      font: 9px monospace;
+      color: #888;
+      width: 30px;
+      text-align: right;
+    }
+
+    /* Mana */
+    .mana-bar-bg {
+      width: 100%;
+      height: 12px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 2px;
+    }
+    .mana-bar-fill {
+      height: 100%;
+      background: #66aaff;
+      transition: width 0.15s;
+    }
+    .mana-text {
+      font: 10px monospace;
+      color: #8af;
+      text-align: center;
+    }
+
+    /* Mode buttons */
+    .mode-row {
+      display: flex;
+      gap: 2px;
+    }
+    .mode-btn {
+      flex: 1;
+      background: rgba(40, 40, 60, 0.9);
+      border: 1px solid #444;
+      border-radius: 3px;
+      color: #aaa;
+      font: bold 9px monospace;
+      padding: 4px 0;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .mode-btn:hover { border-color: #888; color: #ddd; }
+    .mode-btn.active { border-color: #4a4; color: #6d6; background: rgba(40, 80, 40, 0.6); }
+
+    /* Tool buttons */
+    .tool-btn {
+      width: 100%;
+      background: rgba(40, 40, 60, 0.9);
+      border: 1px solid #444;
+      border-radius: 3px;
+      color: #aaa;
+      font: bold 10px monospace;
+      padding: 5px 0;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.1s, color 0.1s;
+      margin-bottom: 2px;
+    }
+    .tool-btn:hover { border-color: #888; color: #ddd; }
+    .tool-btn.active { border-color: #ff8c00; color: #ffaa33; background: rgba(80, 60, 20, 0.6); }
+
+    /* Stats */
+    .stat-line {
+      font: 10px monospace;
+      color: #888;
+      line-height: 1.4;
+    }
+    .stat-val { color: #ccc; }
+
+    /* Slider rows */
+    .sb-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 2px;
+    }
+    .sb-slider-label {
+      font: 9px monospace;
+      color: #666;
+      width: 22px;
+    }
+    .sb-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 3px;
+      background: #333;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    .sb-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #aaa;
+      cursor: pointer;
+    }
+    .sb-slider::-moz-range-thumb {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #aaa;
+      border: none;
+      cursor: pointer;
+    }
+    .sb-icon-btn {
+      background: none;
+      border: none;
+      color: #888;
+      font: 12px monospace;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+    .sb-icon-btn:hover { color: #ccc; }
+
     /* Power Bar */
     #power-bar {
       display: none;
       position: fixed;
       bottom: 12px;
-      left: 50%;
+      left: calc(160px + (100% - 160px) / 2);
       transform: translateX(-50%);
       background: rgba(0, 0, 0, 0.7);
       border: 1px solid #444;
@@ -142,68 +310,6 @@
       font: 9px monospace;
       color: #8af;
     }
-
-    /* Top-right controls */
-    .top-ctrl {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      z-index: 20;
-      user-select: none;
-    }
-    .ctrl-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid #444;
-      border-radius: 4px;
-      padding: 4px 8px;
-    }
-    .ctrl-label {
-      font: 11px monospace;
-      color: #888;
-      min-width: 28px;
-    }
-    .ctrl-row button {
-      background: none;
-      border: none;
-      color: #ccc;
-      font: 16px monospace;
-      cursor: pointer;
-      padding: 0 2px;
-      line-height: 1;
-    }
-    .ctrl-row button:hover { color: #fff; }
-    .ctrl-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 60px;
-      height: 4px;
-      background: #444;
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
-    .ctrl-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #ccc;
-      cursor: pointer;
-    }
-    .ctrl-slider::-moz-range-thumb {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #ccc;
-      border: none;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
@@ -234,6 +340,74 @@
   </div>
 
   <canvas id="game"></canvas>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <!-- Population -->
+    <div class="sb-section">
+      <div class="sb-label">Population</div>
+      <div class="pop-row">
+        <span class="pop-label" style="color:#4488ff">B</span>
+        <div class="pop-bar-bg"><div id="pop-bar-blue" class="pop-bar-fill" style="width:0;background:#4488ff"></div></div>
+        <span id="pop-val-blue" class="pop-val">0</span>
+      </div>
+      <div class="pop-row">
+        <span class="pop-label" style="color:#ff4444">R</span>
+        <div class="pop-bar-bg"><div id="pop-bar-red" class="pop-bar-fill" style="width:0;background:#ff4444"></div></div>
+        <span id="pop-val-red" class="pop-val">0</span>
+      </div>
+    </div>
+
+    <!-- Mana -->
+    <div class="sb-section">
+      <div class="sb-label">Mana</div>
+      <div class="mana-bar-bg"><div id="mana-bar-fill" class="mana-bar-fill" style="width:0"></div></div>
+      <div id="mana-text" class="mana-text">0</div>
+    </div>
+
+    <!-- Mode -->
+    <div class="sb-section">
+      <div class="sb-label">Mode</div>
+      <div class="mode-row">
+        <button class="mode-btn" data-mode="0">1 Stl</button>
+        <button class="mode-btn" data-mode="1">2 Mag</button>
+        <button class="mode-btn" data-mode="2">3 Fgt</button>
+        <button class="mode-btn" data-mode="3">4 Gth</button>
+      </div>
+    </div>
+
+    <!-- Tools -->
+    <div class="sb-section">
+      <div class="sb-label">Tools</div>
+      <button id="btn-inspect" class="tool-btn">Inspect (I)</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="sb-section">
+      <div class="sb-label">Your Team</div>
+      <div class="stat-line">Settlements: <span id="stat-my-set" class="stat-val">0</span></div>
+      <div class="stat-line">Walkers: <span id="stat-my-walk" class="stat-val">0</span></div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-label">Opponent</div>
+      <div class="stat-line">Settlements: <span id="stat-opp-set" class="stat-val">0</span></div>
+      <div class="stat-line">Walkers: <span id="stat-opp-walk" class="stat-val">0</span></div>
+    </div>
+
+    <!-- Settings -->
+    <div class="sb-section">
+      <div class="sb-label">Settings</div>
+      <div class="sb-slider-row">
+        <button id="btn-mute" class="sb-icon-btn" title="Mute (M)">&#9835;</button>
+        <input id="music-vol" class="sb-slider" type="range" min="0" max="100" value="30">
+      </div>
+      <div class="sb-slider-row">
+        <span class="sb-slider-label">Tex</span>
+        <input id="tex-opacity" class="sb-slider" type="range" min="0" max="100" value="40">
+      </div>
+    </div>
+  </div>
+
   <div id="power-bar">
     <div class="power-btn" data-power="earthquake"><span class="power-hotkey">Q</span><span class="power-name">Quake</span><span class="power-cost">1500</span></div>
     <div class="power-btn" data-power="swamp"><span class="power-hotkey">W</span><span class="power-name">Swamp</span><span class="power-cost">60</span></div>
@@ -242,17 +416,6 @@
     <div class="power-btn" data-power="flood"><span class="power-hotkey">T</span><span class="power-name">Flood</span><span class="power-cost">500</span></div>
     <div class="power-btn" data-power="armageddon"><span class="power-hotkey">Y</span><span class="power-name">Armgddn</span><span class="power-cost">ALL</span></div>
   </div>
-  <div class="top-ctrl">
-    <div class="ctrl-row">
-      <button id="btn-mute" title="Mute (M)">&#9835;</button>
-      <input id="music-vol" class="ctrl-slider" type="range" min="0" max="100" value="30">
-    </div>
-    <div class="ctrl-row">
-      <span class="ctrl-label">Tex</span>
-      <input id="tex-opacity" class="ctrl-slider" type="range" min="0" max="100" value="40">
-    </div>
-  </div>
-  <div id="ui">LMB: Raise &nbsp; RMB: Lower &nbsp; MMB: Pan &nbsp; G: Grid &nbsp; 1-4: Mode &nbsp; Shift+LMB: Magnet &nbsp; Q/W/E/R/T/Y: Powers &nbsp; Esc: Cancel &nbsp; M: Mute</div>
 
   <script src="/shared/constants.js"></script>
   <script src="game.js"></script>

@@ -65,6 +65,35 @@ let settlementSpritesLoaded = false;
   }
 })();
 
+// ── Walker Sprites ────────────────────────────────────────────────────
+// Directions: se, nw (sprites), sw = mirror of se, ne = mirror of nw
+// Frames: 0 (standing), 1 (walk)
+const walkerSprites = {}; // key: "se-blue-0" etc
+let walkerSpritesLoaded = false;
+
+(function loadWalkerSprites() {
+  let count = 0;
+  const dirs = ['se', 'nw'];
+  const teams = ['blue', 'red'];
+  const total = dirs.length * teams.length * 2; // 2 dirs × 2 teams × 2 frames
+  for (const dir of dirs) {
+    for (const team of teams) {
+      for (let frame = 0; frame < 2; frame++) {
+        const file = frame === 0
+          ? 'walker-' + dir + '-' + team + '.png'
+          : 'walker-' + dir + '-' + team + '-1.png';
+        const key = dir + '-' + team + '-' + frame;
+        const img = new Image();
+        img.src = 'gfx/' + file;
+        const done = () => { if (++count >= total) walkerSpritesLoaded = true; };
+        img.onload = done;
+        img.onerror = done;
+        walkerSprites[key] = img;
+      }
+    }
+  }
+})();
+
 // ── Boulder Sprite ──────────────────────────────────────────────────
 const boulderImg = new Image();
 let boulderLoaded = false;
@@ -174,7 +203,13 @@ let cropSetRed = new Set();
 let seaLevel = SEA_LEVEL;
 let leaders = [-1, -1];
 let armageddon = false;
+let magnetLocked = false;
+let teamPop = [0, 0];
+let fires = []; // {x, y, a (age in seconds)}
+let fireParticles = []; // client-side particles for rendering
 let targetingPower = null;
+let inspectMode = false;
+let inspectData = null; // {type:'settlement'|'walker', screenX, screenY, ...data}
 
 // ── Walker Interpolation ────────────────────────────────────────────
 let prevWalkers = [];
@@ -202,6 +237,7 @@ function getInterpolatedWalkers() {
         strength: w.s,
         x: pw.x + (w.x - pw.x) * fraction,
         y: pw.y + (w.y - pw.y) * fraction,
+        tx: w.tx, ty: w.ty,
         isLeader: w.l,
         isKnight: w.k,
       });
@@ -212,6 +248,7 @@ function getInterpolatedWalkers() {
         strength: w.s,
         x: w.x,
         y: w.y,
+        tx: w.tx, ty: w.ty,
         isLeader: w.l,
         isKnight: w.k,
       });
@@ -466,44 +503,98 @@ function rebuildWalkerGrid() {
   }
 }
 
+function getWalkerDirection(w) {
+  if (w.tx == null || w.ty == null) return 'se';
+  // Movement vector in grid space
+  const dx = w.tx - w.x;
+  const dy = w.ty - w.y;
+  if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return 'se'; // stationary
+  // In isometric: +gx = screen SE, -gx = screen NW, +gy = screen SW, -gy = screen NE
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'se' : 'nw';
+  } else {
+    return dy >= 0 ? 'sw' : 'ne';
+  }
+}
+
 function drawWalker(w) {
   const h = heightAt(w.x, w.y);
   const p = project(w.x, w.y, h);
   const isKnight = w.isKnight;
   const isLeader = w.isLeader;
-  const radius = isKnight ? 4 + Math.min(3, Math.floor(w.strength / 50)) : 2 + Math.min(3, Math.floor(w.strength / 50));
-  ctx.beginPath();
-  ctx.arc(p.x, p.y - 3, radius, 0, Math.PI * 2);
-  ctx.fillStyle = TEAM_COLORS[w.team];
-  ctx.fill();
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
+  const team = w.team === TEAM_BLUE ? 'blue' : 'red';
 
-  // Leader: gold crown
+  // Determine direction and animation frame
+  const dir = getWalkerDirection(w);
+  const animFrame = Math.floor(performance.now() / 250) % 2; // alternate every 250ms
+
+  // Map direction to sprite key + mirror flag
+  // se/nw have direct sprites; sw mirrors se, ne mirrors nw
+  let spriteDir, mirror;
+  if (dir === 'se') { spriteDir = 'se'; mirror = false; }
+  else if (dir === 'nw') { spriteDir = 'nw'; mirror = false; }
+  else if (dir === 'sw') { spriteDir = 'se'; mirror = true; }
+  else { spriteDir = 'nw'; mirror = true; } // ne
+
+  const key = spriteDir + '-' + team + '-' + animFrame;
+  const img = walkerSprites[key];
+  const spriteH = isKnight ? 18 : 14; // screen pixels tall
+  const spriteReady = walkerSpritesLoaded && img && img.complete && img.naturalWidth > 0;
+
+  if (spriteReady) {
+    const scale = spriteH / img.height;
+    const spriteW = img.width * scale;
+    const drawX = p.x - spriteW / 2;
+    const drawY = p.y - spriteH + 2; // feet at walker position
+
+    ctx.save();
+    if (mirror) {
+      // Flip horizontally around the walker's center x
+      ctx.translate(p.x, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -spriteW / 2, drawY, spriteW, spriteH);
+    } else {
+      ctx.drawImage(img, drawX, drawY, spriteW, spriteH);
+    }
+    ctx.restore();
+  } else {
+    // Fallback: colored circle
+    const radius = isKnight ? 4 + Math.min(3, Math.floor(w.strength / 50)) : 2 + Math.min(3, Math.floor(w.strength / 50));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 3, radius, 0, Math.PI * 2);
+    ctx.fillStyle = TEAM_COLORS[w.team];
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Leader: gold crown above sprite
   if (isLeader) {
+    const crownY = spriteReady ? p.y - spriteH - 2 : p.y - 8;
     ctx.fillStyle = '#ffd700';
     ctx.beginPath();
-    ctx.moveTo(p.x - 4, p.y - 8);
-    ctx.lineTo(p.x - 3, p.y - 12);
-    ctx.lineTo(p.x - 1, p.y - 9);
-    ctx.lineTo(p.x, p.y - 13);
-    ctx.lineTo(p.x + 1, p.y - 9);
-    ctx.lineTo(p.x + 3, p.y - 12);
-    ctx.lineTo(p.x + 4, p.y - 8);
+    ctx.moveTo(p.x - 4, crownY + 4);
+    ctx.lineTo(p.x - 3, crownY);
+    ctx.lineTo(p.x - 1, crownY + 3);
+    ctx.lineTo(p.x, crownY - 1);
+    ctx.lineTo(p.x + 1, crownY + 3);
+    ctx.lineTo(p.x + 3, crownY);
+    ctx.lineTo(p.x + 4, crownY + 4);
     ctx.closePath();
     ctx.fill();
   }
 
-  // Knight: white cross
+  // Knight: white cross above sprite
   if (isKnight) {
+    const crossY = spriteReady ? p.y - spriteH - 4 : p.y - 10;
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(p.x, p.y - 10);
-    ctx.lineTo(p.x, p.y - 15);
-    ctx.moveTo(p.x - 2.5, p.y - 13);
-    ctx.lineTo(p.x + 2.5, p.y - 13);
+    ctx.moveTo(p.x, crossY);
+    ctx.lineTo(p.x, crossY - 5);
+    ctx.moveTo(p.x - 2.5, crossY - 3);
+    ctx.lineTo(p.x + 2.5, crossY - 3);
     ctx.stroke();
   }
 }
@@ -556,6 +647,24 @@ function drawSettlement(s) {
       ctx.drawImage(img, pTop.x - dw / 2, centerY - dh / 2, dw, dh);
     }
   }
+
+  // Draw leader crown on settlement containing leader
+  if (s.hl) {
+    const crownX = pTop.x;
+    const crownY = pTop.y - 6;
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.moveTo(crownX - 5, crownY);
+    ctx.lineTo(crownX - 3, crownY - 5);
+    ctx.lineTo(crownX, crownY - 2);
+    ctx.lineTo(crownX + 3, crownY - 5);
+    ctx.lineTo(crownX + 5, crownY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#b8960f';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
 }
 
 function drawMagnetFlag(team) {
@@ -577,6 +686,71 @@ function drawMagnetFlag(team) {
   ctx.fill();
 }
 
+// ── Fire Particle System ─────────────────────────────────────────────
+function updateFireParticles(dt) {
+  // Spawn particles for active fires
+  for (const f of fires) {
+    // Spawn rate decreases as fire ages (5s total life)
+    const intensity = Math.max(0, 1 - f.a / 5);
+    const spawnCount = Math.floor(intensity * 3 * dt * 60); // ~3 per frame at full intensity
+    for (let i = 0; i < spawnCount; i++) {
+      fireParticles.push({
+        x: f.x + 0.3 + Math.random() * 0.4,
+        y: f.y + 0.3 + Math.random() * 0.4,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: -0.5 - Math.random() * 0.8, // rise upward in screen space
+        life: 0.4 + Math.random() * 0.6,
+        maxLife: 0.4 + Math.random() * 0.6,
+        size: 1.5 + Math.random() * 2.5,
+      });
+    }
+  }
+  // Update existing particles
+  for (let i = fireParticles.length - 1; i >= 0; i--) {
+    const p = fireParticles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      fireParticles.splice(i, 1);
+      continue;
+    }
+    p.x += p.vx * dt;
+    p.vy -= 0.5 * dt; // slight acceleration upward
+    p.size *= (1 - 0.5 * dt); // shrink
+  }
+}
+
+function drawSingleFire(f) {
+  const h = heightAt(f.x + 0.5, f.y + 0.5);
+  const p = project(f.x + 0.5, f.y + 0.5, h);
+  const intensity = Math.max(0, 1 - f.a / 5);
+
+  // Glow at base
+  const glowR = 8 + intensity * 6;
+  const grd = ctx.createRadialGradient(p.x, p.y - 4, 0, p.x, p.y - 4, glowR);
+  grd.addColorStop(0, `rgba(255,120,20,${0.4 * intensity})`);
+  grd.addColorStop(1, 'rgba(255,60,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(p.x - glowR, p.y - 4 - glowR, glowR * 2, glowR * 2);
+}
+
+function drawFireParticles() {
+  for (const fp of fireParticles) {
+    const h = heightAt(fp.x, fp.y);
+    const base = project(fp.x, fp.y, h);
+    const sx = base.x;
+    const sy = base.y + fp.vy * (fp.maxLife - fp.life) * 12;
+    const t = 1 - fp.life / fp.maxLife;
+    const r = Math.floor(255 - t * 80);
+    const g = Math.floor(180 - t * 160);
+    const b = Math.floor(30 - t * 30);
+    const a = fp.life / fp.maxLife;
+    ctx.fillStyle = `rgba(${r},${g},${b},${a.toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, fp.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function getTeamStats(team) {
   let pop = 0, set = 0, walk = 0;
   for (const s of settlements) {
@@ -592,36 +766,53 @@ function getTeamStats(team) {
   return { pop, set, walk };
 }
 
-function drawUI() {
-  const margin = 10;
-  const barW = 120, barH = 10;
-  ctx.font = '12px monospace';
+function updateSidebar() {
+  const maxPop = 800;
+  const bluePct = Math.min(100, (teamPop[TEAM_BLUE] / maxPop) * 100);
+  const redPct = Math.min(100, (teamPop[TEAM_RED] / maxPop) * 100);
 
+  const popBarBlue = document.getElementById('pop-bar-blue');
+  const popBarRed = document.getElementById('pop-bar-red');
+  const popValBlue = document.getElementById('pop-val-blue');
+  const popValRed = document.getElementById('pop-val-red');
+  if (popBarBlue) popBarBlue.style.width = bluePct + '%';
+  if (popBarRed) popBarRed.style.width = redPct + '%';
+  if (popValBlue) popValBlue.textContent = teamPop[TEAM_BLUE];
+  if (popValRed) popValRed.textContent = teamPop[TEAM_RED];
+
+  // Mana
+  const manaPct = Math.min(100, (myMana / MANA_MAX) * 100);
+  const manaFill = document.getElementById('mana-bar-fill');
+  const manaText = document.getElementById('mana-text');
+  if (manaFill) manaFill.style.width = manaPct + '%';
+  if (manaText) manaText.textContent = Math.floor(myMana) + ' / ' + MANA_MAX;
+
+  // Mode buttons
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  modeBtns.forEach(btn => {
+    const m = parseInt(btn.dataset.mode);
+    btn.classList.toggle('active', teamMode[myTeam] === m);
+  });
+
+  // Inspect button
+  const inspBtn = document.getElementById('btn-inspect');
+  if (inspBtn) inspBtn.classList.toggle('active', inspectMode);
+
+  // Stats
   const otherTeam = myTeam === 0 ? 1 : 0;
-
-  // My team stats — bottom left
   const myStats = getTeamStats(myTeam);
-  const myLabel = TEAM_NAMES[myTeam] + ' (You)';
-  ctx.fillStyle = TEAM_COLORS[myTeam];
-  ctx.fillText(`${myLabel}: ${MODE_NAMES[teamMode[myTeam]]}`, margin, canvas.height - 70);
-  ctx.fillText(`Pop: ${myStats.pop}  Set: ${myStats.set}  Walk: ${myStats.walk}`, margin, canvas.height - 55);
-  // Mana bar
-  ctx.fillStyle = '#333';
-  ctx.fillRect(margin, canvas.height - 40, barW, barH);
-  ctx.fillStyle = TEAM_COLORS[myTeam];
-  ctx.fillRect(margin, canvas.height - 40, barW * Math.min(1, myMana / 1000), barH);
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(margin, canvas.height - 40, barW, barH);
-  ctx.fillStyle = '#ccc';
-  ctx.fillText(`Mana: ${Math.floor(myMana)}`, margin, canvas.height - 15);
-
-  // Opponent stats — bottom right (no mana bar)
   const oppStats = getTeamStats(otherTeam);
-  const rx = canvas.width - margin - barW;
-  ctx.fillStyle = TEAM_COLORS[otherTeam];
-  ctx.fillText(`${TEAM_NAMES[otherTeam]}: ${MODE_NAMES[teamMode[otherTeam]]}`, rx, canvas.height - 70);
-  ctx.fillText(`Pop: ${oppStats.pop}  Set: ${oppStats.set}  Walk: ${oppStats.walk}`, rx, canvas.height - 55);
+  const el = id => document.getElementById(id);
+  const s = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+  s('stat-my-set', myStats.set);
+  s('stat-my-walk', myStats.walk);
+  s('stat-opp-set', oppStats.set);
+  s('stat-opp-walk', oppStats.walk);
+}
+
+function showSidebar() {
+  const sb = document.getElementById('sidebar');
+  if (sb) sb.classList.add('visible');
 }
 
 function centerOnHome() {
@@ -660,19 +851,26 @@ function render() {
     }
   }
 
-  // Pass 2: settlements
-  const sortedSettlements = settlements.slice().sort((a, b) => (a.ox + a.oy) - (b.ox + b.oy));
-  for (const s of sortedSettlements) drawSettlement(s);
-
-  // Pass 3: walkers via grid
-  for (let row = 0; row < MAP_H; row++) {
-    for (let col = 0; col < MAP_W; col++) {
-      const wlist = walkerGrid[row * MAP_W + col];
-      if (wlist) {
-        for (const w of wlist) drawWalker(w);
-      }
-    }
+  // Pass 2: settlements, walkers, and fires sorted together by depth (x+y)
+  const drawList = [];
+  for (const s of settlements) {
+    drawList.push({ depth: s.ox + s.oy + s.sz, type: 's', obj: s });
   }
+  for (const w of walkers) {
+    drawList.push({ depth: w.x + w.y, type: 'w', obj: w });
+  }
+  for (const f of fires) {
+    drawList.push({ depth: f.x + f.y + 0.5, type: 'f', obj: f });
+  }
+  drawList.sort((a, b) => a.depth - b.depth);
+  for (const item of drawList) {
+    if (item.type === 's') drawSettlement(item.obj);
+    else if (item.type === 'w') drawWalker(item.obj);
+    else drawSingleFire(item.obj);
+  }
+
+  // Fire particles (on top of everything in world space)
+  drawFireParticles();
 
   // Targeting overlay
   if (targetingPower) {
@@ -737,12 +935,20 @@ function render() {
   // Reset transform for HUD (drawn in screen space)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // HUD
-  drawUI();
+  // Power bar needs responsive updates (targeting feedback)
   updatePowerBar();
+  // Sidebar — throttle DOM updates to ~4/sec
+  const _now = performance.now();
+  if (!updateSidebar._last || _now - updateSidebar._last > 250) {
+    updateSidebar._last = _now;
+    updateSidebar();
+  }
 
   // Minimap (drawn on top of HUD, in screen space)
   drawMinimap();
+
+  // Inspect tooltip
+  if (inspectData) drawInspectTooltip();
 
   // Armageddon overlay
   if (armageddon && !gameOver) {
@@ -843,7 +1049,7 @@ function handleServerMessage(msg) {
       gameStarted = true;
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('game').style.display = 'block';
-      document.getElementById('ui').style.display = 'block';
+      showSidebar();
       showPowerBar();
       startMusic();
       resize();
@@ -930,6 +1136,9 @@ function applyStateSnapshot(msg) {
   seaLevel = msg.seaLevel !== undefined ? msg.seaLevel : SEA_LEVEL;
   leaders = msg.leaders || [-1, -1];
   armageddon = msg.armageddon || false;
+  magnetLocked = msg.magnetLocked || false;
+  teamPop = msg.teamPop || [0, 0];
+  fires = msg.fires || [];
 }
 
 function sendMessage(msg) {
@@ -947,6 +1156,12 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 0 && isInMinimap(e.clientX, e.clientY)) {
     const { gx, gy } = minimapClickToGrid(e.clientX, e.clientY);
     centerCameraOnGrid(gx, gy);
+    return;
+  }
+
+  // Inspect mode click
+  if (inspectMode && e.button === 0) {
+    performInspect(e.clientX, e.clientY);
     return;
   }
 
@@ -991,6 +1206,8 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape') {
     targetingPower = null;
+    inspectMode = false;
+    inspectData = null;
     return;
   }
 
@@ -1001,6 +1218,11 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'g' || e.key === 'G') {
     gridMode = (gridMode + 1) % GRID_MODES.length;
+  }
+  if (e.key === 'i' || e.key === 'I') {
+    inspectMode = !inspectMode;
+    if (!inspectMode) inspectData = null;
+    return;
   }
   if (e.key === 'm' || e.key === 'M') {
     toggleMusicMute();
@@ -1109,6 +1331,22 @@ document.querySelectorAll('.power-btn').forEach(btn => {
     const powerDef = POWERS.find(p => p.id === powerId);
     if (powerDef) activatePower(powerDef);
   });
+});
+
+// Sidebar: mode button click handlers
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!gameStarted || armageddon) return;
+    const mode = parseInt(btn.dataset.mode);
+    sendMessage({ type: 'mode', mode });
+  });
+});
+
+// Sidebar: inspect button click handler
+document.getElementById('btn-inspect').addEventListener('click', () => {
+  if (!gameStarted) return;
+  inspectMode = !inspectMode;
+  if (!inspectMode) inspectData = null;
 });
 
 // ── Minimap ─────────────────────────────────────────────────────────
@@ -1267,6 +1505,111 @@ function updatePowerBar() {
   });
 }
 
+// ── Inspect Tool ─────────────────────────────────────────────────────
+function performInspect(sx, sy) {
+  const { px, py } = screenToGrid(sx, sy);
+
+  // Check settlements first
+  for (const s of settlements) {
+    if (Math.abs(s.tx - px) <= 1 && Math.abs(s.ty - py) <= 1) {
+      const levelDef = SETTLEMENT_LEVELS ? SETTLEMENT_LEVELS[s.l] : null;
+      inspectData = {
+        type: 'settlement', screenX: sx, screenY: sy,
+        team: s.t, level: s.l,
+        name: levelDef ? levelDef.name : 'Level ' + s.l,
+        pop: s.p, cap: LEVEL_CAPACITY[s.l] || 0,
+        tech: levelDef ? levelDef.tech : 0,
+        hasLeader: !!s.hl,
+      };
+      return;
+    }
+  }
+
+  // Check walkers
+  let closest = null, closestDist = 4; // max 2 tile distance squared
+  for (const w of walkers) {
+    const dx = w.x - px, dy = w.y - py;
+    const d = dx * dx + dy * dy;
+    if (d < closestDist) { closestDist = d; closest = w; }
+  }
+  if (closest) {
+    inspectData = {
+      type: 'walker', walkerId: closest.id,
+      team: closest.team, strength: closest.strength,
+      isLeader: closest.isLeader, isKnight: closest.isKnight,
+    };
+    return;
+  }
+
+  inspectData = null;
+}
+
+function drawInspectTooltip() {
+  const d = inspectData;
+  if (!d) return;
+
+  // For walkers, track the walker each frame to follow it
+  let anchorX, anchorY;
+  if (d.type === 'walker') {
+    const w = walkers.find(w => w.id === d.walkerId);
+    if (!w) { inspectData = null; return; } // walker died
+    // Update live data
+    d.strength = w.strength;
+    d.isLeader = w.isLeader;
+    d.isKnight = w.isKnight;
+    d.team = w.team;
+    // Project walker position to screen
+    const h = heightAt(w.x, w.y);
+    const p = project(w.x, w.y, h);
+    // Convert from world-space (zoomed) to screen-space
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    anchorX = p.x * zoom + cx * (1 - zoom);
+    anchorY = p.y * zoom + cy * (1 - zoom);
+  } else {
+    anchorX = d.screenX;
+    anchorY = d.screenY;
+  }
+
+  const lines = [];
+  if (d.type === 'settlement') {
+    lines.push(d.name.charAt(0).toUpperCase() + d.name.slice(1) + ' (Lv' + d.level + ')');
+    lines.push('Pop: ' + d.pop + ' / ' + d.cap);
+    lines.push('Tech: ' + d.tech);
+    lines.push('Team: ' + TEAM_NAMES[d.team]);
+    if (d.hasLeader) lines.push('Leader inside');
+  } else {
+    let label = 'Walker';
+    if (d.isKnight) label = 'Knight';
+    else if (d.isLeader) label = 'Leader';
+    lines.push(label);
+    lines.push('Strength: ' + d.strength);
+    lines.push('Team: ' + TEAM_NAMES[d.team]);
+  }
+
+  ctx.font = '11px monospace';
+  const lineH = 15;
+  const pad = 6;
+  let maxW = 0;
+  for (const l of lines) maxW = Math.max(maxW, ctx.measureText(l).width);
+  const tw = maxW + pad * 2;
+  const th = lines.length * lineH + pad * 2;
+  let tx = anchorX + 12;
+  let ty = anchorY - th / 2;
+  if (tx + tw > canvas.width) tx = anchorX - tw - 12;
+  if (ty < 0) ty = 0;
+  if (ty + th > canvas.height) ty = canvas.height - th;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
+  ctx.fillRect(tx, ty, tw, th);
+  ctx.strokeStyle = TEAM_COLORS[d.team];
+  ctx.lineWidth = 1;
+  ctx.strokeRect(tx, ty, tw, th);
+  ctx.fillStyle = '#ddd';
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], tx + pad, ty + pad + (i + 1) * lineH - 3);
+  }
+}
+
 function showPowerBar() {
   const bar = document.getElementById('power-bar');
   if (bar) bar.style.display = 'flex';
@@ -1275,12 +1618,15 @@ function showPowerBar() {
 // ── Game Loop ───────────────────────────────────────────────────────
 let lastFrame = 0;
 
+const SIDEBAR_W = 160;
 function updateEdgePan(dt) {
   if (!gameStarted || panning) return;
   const w = canvas.width, h = canvas.height;
   let dx = 0, dy = 0;
 
-  if (mouseX < EDGE_SIZE) dx = 1 - mouseX / EDGE_SIZE;
+  // Don't edge-pan when mouse is over the sidebar
+  if (mouseX < SIDEBAR_W) { /* skip left edge pan */ }
+  else if (mouseX < SIDEBAR_W + EDGE_SIZE) dx = 1 - (mouseX - SIDEBAR_W) / EDGE_SIZE;
   else if (mouseX > w - EDGE_SIZE) dx = -((mouseX - (w - EDGE_SIZE)) / EDGE_SIZE);
 
   if (mouseY < EDGE_SIZE) dy = 1 - mouseY / EDGE_SIZE;
@@ -1298,6 +1644,7 @@ function gameLoop(now) {
   const dt = Math.min(0.1, (now - lastFrame) / 1000);
   lastFrame = now;
   updateEdgePan(dt);
+  updateFireParticles(dt);
   render();
   requestAnimationFrame(gameLoop);
 }

@@ -32,7 +32,8 @@ Dual-environment: loaded as `<script>` tag on client (globals), `require()` on s
 - **Crops:** `CROP_ZONE_RADIUS=2` (5×5 zone), `CROP_LEVEL_THRESHOLDS=[0,0,2,4,7,10,13,17,20,24]`, `GROWTH_PER_CROP_PER_SEC=0.1`
 - **Ejection:** `EJECT_DWELL_TIME=15` (seconds at cap), `EJECT_FRACTION=0.5`, `EJECT_MIN_STRENGTH=2`
 - **Mana:** `MANA_PER_POP_PER_SEC=0.015`, `MANA_MAX=6000`
-- **Combat:** `TECH_ADVANTAGE_MULT=1.5` (damage multiplier per tech level difference)
+- **Combat:** `TECH_ADVANTAGE_MULT=1.5` (damage multiplier per tech level difference), `WALKER_ATTRITION_PER_SEC=0.05`
+- **Build proximity:** `BUILD_PROXIMITY_RADIUS=6`
 - **Start:** `START_WALKERS=3`, `START_STRENGTH=5`, `START_MANA=50`
 - **Tick:** `TICK_RATE=20`, `TICK_INTERVAL=50`
 
@@ -40,16 +41,17 @@ Dual-environment: loaded as `<script>` tag on client (globals), `require()` on s
 - **HTTP:** Serves `public/` at root and `shared/` at `/shared/` using raw `http` + `fs` (no Express)
 - **Rooms:** Map of 4-letter room codes to game instances. Player 1 creates, Player 2 joins. Supports vs AI mode.
 - **Simulation:** Runs at 20Hz tick rate. All game logic lives server-side. Every function takes `state` as first parameter.
-- **Game state** (`createGameState`): `heights` 2D array, `walkers[]`, `settlements[]`, `settlementMap` Int32Array, `walkerGrid`, `teamMode[2]`, `magnetPos[2]`, `mana[2]`, `swamps[]`, `rocks` Set, `trees` Set, `crops[]`, `cropCounts[]`, `cropOwnerMap` Int32Array, `seaLevel` (mutable), `leaders[2]`, `armageddon` bool, timers, `nextWalkerId`, `gameOver`, `winner`
+- **Game state** (`createGameState`): `heights` 2D array, `walkers[]`, `settlements[]`, `settlementMap` Int32Array, `walkerGrid`, `teamMode[2]`, `magnetPos[2]`, `magnetLocked[2]`, `mana[2]`, `swamps[]`, `rocks` Set, `trees` Set, `crops[]`, `cropCounts[]`, `cropOwnerMap` Int32Array, `seaLevel` (mutable), `leaders[2]`, `armageddon` bool, timers, `nextWalkerId`, `gameOver`, `winner`
 - **WebSocket protocol:**
   - Client sends: `create`, `create_ai`, `join`, `raise`, `lower`, `mode`, `magnet`, `power`
   - Server sends: `created`, `joined`, `start`, `state` (20/sec), `gameover`, `error`
   - `power` message: `{type:'power', power:<id>, x, y}` — validated against POWERS array, mana checked, dispatched to `executePower*` functions
-- **State serialization:** Heights as flat array, walkers/settlements as minimal objects (walkers include `l`/`k` flags for leader/knight). Swamps as `{x,y,t}` array, rocks/trees as flat `[x1,y1,x2,y2,...]` arrays, crops as `[x,y,team,...]` triplets. Each player receives only their own mana. Also sends `seaLevel`, `leaders`, `armageddon`.
+- **State serialization:** Heights as flat array, walkers/settlements as minimal objects (walkers include `l`/`k`/`tc` flags for leader/knight/tech). Swamps as `{x,y,t}` array, rocks/trees as flat `[x1,y1,x2,y2,...]` arrays, crops as `[x,y,team,...]` triplets. Each player receives only their own mana. Also sends `seaLevel`, `leaders`, `armageddon`, `magnetLocked`, `teamPop`.
 
 #### Terrain System
 - `heights[x][y]` — height point grid (MAP_W+1 x MAP_H+1), values 0 to MAX_HEIGHT
-- `raisePoint`/`lowerPoint` — modify single point, cascade adjacency constraint (max 1 diff between neighbors). Costs `TERRAIN_RAISE_COST`/`TERRAIN_LOWER_COST` mana (1 each).
+- `raisePoint`/`lowerPoint` — modify single point, cascade adjacency constraint (max 1 diff between neighbors). Costs `TERRAIN_RAISE_COST`/`TERRAIN_LOWER_COST` mana (1 each). Restricted by build proximity (`canBuildAtPoint`).
+- **Build proximity:** `canBuildAtPoint(state, team, px, py)` — terraforming only allowed within `BUILD_PROXIMITY_RADIUS=6` of own walkers or settlements. Prevents cross-map manipulation.
 - `isTileWater` — all 4 corners <= seaLevel
 - `isTileFlat` — all 4 corners equal AND > seaLevel AND not a rock tile
 - `generateTerrain` — procedural island generation with `placeBlob` + `enforceAdjacency`
@@ -63,14 +65,16 @@ Dual-environment: loaded as `<script>` tag on client (globals), `require()` on s
 - `isTileSettleable` — tile must be flat, not in a settlement footprint, and not claimed by another settlement's crop field (`cropOwnerMap`)
 - Knights always use `pickFightTarget`, move at `WALKER_SPEED * KNIGHT_SPEED_MULT`, lower terrain around destroyed settlements
 - Leaders: auto-assigned when walker is within radius 2 of team's magnet and no leader exists. Cleared on death in `pruneDeadEntities`.
+- **Papal magnet lifecycle:** `magnetLocked[team]` state. When leader dies, magnet drops at leader's death location and becomes locked. Locked magnet cannot be moved by player. When a new leader is assigned (walker near magnet), magnet unlocks. Serialized to client for UI feedback.
 - Armageddon: all walkers use `pickArmageddonTarget` (head to map center, fight when near), auto-raise terrain when blocked by water
 - Swamp death: walkers on enemy swamp tiles die
-- Collisions: same-team merge (sum strength, keep max tech), cross-team combat (tech-modified), settlement assault (tech-modified)
+- **Walker attrition:** `WALKER_ATTRITION_PER_SEC=0.05` — walkers lose strength over time using fractional accumulator. Die at 0.
+- Collisions: same-team merge (sum strength, keep max tech), cross-team combat (tech-modified), settlement conquest (tech-modified)
 
 #### Combat System
 - **Tech advantage:** Each tech level difference gives a `TECH_ADVANTAGE_MULT` (1.5×) damage multiplier. Walker tech inherited from settlement level at ejection.
 - **Walker vs walker:** Effective strength = `strength × 1.5^(techAdvantage)`. Higher effective strength wins. Survivor keeps remainder adjusted for tech ratio.
-- **Walker vs settlement:** Same tech formula. Settlement tech comes from `SETTLEMENT_LEVELS[level].tech`.
+- **Settlement conquest:** Walker overpowers settlement → captures it (changes team), walker consumed. Remaining population becomes the conquered settlement's new population. Knights are an exception — they still destroy settlements and wreck terrain.
 - **Same-team merge:** Strengths sum (capped 255), highest tech kept.
 
 #### Settlement System
@@ -101,13 +105,14 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 | Power | Cost | Hotkey | Targeted | Function |
 |-------|------|--------|----------|----------|
 | Swamp | 60 | W | Yes | Place trap on flat tile; enemy walkers die on contact |
-| Knight | 200 | E | No | Promote team's leader to knight (3x strength, 1.5x speed, fights only) |
+| Knight | 200 | E | No | Leader at a settlement consumes it, becomes knight (3x strength, 1.5x speed, fights only), wrecks terrain |
 | Flood | 500 | T | No | Raise sea level by 1, kill/destroy newly submerged entities |
 | Earthquake | 1500 | Q | Yes | Randomly lower points 0-2 times within radius 7 |
 | Volcano | 5000 | R | Yes | Raise terrain to MAX_HEIGHT with falloff, add rock tiles, kill units in radius 5 |
 | Armageddon | All mana | Y | No | Destroy all settlements (eject as walkers), all march to center and fight |
 
 - `executePowerSwamp` and `executePowerKnight` return `false` on invalid state (no mana deducted)
+- **Knight power:** Requires leader at a friendly settlement. Destroys the settlement, drops magnet at location, applies `knightDestroyTerrain` (patchwork — random ±1 height at 60% of points in radius, then enforceAdjacency). If no leader or leader not at settlement, power fails.
 - Volcano adds rock tiles in inner radius (radius/2) — rocks make tiles non-flat, preventing settlements
 - Armageddon drains all mana (cost=0 in POWERS array, special-cased in handler)
 
@@ -136,7 +141,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Rendering only:** No simulation. Receives state snapshots from server at 20Hz.
 - **Walker interpolation:** Stores prev/curr walker snapshots, lerps positions by elapsed tick fraction for smooth 60fps rendering. Passes through `isLeader`/`isKnight` flags.
 - **Settlement sprites:** 9 levels × 2 teams = 18 sprites loaded from `gfx/`. `SETT_LEVEL_NAMES = ['tent','hut','cottage','house','largehouse','manor','towerhouse','fortress','castle']`. Sprite sizing varies by level: 75% for tent/hut, 85% for cottage–manor, 95% for towerhouse/fortress, 60% for castle (3×3). Sprites scaled around visual center (`pTop.y + tileH*0.25` for 1×1, midpoint for 3×3).
-- **Drawing pipeline:** Pass 1: terrain tiles (with crop/swamp overlays, boulder/tree sprites). Pass 2: settlements (sorted by depth). Pass 3: walkers via grid (with leader crown / knight cross markers). Then: targeting overlay, magnet flags. Reset to screen space: HUD, power bar update, minimap, armageddon overlay, game over overlay.
+- **Drawing pipeline:** Pass 1: terrain tiles (with crop/swamp overlays, boulder/tree sprites). Pass 2: settlements (sorted by depth). Pass 3: walkers via grid (with leader crown / knight cross markers). Then: targeting overlay, magnet flags. Reset to screen space: HUD, power bar update, minimap, population meters, inspect tooltip, armageddon overlay, game over overlay.
 - **Crop overlay:** Blue team: `rgba(100,180,60,0.35)`, Red team: `rgba(160,160,40,0.35)` on crop tiles.
 - **Swamp overlay:** Green-brown semi-transparent (`rgba(80,100,30,0.5)`) on swamp tiles
 - **Rock overlay:** Boulder sprite on rock tiles
@@ -146,9 +151,11 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Targeting mode:** `targetingPower` variable. For earthquake/volcano shows orange-tinted radius overlay. For swamp shows single-tile highlight. Click sends `{type:'power', power, x, y}`, Escape cancels.
 - **Armageddon overlay:** Red "ARMAGEDDON" text, disables all player input except camera
 - **Sea level:** Mutable `seaLevel` variable, updated from server state, replaces `SEA_LEVEL` constant in water checks
-- **State reception:** `applyStateSnapshot` unpacks heights, walkers, settlements, magnetPos, teamMode, mana, swamps (builds `swampSet`), rocks (builds Set), trees (builds Set), crops (builds `cropSetBlue`/`cropSetRed`), seaLevel, leaders, armageddon
+- **State reception:** `applyStateSnapshot` unpacks heights, walkers, settlements, magnetPos, teamMode, mana, swamps (builds `swampSet`), rocks (builds Set), trees (builds Set), crops (builds `cropSetBlue`/`cropSetRed`), seaLevel, leaders, armageddon, magnetLocked, teamPop
 - **Minimap:** 200x200px top-down map in bottom-right corner. Pass 1: terrain. Pass 2a: crops (blue/red tints). Pass 2b: trees (dark green). Pass 2c: swamps. Pass 3: settlements. Pass 4: walkers. Pass 5: magnets. Pass 6: viewport bounds. LMB click scrolls main view.
-- **Input:** LMB raise (or power targeting click, or minimap click), RMB lower, Shift+LMB magnet, 1-4 mode keys, Q/W/E/R/T/Y power hotkeys, Escape cancel targeting, M mute toggle, MMB pan, G grid toggle, mouse wheel zoom, edge pan. Armageddon blocks all non-camera input.
+- **Population meters:** `drawPopulationMeters()` — two vertical bars (blue/red) centered at top of screen, showing relative team population. Updated from `teamPop` sent by server.
+- **Inspect tool:** `I` hotkey toggles inspect mode. Click on settlement or walker shows tooltip with stats (level, pop/cap, tech, strength, team). Escape dismisses. `performInspect(sx, sy)` hit-tests settlements then walkers, `drawInspectTooltip()` renders info box.
+- **Input:** LMB raise (or power targeting click, or minimap click, or inspect click), RMB lower, Shift+LMB magnet, 1-4 mode keys, Q/W/E/R/T/Y power hotkeys, I inspect toggle, Escape cancel targeting/inspect, M mute toggle, MMB pan, G grid toggle, mouse wheel zoom, edge pan. Armageddon blocks all non-camera input.
 - **Power bar:** `updatePowerBar()` called each frame toggles `disabled`/`active` CSS classes. `showPowerBar()` on game start. Button click handlers mirror hotkey behavior via `activatePower()`.
 - **Music:** 3 tracks in `public/music/`, shuffled and played sequentially in a loop. Starts on game start. Volume (0-1, default 0.3) and mute state persisted to `localStorage`.
 - **Lobby:** Create/Join/AI UI in HTML overlay, hidden when game starts.
@@ -159,7 +166,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - Power bar: fixed bottom-center flex row of 6 buttons, each showing hotkey, name, cost. Costs: Swamp 60, Knight 200, Flood 500, Quake 1500, Volcano 5000, Armageddon ALL. Dark semi-transparent background. `.disabled` class (opacity 0.35), `.active` class (orange border + glow).
 - Music control: fixed top-right, mute button (note icon) + volume slider (range input). Always visible.
 - Texture opacity slider: adjacent to music controls.
-- Help text bar: fixed top-left showing all controls including powers, Escape, and M for mute
+- Help text bar: fixed top-left showing all controls including powers, I for inspect, Escape, and M for mute
 
 ### Key Design Patterns
 - **Authoritative server:** All game logic is server-side. Client is pure renderer + input sender.
@@ -169,7 +176,9 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Mutable sea level:** `state.seaLevel` replaces the constant `SEA_LEVEL` on server, `seaLevel` variable replaces it on client, enabling the Flood power.
 - **Power validation:** Server validates power name against POWERS array, checks mana, validates coordinates for targeted powers. Some powers (`swamp`, `knight`) return false on invalid state to prevent mana deduction. Armageddon special-cased to drain all mana.
 - **Crop-based settlement levels:** Settlement level determined by count of flat tiles in 5×5 zone, not by flat square size. No settlement merges.
+- **Settlement conquest:** Walkers capture (not destroy) enemy settlements. Knights are the exception — they destroy and wreck terrain.
 - **Tech inheritance:** Walkers inherit tech level from their settlement when ejected. Tech affects combat via `TECH_ADVANTAGE_MULT`.
+- **Papal magnet lifecycle:** Magnet drops and locks on leader death, unlocks when new leader assigned. Prevents magnet manipulation without a leader.
 - **localStorage persistence:** Music volume, mute state, texture opacity saved across sessions.
 
 ### Tuning Philosophy

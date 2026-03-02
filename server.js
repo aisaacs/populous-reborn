@@ -98,8 +98,10 @@ function createGameState() {
     crops: [],
     cropCounts: [],
     cropOwnerMap: new Int32Array(C.MAP_W * C.MAP_H).fill(-1),
+    fires: [], // {x, y, age} — burning settlement ruins
     seaLevel: C.SEA_LEVEL,
     leaders: [-1, -1],
+    magnetLocked: [false, false],
     armageddon: false,
     levelEvalTimer: 0,
     pruneTimer: 0,
@@ -428,6 +430,21 @@ function invalidateTrees(state) {
   }
 }
 
+// Build proximity: can only terraform near own units
+function canBuildAtPoint(state, team, px, py) {
+  const r = C.BUILD_PROXIMITY_RADIUS;
+  for (const w of state.walkers) {
+    if (w.dead || w.team !== team) continue;
+    if (Math.abs(w.x - px) <= r && Math.abs(w.y - py) <= r) return true;
+  }
+  for (const s of state.settlements) {
+    if (s.dead || s.team !== team) continue;
+    if (Math.abs(s.tx - px) <= r && Math.abs(s.ty - py) <= r) return true;
+  }
+  return false;
+}
+
+
 // ── Walker Alive Helper ────────────────────────────────────────────
 function isWalkerAlive(state, id) {
   if (id < 0) return false;
@@ -631,6 +648,7 @@ function updateWalkers(state, dt) {
       if (ldx * ldx + ldy * ldy < 4) { // radius 2
         w.isLeader = true;
         state.leaders[w.team] = w.id;
+        state.magnetLocked[w.team] = false;
       }
     }
 
@@ -678,6 +696,18 @@ function updateWalkers(state, dt) {
       }
     }
   }
+
+  // Walker attrition — walkers gradually lose strength over time
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    w.attritionFrac = (w.attritionFrac || 0) + C.WALKER_ATTRITION_PER_SEC * dt;
+    if (w.attritionFrac >= 1) {
+      const loss = Math.floor(w.attritionFrac);
+      w.attritionFrac -= loss;
+      w.strength -= loss;
+      if (w.strength <= 0) w.dead = true;
+    }
+  }
 }
 
 // ── Settlement System ───────────────────────────────────────────────
@@ -692,6 +722,7 @@ function settleWalker(state, w, tx, ty) {
     dead: false,
     atCapTime: 0,
     popFrac: 0,
+    hasLeader: false,
   };
   state.settlements.push(s);
   setSettlement(state, tx, ty, s);
@@ -710,6 +741,12 @@ function settleWalker(state, w, tx, ty) {
   const cap = C.LEVEL_CAPACITY[s.level];
   if (w.strength <= cap) {
     s.population = w.strength;
+    // Leader enters the settlement
+    if (w.isLeader) {
+      s.hasLeader = true;
+      w.isLeader = false;
+      // leaders[team] stays set — leader is "inside" the settlement
+    }
     w.dead = true;
   } else {
     s.population = cap;
@@ -720,7 +757,7 @@ function settleWalker(state, w, tx, ty) {
     w.y = ty + 0.5 + Math.sin(angle) * 1.5;
     w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, w.x));
     w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, w.y));
-    // Don't call pickSettleTarget here — let the walker's next tick handle it
+    // Leader keeps walking — don't transfer to settlement
     pickRandomTarget(state, w);
   }
 
@@ -794,9 +831,15 @@ function evaluateSettlementLevels(state) {
       s.population = Math.floor(cap / 2);
       const angle = Math.random() * Math.PI * 2;
       const sTech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
-      spawnWalker(state, s.team, excess,
+      const ew = spawnWalker(state, s.team, excess,
         s.tx + 0.5 + Math.cos(angle) * 1.2,
         s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
+      // If settlement contains leader, ejected walker becomes leader
+      if (s.hasLeader) {
+        ew.isLeader = true;
+        state.leaders[s.team] = ew.id;
+        s.hasLeader = false;
+      }
     }
   }
 }
@@ -893,6 +936,12 @@ function updatePopulationGrowth(state, dt) {
         const w = spawnWalker(state, s.team, ejectStrength, sx, sy);
         // Ejected walkers inherit tech from settlement
         w.tech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
+        // If settlement contains leader, ejected walker becomes the leader
+        if (s.hasLeader) {
+          w.isLeader = true;
+          state.leaders[s.team] = w.id;
+          s.hasLeader = false;
+        }
       }
     } else {
       s.atCapTime = 0;
@@ -927,6 +976,12 @@ function handleWalkerCollisions(state) {
             if (w.isKnight || other.isKnight) continue;
             w.strength = Math.min(255, w.strength + other.strength);
             w.tech = Math.max(w.tech || 0, other.tech || 0);
+            // Preserve leadership: if absorbed walker was leader, survivor inherits
+            if (other.isLeader) {
+              w.isLeader = true;
+              state.leaders[w.team] = w.id;
+              other.isLeader = false;
+            }
             other.dead = true;
           } else {
             // Tech-based combat: higher tech deals more effective damage
@@ -963,41 +1018,58 @@ function handleWalkerCollisions(state) {
         const dmg = Math.min(es.population, Math.max(1, Math.floor(w.strength / 10)));
         es.population -= dmg;
         if (es.population <= 0) {
+          // If settlement had a leader, leader is killed
+          if (es.hasLeader) {
+            state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
+            state.magnetLocked[es.team] = true;
+            state.leaders[es.team] = -1;
+            es.hasLeader = false;
+          }
           es.dead = true;
           clearSettlementMap(state, es.tx, es.ty);
-          // Wreck terrain: randomly raise/lower 2-3 nearby points
-          const wrecks = 2 + Math.floor(Math.random() * 2);
-          for (let i = 0; i < wrecks; i++) {
-            const wpx = es.tx + Math.floor(Math.random() * 5) - 2;
-            const wpy = es.ty + Math.floor(Math.random() * 5) - 2;
-            if (wpx >= 0 && wpx <= C.MAP_W && wpy >= 0 && wpy <= C.MAP_H) {
-              if (Math.random() < 0.5) raisePoint(state, wpx, wpy);
-              else lowerPoint(state, wpx, wpy);
-            }
-          }
-          invalidateSwamps(state);
-          invalidateRocks(state);
-          invalidateTrees(state);
-          evaluateSettlementLevels(state);
+          // Set building on fire
+          state.fires.push({ x: es.tx, y: es.ty, age: 0 });
           pickFightTarget(state, w); // find next target
         }
       } else {
-        // Tech-based settlement assault
+        // Tech-based settlement assault — CONQUEST, not destruction
         const wTech = w.tech || 0;
         const sTech = C.SETTLEMENT_LEVELS[es.level] ? C.SETTLEMENT_LEVELS[es.level].tech : 0;
-        const wMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, wTech - sTech));
-        const sMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, sTech - wTech));
-        const wEff = w.strength * wMult;
-        const sEff = es.population * sMult;
-        if (wEff >= sEff) {
-          const t = es.population / wMult;
-          w.strength = Math.max(0, Math.round(w.strength - sMult * t));
-          es.dead = true;
-          clearSettlementMap(state, es.tx, es.ty);
-          if (w.strength <= 0) w.dead = true;
+        const techDiff = wTech - sTech;
+        let wStr = w.strength;
+        let sPop = es.population;
+        if (techDiff > 0) {
+          wStr = Math.floor(wStr * Math.pow(C.TECH_ADVANTAGE_MULT, techDiff));
+        } else if (techDiff < 0) {
+          sPop = Math.floor(sPop * Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff));
+        }
+
+        if (wStr > sPop) {
+          // CONQUEST — settlement changes team
+          // If conquered settlement had a leader, that team's leader is killed
+          if (es.hasLeader) {
+            state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
+            state.magnetLocked[es.team] = true;
+            state.leaders[es.team] = -1;
+            es.hasLeader = false;
+          }
+          const effRemainder = wStr - sPop;
+          const rawRemainder = techDiff > 0
+            ? Math.ceil(effRemainder / Math.pow(C.TECH_ADVANTAGE_MULT, techDiff))
+            : effRemainder;
+          es.team = w.team;
+          es.population = Math.min(rawRemainder, C.LEVEL_CAPACITY[es.level]);
+          es.popFrac = 0;
+          es.atCapTime = 0;
+          w.dead = true;
+          // Crops recalculated next tick by computeCrops
         } else {
-          const t = w.strength / sMult;
-          es.population = Math.max(1, Math.round(es.population - wMult * t));
+          // Defense holds — walker dies
+          const effRemainder = sPop - wStr;
+          const rawRemainder = techDiff < 0
+            ? Math.ceil(effRemainder / Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff))
+            : effRemainder;
+          es.population = Math.max(1, rawRemainder);
           w.dead = true;
         }
       }
@@ -1007,12 +1079,38 @@ function handleWalkerCollisions(state) {
 
 // ── Entity Pruning ──────────────────────────────────────────────────
 function pruneDeadEntities(state) {
-  // Clear leaders if their walker is dead
+  // Clear leaders if their walker is dead — but not if leader is inside a settlement
   for (let t = 0; t < 2; t++) {
-    if (state.leaders[t] >= 0 && !isWalkerAlive(state, state.leaders[t])) {
-      state.leaders[t] = -1;
+    if (state.leaders[t] >= 0) {
+      const leaderW = state.walkers.find(w => w.id === state.leaders[t]);
+      if (!leaderW || leaderW.dead) {
+        // Check if leader entered a settlement (hasLeader flag)
+        const leaderInSettlement = state.settlements.some(
+          s => !s.dead && s.team === t && s.hasLeader
+        );
+        if (!leaderInSettlement) {
+          // Leader truly dead — drop magnet
+          if (leaderW) {
+            state.magnetPos[t] = { x: leaderW.x, y: leaderW.y };
+          }
+          state.magnetLocked[t] = true;
+          state.leaders[t] = -1;
+        }
+      }
     }
   }
+
+  // Handle dead settlements that had leaders — drop magnet at settlement location
+  for (const s of state.settlements) {
+    if (s.dead && s.hasLeader) {
+      const t = s.team;
+      state.magnetPos[t] = { x: s.tx + 0.5, y: s.ty + 0.5 };
+      state.magnetLocked[t] = true;
+      state.leaders[t] = -1;
+      s.hasLeader = false;
+    }
+  }
+
   state.walkers = state.walkers.filter(w => !w.dead);
 
   const alive = state.settlements.filter(s => !s.dead);
@@ -1073,6 +1171,8 @@ function serializeState(state, team) {
       s: w.strength,
       x: Math.round(w.x * 100) / 100,
       y: Math.round(w.y * 100) / 100,
+      tx: Math.round(w.tx * 100) / 100,
+      ty: Math.round(w.ty * 100) / 100,
     };
     if (w.isLeader) wd.l = 1;
     if (w.isKnight) wd.k = 1;
@@ -1083,13 +1183,15 @@ function serializeState(state, team) {
   const settlementData = [];
   for (const s of state.settlements) {
     if (s.dead) continue;
-    settlementData.push({
+    const sd = {
       t: s.team,
       l: s.level,
       p: s.population,
       tx: s.tx, ty: s.ty,
       ox: s.sqOx, oy: s.sqOy, sz: s.sqSize,
-    });
+    };
+    if (s.hasLeader) sd.hl = 1;
+    settlementData.push(sd);
   }
 
   // Swamps: array of {x, y}
@@ -1130,9 +1232,12 @@ function serializeState(state, team) {
     rocks: rockData,
     trees: treeData,
     crops: cropData,
+    fires: state.fires.map(f => ({ x: f.x, y: f.y, a: Math.round(f.age * 10) / 10 })),
     seaLevel: state.seaLevel,
     leaders: state.leaders,
     armageddon: state.armageddon,
+    magnetLocked: state.magnetLocked[team],
+    teamPop: [getTeamStats(state, C.TEAM_BLUE).pop, getTeamStats(state, C.TEAM_RED).pop],
   };
 }
 
@@ -1169,16 +1274,81 @@ function executePowerSwamp(state, team, tx, ty) {
 function executePowerKnight(state, team) {
   const leaderId = state.leaders[team];
   if (leaderId < 0) return false;
+
+  // Check if leader is inside a settlement (hasLeader flag)
+  let hostSettlement = null;
+  for (const s of state.settlements) {
+    if (s.dead || s.team !== team) continue;
+    if (s.hasLeader) {
+      hostSettlement = s;
+      break;
+    }
+  }
+
+  if (hostSettlement) {
+    // Leader is inside the settlement — extract as knight
+    const sx = hostSettlement.tx + 0.5;
+    const sy = hostSettlement.ty + 0.5;
+    const knightStrength = Math.min(255, hostSettlement.population * C.KNIGHT_STRENGTH_MULT);
+    const sTech = C.SETTLEMENT_LEVELS[hostSettlement.level] ? C.SETTLEMENT_LEVELS[hostSettlement.level].tech : 0;
+
+    // Spawn knight walker from settlement
+    const knight = spawnWalker(state, team, knightStrength, sx, sy, sTech);
+    knight.isKnight = true;
+
+    // Destroy host settlement
+    hostSettlement.dead = true;
+    hostSettlement.hasLeader = false;
+    clearSettlementMap(state, hostSettlement.tx, hostSettlement.ty);
+
+    // Magnet drops at destroyed settlement
+    state.magnetPos[team] = { x: hostSettlement.tx, y: hostSettlement.ty };
+    state.magnetLocked[team] = true;
+    state.leaders[team] = -1;
+
+    // Set building on fire
+    state.fires.push({ x: hostSettlement.tx, y: hostSettlement.ty, age: 0 });
+
+    pickFightTarget(state, knight);
+    return true;
+  }
+
+  // Leader is a walker — check if standing near a friendly settlement
   let leader = null;
   for (const w of state.walkers) {
     if (w.id === leaderId && !w.dead) { leader = w; break; }
   }
   if (!leader || leader.isKnight) return false;
+
+  const lx = Math.floor(leader.x), ly = Math.floor(leader.y);
+  for (const s of state.settlements) {
+    if (s.dead || s.team !== team) continue;
+    if (Math.abs(s.tx - lx) <= 1 && Math.abs(s.ty - ly) <= 1) {
+      hostSettlement = s;
+      break;
+    }
+  }
+  if (!hostSettlement) return false; // leader not at a settlement — fail
+
+  // Promote to knight
   leader.isKnight = true;
   leader.strength = Math.min(255, leader.strength * C.KNIGHT_STRENGTH_MULT);
   leader.isLeader = false;
   state.leaders[team] = -1;
-  pickFightTarget(state, leader); // immediately seek enemies
+
+  // Destroy host settlement
+  hostSettlement.dead = true;
+  hostSettlement.hasLeader = false;
+  clearSettlementMap(state, hostSettlement.tx, hostSettlement.ty);
+
+  // Magnet drops at destroyed settlement
+  state.magnetPos[team] = { x: hostSettlement.tx, y: hostSettlement.ty };
+  state.magnetLocked[team] = true;
+
+  // Set building on fire
+  state.fires.push({ x: hostSettlement.tx, y: hostSettlement.ty, age: 0 });
+
+  pickFightTarget(state, leader);
   return true;
 }
 
@@ -1220,6 +1390,12 @@ function executePowerVolcano(state, team, px, py) {
     if (s.dead) continue;
     const dx = (s.tx + 0.5) - px, dy = (s.ty + 0.5) - py;
     if (dx * dx + dy * dy < r2) {
+      if (s.hasLeader) {
+        state.magnetPos[s.team] = { x: s.tx + 0.5, y: s.ty + 0.5 };
+        state.magnetLocked[s.team] = true;
+        state.leaders[s.team] = -1;
+        s.hasLeader = false;
+      }
       s.dead = true;
       clearSettlementMap(state, s.tx, s.ty);
     }
@@ -1243,6 +1419,13 @@ function executePowerFlood(state, team) {
   for (const s of state.settlements) {
     if (s.dead) continue;
     if (isTileWater(state, s.tx, s.ty)) {
+      // Leader inside settlement dies
+      if (s.hasLeader) {
+        state.magnetPos[s.team] = { x: s.tx + 0.5, y: s.ty + 0.5 };
+        state.magnetLocked[s.team] = true;
+        state.leaders[s.team] = -1;
+        s.hasLeader = false;
+      }
       s.dead = true;
       clearSettlementMap(state, s.tx, s.ty);
     }
@@ -1261,9 +1444,21 @@ function executePowerArmageddon(state, team) {
     if (s.population > 0) {
       const angle = Math.random() * Math.PI * 2;
       const sTech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
-      spawnWalker(state, s.team, s.population,
+      const w = spawnWalker(state, s.team, s.population,
         s.tx + 0.5 + Math.cos(angle) * 1.2,
         s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
+      // If settlement had a leader, ejected walker becomes leader
+      if (s.hasLeader) {
+        w.isLeader = true;
+        state.leaders[s.team] = w.id;
+        s.hasLeader = false;
+      }
+    } else if (s.hasLeader) {
+      // Empty settlement with leader — leader dies
+      state.magnetPos[s.team] = { x: s.tx + 0.5, y: s.ty + 0.5 };
+      state.magnetLocked[s.team] = true;
+      state.leaders[s.team] = -1;
+      s.hasLeader = false;
     }
     s.dead = true;
     clearSettlementMap(state, s.tx, s.ty);
@@ -1355,6 +1550,10 @@ function startGame(room) {
 
       updatePopulationGrowth(state, dt);
     }
+
+    // Age and prune fires
+    for (const f of state.fires) f.age += dt;
+    state.fires = state.fires.filter(f => f.age < 5.0);
 
     state.pruneTimer += dt;
     if (state.pruneTimer >= 3.0) {
@@ -1481,6 +1680,7 @@ wss.on('connection', (ws) => {
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
         if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) return;
+        if (!canBuildAtPoint(state, playerTeam, px, py)) return;
         if (state.mana[playerTeam] < C.TERRAIN_RAISE_COST) return;
         state.mana[playerTeam] -= C.TERRAIN_RAISE_COST;
         raisePoint(state, px, py);
@@ -1498,6 +1698,7 @@ wss.on('connection', (ws) => {
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
         if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) return;
+        if (!canBuildAtPoint(state, playerTeam, px, py)) return;
         if (state.mana[playerTeam] < C.TERRAIN_LOWER_COST) return;
         state.mana[playerTeam] -= C.TERRAIN_LOWER_COST;
         lowerPoint(state, px, py);
@@ -1570,6 +1771,7 @@ wss.on('connection', (ws) => {
       case 'magnet': {
         if (!playerRoom || !playerRoom.started || playerRoom.state.gameOver) return;
         if (playerRoom.state.armageddon) return;
+        if (playerRoom.state.magnetLocked[playerTeam]) return;
         const { x, y } = msg;
         if (typeof x !== 'number' || typeof y !== 'number') return;
         playerRoom.state.magnetPos[playerTeam] = { x, y };

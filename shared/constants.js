@@ -77,6 +77,10 @@ const MANA_MAX = 6000;
 
 // ── Combat ──────────────────────────────────────────────────────────
 const TECH_ADVANTAGE_MULT = 1.5;
+const WALKER_ATTRITION_PER_SEC = 0.05;
+
+// ── Build Proximity ─────────────────────────────────────────────────
+const BUILD_PROXIMITY_RADIUS = 6;
 
 // ── Starting Conditions ─────────────────────────────────────────────
 const START_WALKERS = 3;
@@ -99,7 +103,8 @@ if (typeof module !== 'undefined') {
     CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, GROWTH_PER_CROP_PER_SEC,
     EJECT_DWELL_TIME, EJECT_FRACTION, EJECT_MIN_STRENGTH,
     MANA_PER_POP_PER_SEC, MANA_MAX,
-    TECH_ADVANTAGE_MULT,
+    TECH_ADVANTAGE_MULT, WALKER_ATTRITION_PER_SEC,
+    BUILD_PROXIMITY_RADIUS,
     START_WALKERS, START_STRENGTH, START_MANA,
     TICK_RATE, TICK_INTERVAL,
   };
