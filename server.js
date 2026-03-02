@@ -1021,11 +1021,13 @@ function handleWalkerCollisions(state) {
       const wMult = techDiff > 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, techDiff) : 1;
       const sMult = techDiff < 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff) : 1;
 
-      // Damage dealt to settlement (scaled by tech)
+      // Damage dealt to settlement (scaled by tech); knights deal more
       const baseDmg = C.ASSAULT_DMG_PER_SEC * dt;
-      const dmgToSett = Math.max(0.1, baseDmg * wMult);
-      // Retaliation damage from settlement to walker (scaled by tech)
-      const dmgToWalker = Math.max(0.05, baseDmg * C.ASSAULT_RETALIATE_FRAC * sMult);
+      const atkMult = w.isKnight ? C.KNIGHT_STRENGTH_MULT : 1;
+      const dmgToSett = Math.max(0.1, baseDmg * wMult * atkMult);
+      // Retaliation damage from settlement to walker (knights take much less)
+      const retalFrac = w.isKnight ? C.ASSAULT_RETALIATE_FRAC * 0.2 : C.ASSAULT_RETALIATE_FRAC;
+      const dmgToWalker = Math.max(0.05, baseDmg * retalFrac * sMult);
 
       // Apply fractional damage using accumulators
       es.assaultFrac = (es.assaultFrac || 0) + dmgToSett;
@@ -1405,7 +1407,12 @@ function executePowerVolcano(state, team, px, py) {
 }
 
 function executePowerFlood(state, team) {
-  state.seaLevel += 1;
+  // Lower all terrain by 1 instead of raising sea level — preserves natural slopes
+  for (let x = 0; x <= C.MAP_W; x++) {
+    for (let y = 0; y <= C.MAP_H; y++) {
+      state.heights[x][y] = Math.max(0, state.heights[x][y] - 1);
+    }
+  }
   // Kill walkers on newly submerged tiles
   for (const w of state.walkers) {
     if (w.dead) continue;
@@ -1417,7 +1424,6 @@ function executePowerFlood(state, team) {
   for (const s of state.settlements) {
     if (s.dead) continue;
     if (isTileWater(state, s.tx, s.ty)) {
-      // Leader inside settlement dies
       if (s.hasLeader) {
         state.magnetPos[s.team] = { x: s.tx + 0.5, y: s.ty + 0.5 };
         state.magnetLocked[s.team] = true;

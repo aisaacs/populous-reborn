@@ -174,19 +174,19 @@
       text-align: center;
     }
 
-    /* Mode buttons */
-    .mode-row {
-      display: flex;
-      gap: 2px;
+    /* Mode buttons — 2x2 grid */
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
     }
     .mode-btn {
-      flex: 1;
       background: rgba(40, 40, 60, 0.9);
       border: 1px solid #444;
       border-radius: 3px;
       color: #aaa;
-      font: bold 9px monospace;
-      padding: 4px 0;
+      font: bold 10px monospace;
+      padding: 6px 0;
       cursor: pointer;
       text-align: center;
       transition: border-color 0.1s, color 0.1s;
@@ -210,6 +210,42 @@
     }
     .tool-btn:hover { border-color: #888; color: #ddd; }
     .tool-btn.active { border-color: #ff8c00; color: #ffaa33; background: rgba(80, 60, 20, 0.6); }
+
+    /* Power buttons in sidebar */
+    .power-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .power-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(40, 40, 60, 0.9);
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 4px 6px;
+      cursor: pointer;
+      transition: border-color 0.15s, opacity 0.15s;
+    }
+    .power-btn:hover { border-color: #888; }
+    .power-btn.disabled { opacity: 0.35; cursor: default; }
+    .power-btn.active { border-color: #ff8c00; box-shadow: 0 0 4px rgba(255,140,0,0.4); }
+    .power-hotkey {
+      font: bold 10px monospace;
+      color: #ff8c00;
+      width: 12px;
+      text-align: center;
+    }
+    .power-name {
+      font: bold 9px monospace;
+      color: #ddd;
+      flex: 1;
+    }
+    .power-cost {
+      font: 9px monospace;
+      color: #8af;
+    }
 
     /* Stats */
     .stat-line {
@@ -260,51 +296,6 @@
       line-height: 1;
     }
     .sb-icon-btn:hover { color: #ccc; }
-
-    /* Power Bar */
-    #power-bar {
-      display: none;
-      position: fixed;
-      bottom: 12px;
-      left: calc(160px + (100% - 160px) / 2);
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.7);
-      border: 1px solid #444;
-      border-radius: 6px;
-      padding: 6px 8px;
-      gap: 6px;
-      z-index: 10;
-      user-select: none;
-    }
-    .power-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: rgba(40, 40, 60, 0.9);
-      border: 2px solid #555;
-      border-radius: 4px;
-      padding: 4px 8px;
-      cursor: pointer;
-      min-width: 64px;
-      transition: border-color 0.15s, opacity 0.15s;
-    }
-    .power-btn:hover { border-color: #888; }
-    .power-btn.disabled { opacity: 0.35; cursor: default; }
-    .power-btn.active { border-color: #ff8c00; box-shadow: 0 0 6px rgba(255,140,0,0.5); }
-    .power-hotkey {
-      font: bold 11px monospace;
-      color: #ff8c00;
-      margin-bottom: 1px;
-    }
-    .power-name {
-      font: bold 10px monospace;
-      color: #ddd;
-      margin-bottom: 1px;
-    }
-    .power-cost {
-      font: 9px monospace;
-      color: #8af;
-    }
   </style>
 </head>
 <body>
@@ -360,14 +351,27 @@
       <div id="mana-text" class="mana-text">0</div>
     </div>
 
-    <!-- Mode -->
+    <!-- Mode — 2x2 grid -->
     <div class="sb-section">
       <div class="sb-label">Mode</div>
-      <div class="mode-row">
-        <button class="mode-btn" data-mode="0">1 Stl</button>
-        <button class="mode-btn" data-mode="1">2 Mag</button>
-        <button class="mode-btn" data-mode="2">3 Fgt</button>
-        <button class="mode-btn" data-mode="3">4 Gth</button>
+      <div class="mode-grid">
+        <button class="mode-btn" data-mode="0">Settle</button>
+        <button class="mode-btn" data-mode="1">Magnet</button>
+        <button class="mode-btn" data-mode="2">Fight</button>
+        <button class="mode-btn" data-mode="3">Gather</button>
+      </div>
+    </div>
+
+    <!-- Divine Powers — ordered least to most powerful -->
+    <div class="sb-section">
+      <div class="sb-label">Powers</div>
+      <div class="power-list">
+        <div class="power-btn" data-power="swamp"><span class="power-hotkey">W</span><span class="power-name">Swamp</span><span class="power-cost">60</span></div>
+        <div class="power-btn" data-power="knight"><span class="power-hotkey">E</span><span class="power-name">Knight</span><span class="power-cost">200</span></div>
+        <div class="power-btn" data-power="flood"><span class="power-hotkey">T</span><span class="power-name">Flood</span><span class="power-cost">500</span></div>
+        <div class="power-btn" data-power="earthquake"><span class="power-hotkey">Q</span><span class="power-name">Earthquake</span><span class="power-cost">1500</span></div>
+        <div class="power-btn" data-power="volcano"><span class="power-hotkey">R</span><span class="power-name">Volcano</span><span class="power-cost">5000</span></div>
+        <div class="power-btn" data-power="armageddon"><span class="power-hotkey">Y</span><span class="power-name">Armageddon</span><span class="power-cost">ALL</span></div>
       </div>
     </div>
 
@@ -397,15 +401,6 @@
         <input id="music-vol" class="sb-slider" type="range" min="0" max="100" value="30">
       </div>
     </div>
-  </div>
-
-  <div id="power-bar">
-    <div class="power-btn" data-power="earthquake"><span class="power-hotkey">Q</span><span class="power-name">Quake</span><span class="power-cost">1500</span></div>
-    <div class="power-btn" data-power="swamp"><span class="power-hotkey">W</span><span class="power-name">Swamp</span><span class="power-cost">60</span></div>
-    <div class="power-btn" data-power="knight"><span class="power-hotkey">E</span><span class="power-name">Knight</span><span class="power-cost">200</span></div>
-    <div class="power-btn" data-power="volcano"><span class="power-hotkey">R</span><span class="power-name">Volcano</span><span class="power-cost">5000</span></div>
-    <div class="power-btn" data-power="flood"><span class="power-hotkey">T</span><span class="power-name">Flood</span><span class="power-cost">500</span></div>
-    <div class="power-btn" data-power="armageddon"><span class="power-hotkey">Y</span><span class="power-name">Armgddn</span><span class="power-cost">ALL</span></div>
   </div>
 
   <script src="/shared/constants.js"></script>

@@ -107,7 +107,7 @@ treeImg.src = 'gfx/tree.png';
 treeImg.onload = () => { treeLoaded = true; };
 
 // ── Music System ───────────────────────────────────────────────────
-const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3'];
+const MUSIC_TRACKS = ['music/001.mp3', 'music/002.mp3', 'music/003.mp3', 'music/004.mp3'];
 let musicQueue = [];
 let musicAudio = null;
 let musicMuted = localStorage.getItem('musicMuted') === 'true';
@@ -632,8 +632,8 @@ function drawSettlement(s) {
       const tileH = pBottom.y - pTop.y;
       // Fill %: 75% tent/hut, 85% cottage-manor, 95% towerhouse/fortress, 55% castle (3×3)
       const fillPct = s.sz >= 3 ? 0.55 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
-      // Anchor sprite so buildings extend above their diamond
-      const centerY = pTop.y + tileH * 0.25;
+      // Anchor sprite: small buildings extend above diamond, castle sits centered
+      const centerY = s.sz >= 3 ? pTop.y + tileH * 0.45 : pTop.y + tileH * 0.25;
       const dh = tileH * fillPct / 0.75;
       const scale = dh / img.height;
       const dw = img.width * scale;
@@ -1485,11 +1485,10 @@ function drawMinimap() {
 
 // ── Power Bar ───────────────────────────────────────────────────────
 function updatePowerBar() {
-  const bar = document.getElementById('power-bar');
-  if (!bar) return;
-  const buttons = bar.querySelectorAll('.power-btn');
-  buttons.forEach((btn, i) => {
-    const power = POWERS[i];
+  const buttons = document.querySelectorAll('.power-btn');
+  buttons.forEach(btn => {
+    const powerId = btn.dataset.power;
+    const power = POWERS.find(p => p.id === powerId);
     if (!power) return;
     const canAfford = myMana >= power.cost;
     const isActive = targetingPower === power.id;
@@ -1604,8 +1603,7 @@ function drawInspectTooltip() {
 }
 
 function showPowerBar() {
-  const bar = document.getElementById('power-bar');
-  if (bar) bar.style.display = 'flex';
+  // Powers are now in the sidebar, shown when sidebar becomes visible
 }
 
 // ── Game Loop ───────────────────────────────────────────────────────
