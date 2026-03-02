@@ -91,7 +91,7 @@ function createGameState() {
     walkerGrid: new Array(C.MAP_W * C.MAP_H),
     teamMode: [C.MODE_SETTLE, C.MODE_SETTLE],
     magnetPos: [{ x: 10, y: 10 }, { x: 50, y: 50 }],
-    mana: [200, 200],
+    mana: [C.START_MANA, C.START_MANA],
     swamps: [],
     rocks: new Set(),
     trees: new Set(),
@@ -102,7 +102,6 @@ function createGameState() {
     leaders: [-1, -1],
     armageddon: false,
     levelEvalTimer: 0,
-    popGrowthTimer: 0,
     pruneTimer: 0,
     nextWalkerId: 1,
     gameOver: false,
@@ -452,13 +451,14 @@ function pickArmageddonTarget(state, w) {
 }
 
 // ── Walker System ───────────────────────────────────────────────────
-function spawnWalker(state, team, strength, x, y) {
+function spawnWalker(state, team, strength, x, y, tech) {
   const w = {
     id: state.nextWalkerId++,
     team, strength: Math.min(255, strength),
     x, y,
     tx: x, ty: y,
     dead: false,
+    tech: tech || 0,
   };
   state.walkers.push(w);
   return w;
@@ -472,16 +472,16 @@ function spawnInitialWalkers(state) {
 
   for (let team = 0; team < 2; team++) {
     const zone = spawnZones[team];
-    for (let r = 0; r < 20; r++) {
-      for (let dx = -r; dx <= r; dx++) {
-        for (let dy = -r; dy <= r; dy++) {
+    let spawned = 0;
+    for (let r = 0; r < 20 && spawned < C.START_WALKERS; r++) {
+      for (let dx = -r; dx <= r && spawned < C.START_WALKERS; dx++) {
+        for (let dy = -r; dy <= r && spawned < C.START_WALKERS; dy++) {
           if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
           const tx = zone.cx + dx, ty = zone.cy + dy;
           if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
           if (!isTileWater(state, tx, ty) && state.heights[tx][ty] > state.seaLevel) {
-            spawnWalker(state, team, 5, tx + 0.5, ty + 0.5);
-            r = 99; // break all loops
-            break;
+            spawnWalker(state, team, C.START_STRENGTH, tx + 0.5, ty + 0.5);
+            spawned++;
           }
         }
       }
@@ -690,7 +690,8 @@ function settleWalker(state, w, tx, ty) {
     tx, ty,
     sqOx: tx, sqOy: ty, sqSize: 1,
     dead: false,
-    atCapTicks: 0,
+    atCapTime: 0,
+    popFrac: 0,
   };
   state.settlements.push(s);
   setSettlement(state, tx, ty, s);
@@ -764,9 +765,10 @@ function evaluateSettlementLevels(state) {
       clearSettlementMap(state, s.tx, s.ty);
       if (s.population > 0) {
         const angle = Math.random() * Math.PI * 2;
+        const sTech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
         spawnWalker(state, s.team, s.population,
           s.tx + 0.5 + Math.cos(angle) * 1.2,
-          s.ty + 0.5 + Math.sin(angle) * 1.2);
+          s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
       }
       continue;
     }
@@ -791,9 +793,10 @@ function evaluateSettlementLevels(state) {
       const excess = s.population - Math.floor(cap / 2);
       s.population = Math.floor(cap / 2);
       const angle = Math.random() * Math.PI * 2;
+      const sTech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
       spawnWalker(state, s.team, excess,
         s.tx + 0.5 + Math.cos(angle) * 1.2,
-        s.ty + 0.5 + Math.sin(angle) * 1.2);
+        s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
     }
   }
 }
@@ -851,34 +854,48 @@ function computeCrops(state) {
   state.cropCounts = cropCounts;
 }
 
-// ── Population Growth ───────────────────────────────────────────────
-// Eject delay: bigger settlements take more growth ticks at cap before spawning
-const EJECT_DELAY = [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]; // indexed by level
+// ── Population Growth & Ejection ────────────────────────────────────
+// Growth: continuous per-second based on crop count
+// Ejection: dwell at cap then eject, only in Settle mode
 
-function updatePopulationGrowth(state) {
+function updatePopulationGrowth(state, dt) {
   for (let si = 0; si < state.settlements.length; si++) {
     const s = state.settlements[si];
     if (s.dead) continue;
     const cap = C.LEVEL_CAPACITY[s.level];
     const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
 
-    if (cropCount > 0 && s.population < cap) {
-      const growth = Math.max(1, Math.floor(cropCount * C.CROP_GROWTH_FACTOR));
-      s.population = Math.min(cap, s.population + growth);
-      s.atCapTicks = 0;
+    if (s.population < cap && cropCount > 0) {
+      // Grow: n crops × GROWTH_PER_CROP_PER_SEC per second
+      s.popFrac = (s.popFrac || 0) + cropCount * C.GROWTH_PER_CROP_PER_SEC * dt;
+      const whole = Math.floor(s.popFrac);
+      if (whole > 0) {
+        s.popFrac -= whole;
+        s.population = Math.min(cap, s.population + whole);
+      }
+      s.atCapTime = 0;
     } else if (s.population >= cap && cap > 0) {
-      // At capacity — eject walkers
-      s.atCapTicks = (s.atCapTicks || 0) + 1;
-      const delay = EJECT_DELAY[s.level] || 1;
-      if (s.atCapTicks >= delay) {
-        s.atCapTicks = 0;
-        const ejectStrength = Math.max(1, Math.floor(s.population / 3));
+      // Only eject in Settle mode
+      if (state.teamMode[s.team] !== C.MODE_SETTLE) {
+        s.atCapTime = 0;
+        continue;
+      }
+      // Dwell at cap before ejecting
+      s.atCapTime = (s.atCapTime || 0) + dt;
+      if (s.atCapTime >= C.EJECT_DWELL_TIME) {
+        s.atCapTime = 0;
+        const ejectStrength = Math.max(C.EJECT_MIN_STRENGTH,
+          Math.floor(s.population * C.EJECT_FRACTION));
         s.population -= ejectStrength;
         const angle = Math.random() * Math.PI * 2;
         const sx = s.tx + 0.5 + Math.cos(angle) * 1.2;
         const sy = s.ty + 0.5 + Math.sin(angle) * 1.2;
-        spawnWalker(state, s.team, ejectStrength, sx, sy);
+        const w = spawnWalker(state, s.team, ejectStrength, sx, sy);
+        // Ejected walkers inherit tech from settlement
+        w.tech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
       }
+    } else {
+      s.atCapTime = 0;
     }
   }
 }
@@ -909,13 +926,23 @@ function handleWalkerCollisions(state) {
             // Knights don't merge with friendlies
             if (w.isKnight || other.isKnight) continue;
             w.strength = Math.min(255, w.strength + other.strength);
+            w.tech = Math.max(w.tech || 0, other.tech || 0);
             other.dead = true;
           } else {
-            if (w.strength > other.strength) {
-              w.strength -= other.strength;
+            // Tech-based combat: higher tech deals more effective damage
+            const wTech = w.tech || 0, oTech = other.tech || 0;
+            const wMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, wTech - oTech));
+            const oMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, oTech - wTech));
+            const wEff = w.strength * wMult;
+            const oEff = other.strength * oMult;
+            if (wEff > oEff) {
+              // w wins: time for other to die, then subtract damage taken
+              const t = other.strength / wMult; // time units
+              w.strength = Math.max(1, Math.round(w.strength - oMult * t));
               other.dead = true;
-            } else if (other.strength > w.strength) {
-              other.strength -= w.strength;
+            } else if (oEff > wEff) {
+              const t = w.strength / oMult;
+              other.strength = Math.max(1, Math.round(other.strength - wMult * t));
               w.dead = true;
             } else {
               w.dead = true;
@@ -954,14 +981,25 @@ function handleWalkerCollisions(state) {
           evaluateSettlementLevels(state);
           pickFightTarget(state, w); // find next target
         }
-      } else if (w.strength >= es.population) {
-        w.strength -= es.population;
-        es.dead = true;
-        clearSettlementMap(state, es.tx, es.ty);
-        if (w.strength <= 0) w.dead = true;
       } else {
-        es.population -= w.strength;
-        w.dead = true;
+        // Tech-based settlement assault
+        const wTech = w.tech || 0;
+        const sTech = C.SETTLEMENT_LEVELS[es.level] ? C.SETTLEMENT_LEVELS[es.level].tech : 0;
+        const wMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, wTech - sTech));
+        const sMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, sTech - wTech));
+        const wEff = w.strength * wMult;
+        const sEff = es.population * sMult;
+        if (wEff >= sEff) {
+          const t = es.population / wMult;
+          w.strength = Math.max(0, Math.round(w.strength - sMult * t));
+          es.dead = true;
+          clearSettlementMap(state, es.tx, es.ty);
+          if (w.strength <= 0) w.dead = true;
+        } else {
+          const t = w.strength / sMult;
+          es.population = Math.max(1, Math.round(es.population - wMult * t));
+          w.dead = true;
+        }
       }
     }
   }
@@ -994,7 +1032,8 @@ function updateMana(state, dt) {
       if (s.dead || s.team !== team) continue;
       totalPop += s.population;
     }
-    state.mana[team] += totalPop * dt * 0.15;
+    state.mana[team] = Math.min(C.MANA_MAX,
+      state.mana[team] + totalPop * C.MANA_PER_POP_PER_SEC * dt);
   }
 }
 
@@ -1221,9 +1260,10 @@ function executePowerArmageddon(state, team) {
     if (s.dead) continue;
     if (s.population > 0) {
       const angle = Math.random() * Math.PI * 2;
+      const sTech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
       spawnWalker(state, s.team, s.population,
         s.tx + 0.5 + Math.cos(angle) * 1.2,
-        s.ty + 0.5 + Math.sin(angle) * 1.2);
+        s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
     }
     s.dead = true;
     clearSettlementMap(state, s.tx, s.ty);
@@ -1268,12 +1308,12 @@ function updateAI(state, room, dt) {
       if (isTileFlat(state, tx, ty) && state.heights[tx][ty] === th) continue;
       for (const [px, py] of [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]]) {
         if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) continue;
-        if (state.heights[px][py] < th && state.mana[team] >= 10) {
-          state.mana[team] -= 10;
+        if (state.heights[px][py] < th && state.mana[team] >= C.TERRAIN_RAISE_COST) {
+          state.mana[team] -= C.TERRAIN_RAISE_COST;
           raisePoint(state, px, py);
           return;
-        } else if (state.heights[px][py] > th && state.mana[team] >= 10) {
-          state.mana[team] -= 10;
+        } else if (state.heights[px][py] > th && state.mana[team] >= C.TERRAIN_LOWER_COST) {
+          state.mana[team] -= C.TERRAIN_LOWER_COST;
           lowerPoint(state, px, py);
           return;
         }
@@ -1313,11 +1353,7 @@ function startGame(room) {
         evaluateSettlementLevels(state);
       }
 
-      state.popGrowthTimer += dt;
-      if (state.popGrowthTimer >= 3.0) {
-        state.popGrowthTimer = 0;
-        updatePopulationGrowth(state);
-      }
+      updatePopulationGrowth(state, dt);
     }
 
     state.pruneTimer += dt;
@@ -1327,7 +1363,7 @@ function startGame(room) {
     }
 
     // Check win condition (after initial grace period of 30 seconds)
-    const elapsed = state.levelEvalTimer + state.popGrowthTimer + state.pruneTimer;
+    const elapsed = state.levelEvalTimer + state.pruneTimer;
     if (!state.gameOver) {
       const blueStats = getTeamStats(state, C.TEAM_BLUE);
       const redStats = getTeamStats(state, C.TEAM_RED);
@@ -1445,8 +1481,8 @@ wss.on('connection', (ws) => {
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
         if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) return;
-        if (state.mana[playerTeam] < 10) return;
-        state.mana[playerTeam] -= 10;
+        if (state.mana[playerTeam] < C.TERRAIN_RAISE_COST) return;
+        state.mana[playerTeam] -= C.TERRAIN_RAISE_COST;
         raisePoint(state, px, py);
         invalidateSwamps(state);
         invalidateRocks(state);
@@ -1462,8 +1498,8 @@ wss.on('connection', (ws) => {
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
         if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) return;
-        if (state.mana[playerTeam] < 10) return;
-        state.mana[playerTeam] -= 10;
+        if (state.mana[playerTeam] < C.TERRAIN_LOWER_COST) return;
+        state.mana[playerTeam] -= C.TERRAIN_LOWER_COST;
         lowerPoint(state, px, py);
         invalidateSwamps(state);
         invalidateRocks(state);
@@ -1506,7 +1542,11 @@ wss.on('connection', (ws) => {
             break;
         }
         if (success !== false) {
-          state.mana[playerTeam] -= powerDef.cost;
+          if (powerDef.id === 'armageddon') {
+            state.mana[playerTeam] = 0; // costs all mana
+          } else {
+            state.mana[playerTeam] -= powerDef.cost;
+          }
         }
         break;
       }

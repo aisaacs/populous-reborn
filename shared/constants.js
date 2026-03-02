@@ -23,7 +23,7 @@ const MODE_GATHER = 3;
 const MODE_NAMES = ['Settle', 'Magnet', 'Fight', 'Gather'];
 
 // ── Gameplay ────────────────────────────────────────────────────────
-const WALKER_SPEED = 1.5;
+const WALKER_SPEED = 0.8;
 const MAX_LEVEL = 9;
 const LEVEL_CAPACITY = [0, 4, 8, 15, 30, 55, 90, 140, 200, 255];
 
@@ -44,12 +44,12 @@ const SETTLEMENT_LEVELS = [
 
 // ── Powers ──────────────────────────────────────────────────────────
 const POWERS = [
-  { id: 'earthquake', name: 'Earthquake', cost: 200,   hotkey: 'Q', targeted: true },
-  { id: 'swamp',      name: 'Swamp',      cost: 350,   hotkey: 'W', targeted: true },
-  { id: 'knight',     name: 'Knight',     cost: 600,   hotkey: 'E', targeted: false },
-  { id: 'volcano',    name: 'Volcano',    cost: 1500,  hotkey: 'R', targeted: true },
-  { id: 'flood',      name: 'Flood',      cost: 4000,  hotkey: 'T', targeted: false },
-  { id: 'armageddon', name: 'Armageddon', cost: 10000, hotkey: 'Y', targeted: false },
+  { id: 'earthquake', name: 'Earthquake', cost: 1500,  hotkey: 'Q', targeted: true },
+  { id: 'swamp',      name: 'Swamp',      cost: 60,    hotkey: 'W', targeted: true },
+  { id: 'knight',     name: 'Knight',     cost: 200,   hotkey: 'E', targeted: false },
+  { id: 'volcano',    name: 'Volcano',    cost: 5000,  hotkey: 'R', targeted: true },
+  { id: 'flood',      name: 'Flood',      cost: 500,   hotkey: 'T', targeted: false },
+  { id: 'armageddon', name: 'Armageddon', cost: 0,     hotkey: 'Y', targeted: false },
 ];
 const EARTHQUAKE_RADIUS = 7;
 const VOLCANO_RADIUS = 5;
@@ -57,12 +57,31 @@ const KNIGHT_STRENGTH_MULT = 3;
 const KNIGHT_SPEED_MULT = 1.5;
 
 // ── Terrain ──────────────────────────────────────────────────────────
-const TERRAIN_TREES = 0.06; // fraction of land tiles with trees
+const TERRAIN_TREES = 0.06;
+const TERRAIN_RAISE_COST = 1;
+const TERRAIN_LOWER_COST = 1;
 
 // ── Crops ────────────────────────────────────────────────────────────
-const CROP_ZONE_RADIUS = 2;  // 5×5 evaluation zone (center ± 2)
-const CROP_LEVEL_THRESHOLDS = [0, 0, 2, 4, 7, 10, 13, 17, 20, 24]; // crop count to reach level (indexed by level)
-const CROP_GROWTH_FACTOR = 0.5; // population growth per crop tile per growth tick
+const CROP_ZONE_RADIUS = 2;
+const CROP_LEVEL_THRESHOLDS = [0, 0, 2, 4, 7, 10, 13, 17, 20, 24];
+const GROWTH_PER_CROP_PER_SEC = 0.1;
+
+// ── Walker Ejection ─────────────────────────────────────────────────
+const EJECT_DWELL_TIME = 15;
+const EJECT_FRACTION = 0.5;
+const EJECT_MIN_STRENGTH = 2;
+
+// ── Mana ────────────────────────────────────────────────────────────
+const MANA_PER_POP_PER_SEC = 0.015;
+const MANA_MAX = 6000;
+
+// ── Combat ──────────────────────────────────────────────────────────
+const TECH_ADVANTAGE_MULT = 1.5;
+
+// ── Starting Conditions ─────────────────────────────────────────────
+const START_WALKERS = 3;
+const START_STRENGTH = 5;
+const START_MANA = 50;
 
 // ── Tick ────────────────────────────────────────────────────────────
 const TICK_RATE = 20;
@@ -76,7 +95,12 @@ if (typeof module !== 'undefined') {
     MODE_SETTLE, MODE_MAGNET, MODE_FIGHT, MODE_GATHER, MODE_NAMES,
     WALKER_SPEED, MAX_LEVEL, LEVEL_CAPACITY, SETTLEMENT_LEVELS,
     POWERS, EARTHQUAKE_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT,
-    TERRAIN_TREES, CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, CROP_GROWTH_FACTOR,
+    TERRAIN_TREES, TERRAIN_RAISE_COST, TERRAIN_LOWER_COST,
+    CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, GROWTH_PER_CROP_PER_SEC,
+    EJECT_DWELL_TIME, EJECT_FRACTION, EJECT_MIN_STRENGTH,
+    MANA_PER_POP_PER_SEC, MANA_MAX,
+    TECH_ADVANTAGE_MULT,
+    START_WALKERS, START_STRENGTH, START_MANA,
     TICK_RATE, TICK_INTERVAL,
   };
 }
