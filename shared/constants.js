@@ -49,7 +49,7 @@ const POWERS = [
   { id: 'knight',     name: 'Knight',     cost: 200,   hotkey: 'E', targeted: false },
   { id: 'volcano',    name: 'Volcano',    cost: 5000,  hotkey: 'R', targeted: true },
   { id: 'flood',      name: 'Flood',      cost: 500,   hotkey: 'T', targeted: false },
-  { id: 'armageddon', name: 'Armageddon', cost: 0,     hotkey: 'Y', targeted: false },
+  { id: 'armageddon', name: 'Armageddon', cost: 6000,  hotkey: 'Y', targeted: false },
 ];
 const EARTHQUAKE_RADIUS = 7;
 const VOLCANO_RADIUS = 5;
