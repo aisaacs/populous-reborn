@@ -1132,53 +1132,358 @@ function drawFireParticles() {
   }
 }
 
+// ── Armageddon Sky Effects ──────────────────────────────────────────
+let armageddonStartTime = 0;
+let armageddonShake = { x: 0, y: 0 };
+const armageddonEmbers = [];
+const EMBER_MAX = 200;
+
+// Supernova targets — a subset of stars that will explode
+let supernovaStars = [];
+
+// Falling tiles — edge tiles that break off and tumble into the void
+const fallingTiles = [];
+const FALLING_TILE_MAX = 80;
+let fallingTileTimer = 0;
+// Track which tiles have already fallen so we don't repeat
+const fallenTileSet = new Set();
+// Frontier: tiles eligible to fall next (adjacent to already-fallen or on edge)
+let fallingFrontier = [];
+
+function onArmageddonStart() {
+  armageddonStartTime = performance.now() / 1000;
+  fallingTiles.length = 0;
+  fallenTileSet.clear();
+  fallingTileTimer = 0;
+  fallingFrontier = [];
+  // Seed frontier with all map edge tiles
+  for (let x = 0; x < MAP_W; x++) { fallingFrontier.push([x, 0]); fallingFrontier.push([x, MAP_H - 1]); }
+  for (let y = 1; y < MAP_H - 1; y++) { fallingFrontier.push([0, y]); fallingFrontier.push([MAP_W - 1, y]); }
+
+  // Pick ~15 bright stars to go supernova at staggered times
+  supernovaStars = [];
+  const candidates = stars.filter(s => s.brightness > 0.4);
+  for (let i = 0; i < Math.min(15, candidates.length); i++) {
+    const idx = Math.floor(Math.random() * candidates.length);
+    const s = candidates.splice(idx, 1)[0];
+    supernovaStars.push({
+      star: s,
+      delay: Math.random() * 4,       // staggered over 4 seconds
+      ringRadius: 0,
+      ringAlpha: 1,
+      exploded: false,
+    });
+  }
+}
+
+function updateArmageddonEffects(dt) {
+  if (!armageddon) return;
+  const elapsed = performance.now() / 1000 - armageddonStartTime;
+
+  // Screen shake — intense at start, fades out over ~8 seconds
+  const shakeIntensity = elapsed < 2 ? 8 * (1 - elapsed / 2)
+    : elapsed < 8 ? (1.5 + Math.sin(elapsed * 7) * 0.5) * (1 - (elapsed - 2) / 6)
+    : 0;
+  armageddonShake.x = (Math.random() - 0.5) * shakeIntensity * 2;
+  armageddonShake.y = (Math.random() - 0.5) * shakeIntensity * 2;
+
+  // Spawn embers (burning particles falling from sky)
+  if (armageddonEmbers.length < EMBER_MAX && Math.random() < 0.4) {
+    armageddonEmbers.push({
+      x: Math.random() * canvas.width,
+      y: -10,
+      vx: (Math.random() - 0.5) * 40,
+      vy: 60 + Math.random() * 120,
+      size: 1.5 + Math.random() * 3,
+      life: 3 + Math.random() * 4,
+      maxLife: 3 + Math.random() * 4,
+      bright: 0.5 + Math.random() * 0.5,
+    });
+  }
+
+  // Update embers
+  for (let i = armageddonEmbers.length - 1; i >= 0; i--) {
+    const e = armageddonEmbers[i];
+    e.x += e.vx * dt;
+    e.y += e.vy * dt;
+    e.vy += 15 * dt; // gentle gravity
+    e.life -= dt;
+    if (e.life <= 0 || e.y > canvas.height + 20) {
+      armageddonEmbers.splice(i, 1);
+    }
+  }
+
+  // Update supernova rings
+  for (const sn of supernovaStars) {
+    if (elapsed < sn.delay) continue;
+    if (!sn.exploded) {
+      sn.exploded = true;
+      sn.ringRadius = 0;
+      sn.ringAlpha = 1;
+    }
+    const snElapsed = elapsed - sn.delay;
+    sn.ringRadius = snElapsed * 120; // expand at 120px/sec
+    sn.ringAlpha = Math.max(0, 1 - snElapsed / 3); // fade over 3s
+  }
+
+  // Falling tiles — erode edges progressively from map edges inward
+  if (elapsed > 3 && heights.length > 0) {
+    // Spawn falling tiles from the frontier (edge-adjacent tiles)
+    fallingTileTimer += dt;
+    const spawnInterval = Math.max(0.05, 0.3 - elapsed * 0.003); // speeds up over time
+    while (fallingTileTimer >= spawnInterval && fallingTiles.length < FALLING_TILE_MAX) {
+      fallingTileTimer -= spawnInterval;
+
+      // Remove already-fallen entries from frontier
+      while (fallingFrontier.length > 0) {
+        const last = fallingFrontier[fallingFrontier.length - 1];
+        if (fallenTileSet.has(last[0] + ',' + last[1])) fallingFrontier.pop();
+        else break;
+      }
+      if (fallingFrontier.length === 0) break;
+
+      // Pick a random frontier tile
+      const idx = Math.floor(Math.random() * fallingFrontier.length);
+      const [tx, ty] = fallingFrontier[idx];
+      // Swap-remove
+      fallingFrontier[idx] = fallingFrontier[fallingFrontier.length - 1];
+      fallingFrontier.pop();
+
+      if (fallenTileSet.has(tx + ',' + ty)) continue;
+      fallenTileSet.add(tx + ',' + ty);
+
+      // Add neighbors to frontier
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nx = tx + dx, ny = ty + dy;
+        if (nx >= 0 && nx < MAP_W && ny >= 0 && ny < MAP_H && !fallenTileSet.has(nx + ',' + ny)) {
+          fallingFrontier.push([nx, ny]);
+        }
+      }
+
+      // Capture current tile appearance
+      const t = heights[tx][ty], r = heights[tx + 1][ty];
+      const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
+      const color = getTileColor(tx, ty);
+
+      fallingTiles.push({
+        tx, ty, t, r, b, l, color,
+        offsetY: 0,       // how far it's fallen (in pixels)
+        vy: 5 + Math.random() * 20,  // initial fall speed
+        rotAngle: 0,
+        rotSpeed: (Math.random() - 0.5) * 3,  // tumble
+        driftX: (Math.random() - 0.5) * 30,   // slight horizontal drift
+        alpha: 1,
+        fallen: true,
+      });
+    }
+  }
+
+  // Update falling tiles
+  for (let i = fallingTiles.length - 1; i >= 0; i--) {
+    const ft = fallingTiles[i];
+    ft.vy += 180 * dt; // gravity
+    ft.offsetY += ft.vy * dt;
+    ft.rotAngle += ft.rotSpeed * dt;
+    ft.alpha = Math.max(0, 1 - ft.offsetY / 600);
+    if (ft.alpha <= 0) {
+      fallingTiles.splice(i, 1);
+    }
+  }
+}
+
 // ── Space Background ────────────────────────────────────────────────
 function drawSpaceBackground(time) {
-  ctx.fillStyle = '#05080f';
+  const elapsed = armageddon ? time - armageddonStartTime : 0;
+
+  // Sky color shifts red during armageddon
+  if (armageddon) {
+    const redShift = Math.min(1, elapsed / 8); // full shift over 8 seconds
+    const r = Math.floor(5 + redShift * 25);
+    const g = Math.floor(8 - redShift * 4);
+    const b = Math.floor(15 - redShift * 10);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+  } else {
+    ctx.fillStyle = '#05080f';
+  }
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Nebula (cached)
+  // Nebula (cached) — tint red during armageddon
   if (!nebulaCanvas || nebulaCanvas.width !== canvas.width || nebulaCanvas.height !== canvas.height) {
     buildNebulaCanvas(canvas.width, canvas.height);
   }
   ctx.drawImage(nebulaCanvas, 0, 0);
 
-  // Stars — screen space, don't move with camera
+  if (armageddon) {
+    // Red nebula overlay that intensifies
+    const redIntensity = Math.min(0.15, elapsed * 0.02);
+    const rGrad = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.4, 0,
+      canvas.width * 0.5, canvas.height * 0.4, canvas.width * 0.6);
+    rGrad.addColorStop(0, `rgba(120, 20, 0, ${redIntensity})`);
+    rGrad.addColorStop(1, `rgba(60, 0, 0, ${redIntensity * 0.5})`);
+    ctx.fillStyle = rGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Stars
   for (const star of stars) {
     const twinkle = 0.5 + 0.5 * Math.sin(time * star.twinkleSpeed + star.x * 100);
-    const alpha = star.brightness * twinkle;
+    let alpha = star.brightness * twinkle;
+    let size = star.size;
+    let r = 255, g = 255, b = 255;
+
+    // During armageddon, stars brighten and shift warm
+    if (armageddon) {
+      const boost = Math.min(1, elapsed / 5);
+      alpha = Math.min(1, alpha * (1 + boost * 1.5));
+      size = star.size * (1 + boost * 0.8);
+      // Shift to warm orange-red
+      g = Math.floor(255 - boost * 80);
+      b = Math.floor(255 - boost * 160);
+    }
+
     const sx = Math.floor(star.x * canvas.width);
     const sy = Math.floor(star.y * canvas.height);
-    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
-    ctx.fillRect(sx, sy, star.size, star.size);
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
+    if (size <= 1.5) {
+      ctx.fillRect(sx, sy, size, size);
+    } else {
+      ctx.beginPath();
+      ctx.arc(sx, sy, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    // Diffraction spikes — any bright star can get one at peak, but rarely
-    // Deterministic hash from time so the spike holds briefly rather than flickering per-frame
-    if (star.brightness > 0.6 && twinkle > 0.8) {
+    // Normal spikes (when not armageddon)
+    if (!armageddon && star.brightness > 0.6 && twinkle > 0.8) {
       const spikeHash = Math.sin(Math.floor(time * star.twinkleSpeed * 0.1) * 9999 + star.x * 7777 + star.y * 3333) * 0.5 + 0.5;
       if (spikeHash < 0.002) {
         const intensity = (twinkle - 0.8) / 0.2;
         const len = star.spikeLen * intensity;
-        const cx = sx + star.size * 0.5;
-        const cy = sy + star.size * 0.5;
+        const scx = sx + star.size * 0.5;
+        const scy = sy + star.size * 0.5;
         ctx.beginPath();
-        ctx.moveTo(cx - len, cy);
-        ctx.lineTo(cx + len, cy);
-        ctx.moveTo(cx, cy - len);
-        ctx.lineTo(cx, cy + len);
+        ctx.moveTo(scx - len, scy); ctx.lineTo(scx + len, scy);
+        ctx.moveTo(scx, scy - len); ctx.lineTo(scx, scy + len);
         ctx.strokeStyle = `rgba(200,220,255,${(alpha * intensity * 0.6).toFixed(2)})`;
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(cx - len * 0.6, cy);
-        ctx.lineTo(cx + len * 0.6, cy);
-        ctx.moveTo(cx, cy - len * 0.6);
-        ctx.lineTo(cx, cy + len * 0.6);
+        ctx.moveTo(scx - len * 0.6, scy); ctx.lineTo(scx + len * 0.6, scy);
+        ctx.moveTo(scx, scy - len * 0.6); ctx.lineTo(scx, scy + len * 0.6);
         ctx.strokeStyle = `rgba(180,200,255,${(alpha * intensity * 0.25).toFixed(2)})`;
         ctx.lineWidth = 3;
         ctx.stroke();
       }
     }
+  }
+
+  // Supernova explosions
+  if (armageddon) {
+    for (const sn of supernovaStars) {
+      if (!sn.exploded || sn.ringAlpha <= 0) continue;
+      const sx = Math.floor(sn.star.x * canvas.width);
+      const sy = Math.floor(sn.star.y * canvas.height);
+
+      // Bright flash at center (fades faster)
+      const flashAlpha = Math.min(1, sn.ringAlpha * 2);
+      if (flashAlpha > 0.05) {
+        const flashR = 4 + (1 - sn.ringAlpha) * 12;
+        const flashGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, flashR);
+        flashGrad.addColorStop(0, `rgba(255, 240, 200, ${flashAlpha.toFixed(2)})`);
+        flashGrad.addColorStop(0.4, `rgba(255, 160, 60, ${(flashAlpha * 0.6).toFixed(2)})`);
+        flashGrad.addColorStop(1, 'rgba(255, 80, 0, 0)');
+        ctx.fillStyle = flashGrad;
+        ctx.fillRect(sx - flashR, sy - flashR, flashR * 2, flashR * 2);
+      }
+
+      // Expanding ring
+      if (sn.ringRadius > 5) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, sn.ringRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, ${Math.floor(100 + sn.ringAlpha * 100)}, ${Math.floor(sn.ringAlpha * 60)}, ${(sn.ringAlpha * 0.5).toFixed(2)})`;
+        ctx.lineWidth = 2 + sn.ringAlpha * 3;
+        ctx.stroke();
+
+        // Inner glow ring
+        ctx.beginPath();
+        ctx.arc(sx, sy, sn.ringRadius * 0.85, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 200, 120, ${(sn.ringAlpha * 0.15).toFixed(2)})`;
+        ctx.lineWidth = sn.ringRadius * 0.15;
+        ctx.stroke();
+      }
+
+      // Cross spike during flash
+      if (sn.ringAlpha > 0.5) {
+        const spikeLen = 20 + (1 - sn.ringAlpha) * 60;
+        const spikeA = (sn.ringAlpha - 0.5) * 2; // 0..1 during first half
+        ctx.beginPath();
+        ctx.moveTo(sx - spikeLen, sy); ctx.lineTo(sx + spikeLen, sy);
+        ctx.moveTo(sx, sy - spikeLen); ctx.lineTo(sx, sy + spikeLen);
+        ctx.strokeStyle = `rgba(255, 220, 160, ${(spikeA * 0.7).toFixed(2)})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+  }
+}
+
+// Draw embers in screen space (on top of map)
+function drawArmageddonEmbers() {
+  if (!armageddon || armageddonEmbers.length === 0) return;
+  for (const e of armageddonEmbers) {
+    const t = 1 - e.life / e.maxLife;
+    const r = 255;
+    const g = Math.floor(200 - t * 150);
+    const b = Math.floor(60 - t * 60);
+    const a = (e.life / e.maxLife) * e.bright;
+    ctx.fillStyle = `rgba(${r},${g},${b},${a.toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.size * (0.5 + 0.5 * (e.life / e.maxLife)), 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tiny trail
+    ctx.fillStyle = `rgba(${r},${g},${b},${(a * 0.3).toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(e.x - e.vx * 0.03, e.y - e.vy * 0.03, e.size * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Draw falling tiles in world space (they tumble off the map edges)
+function drawFallingTiles() {
+  if (!armageddon || fallingTiles.length === 0) return;
+  for (const ft of fallingTiles) {
+    const pTop    = project(ft.tx,     ft.ty,     ft.t);
+    const pRight  = project(ft.tx + 1, ft.ty,     ft.r);
+    const pBottom = project(ft.tx + 1, ft.ty + 1, ft.b);
+    const pLeft   = project(ft.tx,     ft.ty + 1, ft.l);
+
+    // Center of tile
+    const cx = (pTop.x + pRight.x + pBottom.x + pLeft.x) / 4;
+    const cy = (pTop.y + pRight.y + pBottom.y + pLeft.y) / 4;
+
+    ctx.save();
+    ctx.globalAlpha = ft.alpha;
+    // Translate to tile center, apply fall offset + drift, rotate, translate back
+    ctx.translate(cx + ft.driftX * (ft.offsetY / 200), cy + ft.offsetY);
+    ctx.rotate(ft.rotAngle);
+
+    // Draw the tile diamond relative to center
+    ctx.beginPath();
+    ctx.moveTo(pTop.x - cx, pTop.y - cy);
+    ctx.lineTo(pRight.x - cx, pRight.y - cy);
+    ctx.lineTo(pBottom.x - cx, pBottom.y - cy);
+    ctx.lineTo(pLeft.x - cx, pLeft.y - cy);
+    ctx.closePath();
+    ctx.fillStyle = ft.color;
+    ctx.fill();
+
+    // Thin dark edge to give depth
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    ctx.restore();
   }
 }
 
@@ -1390,16 +1695,22 @@ function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawSpaceBackground(performance.now() / 1000);
 
-  // Apply zoom around screen center
+  // Apply zoom around screen center (with armageddon screen shake)
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
-  ctx.setTransform(zoom, 0, 0, zoom, cx * (1 - zoom), cy * (1 - zoom));
+  const shx = armageddon ? armageddonShake.x : 0;
+  const shy = armageddon ? armageddonShake.y : 0;
+  ctx.setTransform(zoom, 0, 0, zoom, cx * (1 - zoom) + shx, cy * (1 - zoom) + shy);
 
   rebuildWalkerGrid();
 
-  // Pass 1: terrain
+  // Falling tiles (behind the map, tumbling into the void during armageddon)
+  drawFallingTiles();
+
+  // Pass 1: terrain (skip tiles that have fallen off during armageddon)
   for (let row = 0; row < MAP_H; row++) {
     for (let col = 0; col < MAP_W; col++) {
+      if (fallenTileSet.has(col + ',' + row)) continue;
       drawTile(col, row);
     }
   }
@@ -1494,6 +1805,9 @@ function render() {
   // Reset transform for HUD (drawn in screen space)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
+  // Armageddon embers (screen space, in front of everything)
+  drawArmageddonEmbers();
+
   // Power bar needs responsive updates (targeting feedback)
   updatePowerBar();
   // Sidebar — throttle DOM updates to ~4/sec
@@ -1511,26 +1825,208 @@ function render() {
 
   // Armageddon overlay
   if (armageddon && !gameOver) {
-    ctx.font = 'bold 36px monospace';
+    const t = performance.now() / 1000;
+    const cx = canvas.width / 2;
+
+    // Screen-edge red vignette
+    const vigGrad = ctx.createRadialGradient(cx, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.3,
+      cx, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7);
+    vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    vigGrad.addColorStop(1, `rgba(80, 0, 0, ${(0.3 + 0.1 * Math.sin(t * 2)).toFixed(2)})`);
+    ctx.fillStyle = vigGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Title text with glow
+    const pulse = 0.7 + 0.3 * Math.sin(t * 3);
+    ctx.save();
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255, 50, 0, 0.8)';
-    ctx.fillText('ARMAGEDDON', canvas.width / 2, 60);
-    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    // Glow layers
+    ctx.shadowColor = `rgba(255, 40, 0, ${(pulse * 0.8).toFixed(2)})`;
+    ctx.shadowBlur = 30 + pulse * 20;
+    ctx.font = "bold 52px 'Cinzel Decorative', 'Cinzel', serif";
+    ctx.fillStyle = `rgba(255, ${Math.floor(60 + pulse * 40)}, 0, 0.95)`;
+    ctx.fillText('ARMAGEDDON', cx, 55);
+
+    // Sharper inner text
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = `rgba(255, ${Math.floor(180 + pulse * 75)}, ${Math.floor(80 + pulse * 60)}, 1)`;
+    ctx.fillText('ARMAGEDDON', cx, 55);
+
+    ctx.restore();
   }
 
   // Game over overlay
   if (gameOver) {
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    const t = performance.now() / 1000;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const won = gameWinner === myTeam;
+
+    // Darken background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.font = 'bold 48px monospace';
+
+    // Radial highlight in winner's color
+    const hlColor = won ? 'rgba(40, 80, 200, 0.12)' : 'rgba(200, 40, 40, 0.08)';
+    const hlGrad = ctx.createRadialGradient(cx, cy - 40, 0, cx, cy - 40, 300);
+    hlGrad.addColorStop(0, hlColor);
+    hlGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = hlGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
     ctx.textAlign = 'center';
-    ctx.fillStyle = TEAM_COLORS[gameWinner];
-    ctx.fillText(`${TEAM_NAMES[gameWinner]} Wins!`, canvas.width / 2, canvas.height / 2 - 20);
-    ctx.font = '20px monospace';
-    ctx.fillStyle = '#ccc';
-    ctx.fillText(gameWinner === myTeam ? 'Victory!' : 'Defeat', canvas.width / 2, canvas.height / 2 + 20);
-    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    // Main result text
+    const resultText = won ? 'VICTORY' : 'DEFEAT';
+    const resultColor = won ? '#6aafff' : '#ff5544';
+    const glowColor = won ? 'rgba(80, 140, 255, 0.6)' : 'rgba(255, 60, 40, 0.5)';
+    const pulse = 0.8 + 0.2 * Math.sin(t * 2);
+
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 25 * pulse;
+    ctx.font = "900 64px 'Cinzel Decorative', 'Cinzel', serif";
+    ctx.fillStyle = resultColor;
+    ctx.fillText(resultText, cx, cy - 50);
+
+    // Sharper pass
+    ctx.shadowBlur = 0;
+    ctx.fillText(resultText, cx, cy - 50);
+
+    // Subtitle
+    ctx.font = "300 18px 'Raleway', sans-serif";
+    ctx.letterSpacing = '4px';
+    ctx.fillStyle = 'rgba(200, 210, 230, 0.7)';
+    const subText = won
+      ? 'Your people have conquered this world'
+      : `The ${TEAM_NAMES[gameWinner]} god has prevailed`;
+    ctx.fillText(subText, cx, cy + 10);
+
+    // Separator line
+    const lineW = 160;
+    const lineGrad = ctx.createLinearGradient(cx - lineW, 0, cx + lineW, 0);
+    lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
+    lineGrad.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+    lineGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = lineGrad;
+    ctx.fillRect(cx - lineW, cy + 35, lineW * 2, 1);
+
+    // Buttons
+    ctx.font = "600 14px 'Raleway', sans-serif";
+    const btnY = cy + 70;
+    const btn1X = cx - 90, btn2X = cx + 90;
+    const btnW = 140, btnH = 40;
+
+    // Play Again button
+    const b1hover = gameOverHover === 'again';
+    ctx.fillStyle = b1hover ? 'rgba(40, 65, 130, 0.9)' : 'rgba(25, 40, 80, 0.8)';
+    ctx.strokeStyle = b1hover ? 'rgba(100, 160, 255, 0.6)' : 'rgba(80, 120, 200, 0.3)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, btn1X - btnW/2, btnY - btnH/2, btnW, btnH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = b1hover ? '#fff' : 'rgba(180, 210, 255, 0.9)';
+    ctx.fillText('PLAY AGAIN', btn1X, btnY);
+
+    // Return to Lobby button
+    const b2hover = gameOverHover === 'lobby';
+    ctx.fillStyle = b2hover ? 'rgba(50, 50, 60, 0.9)' : 'rgba(30, 30, 40, 0.8)';
+    ctx.strokeStyle = b2hover ? 'rgba(160, 160, 180, 0.5)' : 'rgba(100, 100, 120, 0.3)';
+    roundRect(ctx, btn2X - btnW/2, btnY - btnH/2, btnW, btnH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = b2hover ? '#fff' : 'rgba(180, 180, 200, 0.8)';
+    ctx.fillText('LOBBY', btn2X, btnY);
+
+    // Store button rects for hit testing
+    gameOverBtns.again = { x: btn1X - btnW/2, y: btnY - btnH/2, w: btnW, h: btnH };
+    gameOverBtns.lobby = { x: btn2X - btnW/2, y: btnY - btnH/2, w: btnW, h: btnH };
+
+    ctx.restore();
   }
+}
+
+// Rounded rect helper
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.lineTo(x + w - r, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + r);
+  c.lineTo(x + w, y + h - r);
+  c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  c.lineTo(x + r, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - r);
+  c.lineTo(x, y + r);
+  c.quadraticCurveTo(x, y, x + r, y);
+  c.closePath();
+}
+
+// Game over button state
+let gameOverHover = null;
+const gameOverBtns = { again: null, lobby: null };
+
+// Track hover over game over buttons
+window.addEventListener('mousemove', (e) => {
+  if (!gameOver) { gameOverHover = null; return; }
+  const mx = e.clientX, my = e.clientY;
+  gameOverHover = null;
+  for (const key of ['again', 'lobby']) {
+    const b = gameOverBtns[key];
+    if (b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      gameOverHover = key;
+      break;
+    }
+  }
+  canvas.style.cursor = gameOverHover ? 'pointer' : (gameOver ? 'default' : 'crosshair');
+});
+
+function returnToLobby() {
+  // Close existing connection
+  if (ws) { ws.close(); ws = null; }
+
+  // Reset game state
+  gameStarted = false;
+  gameOver = false;
+  gameWinner = -1;
+  gameOverHover = null;
+  gameOverBtns.again = null;
+  gameOverBtns.lobby = null;
+  armageddon = false;
+  fallingTiles.length = 0;
+  fallenTileSet.clear();
+  fallingFrontier = [];
+  armageddonEmbers.length = 0;
+  supernovaStars = [];
+  heights = [];
+  walkers = [];
+  settlements = [];
+  myTeam = -1;
+  myMana = 0;
+  targetingPower = null;
+  inspectMode = false;
+  inspectData = null;
+  magnetMode = false;
+
+  // Show lobby, hide game
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('sidebar').classList.remove('visible');
+  document.getElementById('lobby').style.display = 'flex';
+  document.getElementById('lobby-bg').style.display = 'block';
+  const lobbyVol = document.getElementById('lobby-vol');
+  if (lobbyVol) lobbyVol.style.display = 'flex';
+  document.getElementById('create-section').style.display = '';
+  document.getElementById('join-section').style.display = '';
+  document.getElementById('waiting-section').style.display = 'none';
+  document.getElementById('error-text').textContent = '';
+  canvas.style.cursor = 'crosshair';
+
+  // Restart lobby background
+  lobbyActive = true;
+  resizeLobbyBg();
+  requestAnimationFrame(renderLobby);
 }
 
 // ── Picking ─────────────────────────────────────────────────────────
@@ -1566,6 +2062,7 @@ let ws = null;
 let gameStarted = false;
 let gameOver = false;
 let gameWinner = -1;
+let room_wasAI = false;
 
 function connectToServer() {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1714,7 +2211,9 @@ function applyStateSnapshot(msg) {
 
   seaLevel = msg.seaLevel !== undefined ? msg.seaLevel : SEA_LEVEL;
   leaders = msg.leaders || [-1, -1];
+  const wasArmageddon = armageddon;
   armageddon = msg.armageddon || false;
+  if (armageddon && !wasArmageddon) onArmageddonStart();
   magnetLocked = msg.magnetLocked || [false, false];
   teamPop = msg.teamPop || [0, 0];
   fires = msg.fires || [];
@@ -1728,6 +2227,26 @@ function sendMessage(msg) {
 
 // ── Input ───────────────────────────────────────────────────────────
 canvas.addEventListener('mousedown', (e) => {
+  // Game over button clicks
+  if (gameOver && e.button === 0) {
+    const mx = e.clientX, my = e.clientY;
+    if (gameOverBtns.again && mx >= gameOverBtns.again.x && mx <= gameOverBtns.again.x + gameOverBtns.again.w &&
+        my >= gameOverBtns.again.y && my <= gameOverBtns.again.y + gameOverBtns.again.h) {
+      returnToLobby();
+      // Auto-start same game type
+      setTimeout(() => {
+        if (room_wasAI) document.getElementById('btn-ai').click();
+        else document.getElementById('btn-create').click();
+      }, 100);
+      return;
+    }
+    if (gameOverBtns.lobby && mx >= gameOverBtns.lobby.x && mx <= gameOverBtns.lobby.x + gameOverBtns.lobby.w &&
+        my >= gameOverBtns.lobby.y && my <= gameOverBtns.lobby.y + gameOverBtns.lobby.h) {
+      returnToLobby();
+      return;
+    }
+    return;
+  }
   if (!gameStarted || gameOver) return;
   if (heights.length === 0) return;
 
@@ -1895,6 +2414,7 @@ window.addEventListener('mousemove', (e) => {
 
 // ── Lobby Handlers ──────────────────────────────────────────────────
 document.getElementById('btn-create').addEventListener('click', () => {
+  room_wasAI = false;
   connectToServer();
   ws.onopen = () => {
     sendMessage({ type: 'create' });
@@ -1902,6 +2422,7 @@ document.getElementById('btn-create').addEventListener('click', () => {
 });
 
 document.getElementById('btn-ai').addEventListener('click', () => {
+  room_wasAI = true;
   connectToServer();
   ws.onopen = () => {
     sendMessage({ type: 'create_ai' });
@@ -2016,9 +2537,10 @@ function drawMinimap() {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(mm.x, mm.y, MM_SIZE, MM_SIZE);
 
-  // Pass 1: terrain
+  // Pass 1: terrain (skip fallen tiles — they show as void)
   for (let ty = 0; ty < MAP_H; ty++) {
     for (let tx = 0; tx < MAP_W; tx++) {
+      if (fallenTileSet.has(tx + ',' + ty)) continue;
       ctx.fillStyle = getTileColor(tx, ty);
       ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
     }
@@ -2287,6 +2809,7 @@ function gameLoop(now) {
   lastFrame = now;
   updateEdgePan(dt);
   updateFireParticles(dt);
+  updateArmageddonEffects(dt);
   spawnWaterfallParticles(dt);
   updateWaterfallParticles(dt);
   const t0 = performance.now();

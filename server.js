@@ -1773,50 +1773,140 @@ function executePowerArmageddon(state, team) {
 // ── Basic AI ────────────────────────────────────────────────────────
 function updateAI(state, room, dt) {
   room.aiTimer += dt;
-  if (room.aiTimer < 3.0) return;
+  if (room.aiTimer < 1.5) return;
   room.aiTimer = 0;
 
   const team = C.TEAM_RED;
+  const mana = state.mana[team];
   const redStats = getTeamStats(state, team);
   const blueStats = getTeamStats(state, C.TEAM_BLUE);
 
-  // Simple mode selection
-  if (redStats.set < 2 || redStats.walk > redStats.set * 3) {
+  // ── Mode selection ──
+  if (redStats.set < 3 || redStats.walk > redStats.set * 3) {
     state.teamMode[team] = C.MODE_SETTLE;
-  } else if (redStats.pop > blueStats.pop * 1.5 && redStats.walk >= 3) {
+  } else if (redStats.pop > blueStats.pop * 1.3 && redStats.walk >= 4) {
     state.teamMode[team] = C.MODE_FIGHT;
+  } else if (redStats.set >= 5 && redStats.walk < 2) {
+    state.teamMode[team] = C.MODE_GATHER;
   } else {
     state.teamMode[team] = C.MODE_SETTLE;
   }
 
-  // Flatten terrain near a settlement
-  let target = null;
-  for (const s of state.settlements) {
-    if (s.dead || s.team !== team) continue;
-    target = s;
-    break;
+  // ── Powers (checked every AI tick) ──
+  if (!state.armageddon) {
+    // Armageddon: if dominating and late game
+    if (redStats.pop > blueStats.pop * 2.5 && redStats.pop > 200 && mana >= 100) {
+      executePowerArmageddon(state, team);
+      return;
+    }
+
+    // Knight: if we have a leader and enough mana, and enemy is nearby
+    if (mana >= 200 && state.leaders[team] >= 0) {
+      const success = executePowerKnight(state, team);
+      if (success) { state.mana[team] -= 200; return; }
+    }
+
+    // Swamp: place near enemy settlements to slow them down
+    if (mana >= 60) {
+      let enemySett = null;
+      for (const s of state.settlements) {
+        if (s.dead || s.team === team) continue;
+        enemySett = s;
+        break;
+      }
+      if (enemySett && Math.random() < 0.3) {
+        const sx = enemySett.tx + Math.floor(Math.random() * 7) - 3;
+        const sy = enemySett.ty + Math.floor(Math.random() * 7) - 3;
+        if (sx >= 0 && sx < C.MAP_W && sy >= 0 && sy < C.MAP_H && isTileFlat(state, sx, sy)) {
+          const ok = executePowerSwamp(state, team, sx, sy);
+          if (ok) { state.mana[team] -= 60; return; }
+        }
+      }
+    }
+
+    // Earthquake: target enemy cluster when we can afford it
+    if (mana >= 1500 && Math.random() < 0.4) {
+      let enemySett = null;
+      for (const s of state.settlements) {
+        if (s.dead || s.team === team) continue;
+        if (!enemySett || s.population > enemySett.population) enemySett = s;
+      }
+      if (enemySett) {
+        state.mana[team] -= 1500;
+        executePowerEarthquake(state, team, enemySett.tx, enemySett.ty);
+        return;
+      }
+    }
+
+    // Flood: if enemy has lots of low-lying settlements
+    if (mana >= 500 && Math.random() < 0.25) {
+      let lowEnemy = 0;
+      for (const s of state.settlements) {
+        if (s.dead || s.team === team) continue;
+        if (state.heights[s.tx][s.ty] <= state.seaLevel + 1) lowEnemy++;
+      }
+      if (lowEnemy >= 2) {
+        state.mana[team] -= 500;
+        executePowerFlood(state, team);
+        return;
+      }
+    }
+
+    // Volcano: save for high-value targets
+    if (mana >= 5000 && Math.random() < 0.3) {
+      let bestEnemy = null;
+      for (const s of state.settlements) {
+        if (s.dead || s.team === team) continue;
+        if (!bestEnemy || s.level > bestEnemy.level) bestEnemy = s;
+      }
+      if (bestEnemy && bestEnemy.level >= 5) {
+        state.mana[team] -= 5000;
+        executePowerVolcano(state, team, bestEnemy.tx, bestEnemy.ty);
+        return;
+      }
+    }
   }
-  if (!target) return;
+
+  // ── Terrain flattening ──
+  // Pick a random own settlement to expand around
+  const ownSettlements = state.settlements.filter(s => !s.dead && s.team === team);
+  if (ownSettlements.length === 0) return;
+  const target = ownSettlements[Math.floor(Math.random() * ownSettlements.length)];
 
   const th = state.heights[target.tx][target.ty];
   const cx = target.tx, cy = target.ty;
+  const flatR = 4;
 
-  for (let ddx = -3; ddx <= 3; ddx++) {
-    for (let ddy = -3; ddy <= 3; ddy++) {
-      const tx = cx + ddx, ty = cy + ddy;
-      if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
-      if (isTileFlat(state, tx, ty) && state.heights[tx][ty] === th) continue;
-      for (const [px, py] of [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]]) {
-        if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) continue;
-        if (state.heights[px][py] < th && state.mana[team] >= C.TERRAIN_RAISE_COST) {
-          state.mana[team] -= C.TERRAIN_RAISE_COST;
-          raisePoint(state, px, py);
-          return;
-        } else if (state.heights[px][py] > th && state.mana[team] >= C.TERRAIN_LOWER_COST) {
-          state.mana[team] -= C.TERRAIN_LOWER_COST;
-          lowerPoint(state, px, py);
-          return;
-        }
+  // Shuffle directions so it doesn't always flatten the same corner first
+  const offsets = [];
+  for (let ddx = -flatR; ddx <= flatR; ddx++) {
+    for (let ddy = -flatR; ddy <= flatR; ddy++) {
+      offsets.push([ddx, ddy]);
+    }
+  }
+  for (let i = offsets.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
+  }
+
+  let modsLeft = 3; // up to 3 terrain mods per AI tick
+  for (const [ddx, ddy] of offsets) {
+    if (modsLeft <= 0) break;
+    const tx = cx + ddx, ty = cy + ddy;
+    if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
+    if (isTileFlat(state, tx, ty) && state.heights[tx][ty] === th) continue;
+    for (const [px, py] of [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]]) {
+      if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) continue;
+      if (state.heights[px][py] < th && mana >= C.TERRAIN_RAISE_COST) {
+        state.mana[team] -= C.TERRAIN_RAISE_COST;
+        raisePoint(state, px, py);
+        modsLeft--;
+        break;
+      } else if (state.heights[px][py] > th && mana >= C.TERRAIN_LOWER_COST) {
+        state.mana[team] -= C.TERRAIN_LOWER_COST;
+        lowerPoint(state, px, py);
+        modsLeft--;
+        break;
       }
     }
   }
