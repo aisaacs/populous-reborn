@@ -826,10 +826,11 @@ function updateWalkers(state, dt) {
     }
   }
 
-  // Walker attrition — walkers gradually lose strength over time
+  // Walker attrition — walkers gradually lose strength over time (knights decay faster)
   for (const w of state.walkers) {
     if (w.dead) continue;
-    w.attritionFrac = (w.attritionFrac || 0) + C.WALKER_ATTRITION_PER_SEC * dt;
+    const attrRate = w.isKnight ? C.KNIGHT_ATTRITION_PER_SEC : C.WALKER_ATTRITION_PER_SEC;
+    w.attritionFrac = (w.attritionFrac || 0) + attrRate * dt;
     if (w.attritionFrac >= 1) {
       const loss = Math.floor(w.attritionFrac);
       w.attritionFrac -= loss;
@@ -1251,7 +1252,7 @@ function handleWalkerCollisions(state) {
       const wTech = w.tech || 0;
       const techDiff = wTech - sTech;
       const wMult = techDiff > 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, techDiff) : 1;
-      const atkMult = w.isKnight ? C.KNIGHT_STRENGTH_MULT : 1;
+      const atkMult = 1; // knights rely on raw strength, no bonus multiplier
       // Stronger walkers deal more damage (scaled by strength)
       const strMult = Math.max(1, w.strength / 5);
       totalDmgToSett += C.ASSAULT_DMG_PER_SEC * dt * wMult * atkMult * strMult;
@@ -1275,7 +1276,7 @@ function handleWalkerCollisions(state) {
       const wTech = w.tech || 0;
       const techDiff = wTech - sTech;
       const sMult = techDiff < 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff) : 1;
-      const retalMult = w.isKnight ? 0.2 : 1;
+      const retalMult = w.isKnight ? 0.6 : 1;
       w.assaultFrac = (w.assaultFrac || 0) + retalPerWalker * sMult * retalMult;
       if (w.assaultFrac >= 1) {
         const loss = Math.floor(w.assaultFrac);
