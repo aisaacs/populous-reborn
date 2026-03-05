@@ -76,53 +76,24 @@ const SETT_LEVEL_NAMES = ['tent', 'hut', 'cottage', 'house', 'largehouse', 'mano
 const settlementSprites = {};
 let settlementSpritesLoaded = false;
 
-// Team tint colors for generating sprites for teams 2-5
-const TEAM_TINT_COLORS = {
-  green:  [60, 200, 60],
-  yellow: [220, 220, 40],
-  purple: [170, 70, 255],
-  orange: [255, 140, 30],
-};
-
 (function loadSettlementSprites() {
   let count = 0;
-  const total = SETT_LEVEL_NAMES.length * 2;
+  const allTeams = ['blue', 'red', 'green', 'yellow', 'purple', 'orange'];
+  const total = SETT_LEVEL_NAMES.length * allTeams.length;
   for (const name of SETT_LEVEL_NAMES) {
-    for (const team of ['blue', 'red']) {
+    for (const team of allTeams) {
       const key = name + '-' + team;
       const img = new Image();
       img.src = 'gfx/' + key + '.png';
-      img.onload = () => {
-        if (++count === total) {
-          settlementSpritesLoaded = true;
-          // Generate tinted sprites for teams 2-5 based on blue sprites
-          generateTintedSettlementSprites();
-        }
+      const done = () => {
+        if (++count === total) settlementSpritesLoaded = true;
       };
+      img.onload = done;
+      img.onerror = done;
       settlementSprites[key] = img;
     }
   }
 })();
-
-function generateTintedSettlementSprites() {
-  for (const name of SETT_LEVEL_NAMES) {
-    const baseImg = settlementSprites[name + '-blue'];
-    if (!baseImg || !baseImg.complete || baseImg.naturalWidth === 0) continue;
-    for (const teamName of ['green', 'yellow', 'purple', 'orange']) {
-      const key = name + '-' + teamName;
-      const canvas = document.createElement('canvas');
-      canvas.width = baseImg.width;
-      canvas.height = baseImg.height;
-      const tctx = canvas.getContext('2d');
-      tctx.drawImage(baseImg, 0, 0);
-      tctx.globalCompositeOperation = 'source-atop';
-      const [cr, cg, cb] = TEAM_TINT_COLORS[teamName];
-      tctx.fillStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',0.6)';
-      tctx.fillRect(0, 0, canvas.width, canvas.height);
-      settlementSprites[key] = canvas;
-    }
-  }
-}
 
 // ── Walker Sprites ────────────────────────────────────────────────────
 // Directions: se, nw (sprites), sw = mirror of se, ne = mirror of nw
@@ -133,10 +104,10 @@ let walkerSpritesLoaded = false;
 (function loadWalkerSprites() {
   let count = 0;
   const dirs = ['se', 'nw'];
-  const teams = ['blue', 'red'];
-  const total = dirs.length * teams.length * 2; // 2 dirs x 2 teams x 2 frames
+  const allTeams = ['blue', 'red', 'green', 'yellow', 'purple', 'orange'];
+  const total = dirs.length * allTeams.length * 2;
   for (const dir of dirs) {
-    for (const team of teams) {
+    for (const team of allTeams) {
       for (let frame = 0; frame < 2; frame++) {
         const file = frame === 0
           ? 'walker-' + dir + '-' + team + '.png'
@@ -145,10 +116,7 @@ let walkerSpritesLoaded = false;
         const img = new Image();
         img.src = 'gfx/' + file;
         const done = () => {
-          if (++count >= total) {
-            walkerSpritesLoaded = true;
-            generateTintedWalkerSprites();
-          }
+          if (++count >= total) walkerSpritesLoaded = true;
         };
         img.onload = done;
         img.onerror = done;
@@ -157,30 +125,6 @@ let walkerSpritesLoaded = false;
     }
   }
 })();
-
-function generateTintedWalkerSprites() {
-  const dirs = ['se', 'nw'];
-  for (const dir of dirs) {
-    for (let frame = 0; frame < 2; frame++) {
-      const baseKey = dir + '-blue-' + frame;
-      const baseImg = walkerSprites[baseKey];
-      if (!baseImg || !baseImg.complete || baseImg.naturalWidth === 0) continue;
-      for (const teamName of ['green', 'yellow', 'purple', 'orange']) {
-        const key = dir + '-' + teamName + '-' + frame;
-        const canvas = document.createElement('canvas');
-        canvas.width = baseImg.width;
-        canvas.height = baseImg.height;
-        const tctx = canvas.getContext('2d');
-        tctx.drawImage(baseImg, 0, 0);
-        tctx.globalCompositeOperation = 'source-atop';
-        const [cr, cg, cb] = TEAM_TINT_COLORS[teamName];
-        tctx.fillStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',0.6)';
-        tctx.fillRect(0, 0, canvas.width, canvas.height);
-        walkerSprites[key] = canvas;
-      }
-    }
-  }
-}
 
 // ── Boulder Sprite ──────────────────────────────────────────────────
 const boulderImg = new Image();
