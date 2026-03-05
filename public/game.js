@@ -55,7 +55,7 @@ let textureOpacity = 1.0;
 })();
 
 function getTileTexture(tx, ty) {
-  if (swampSet.has(tx + ',' + ty)) return terrainTextures.swamp;
+  if (swampTiles[ty * localMapW + tx]) return terrainTextures.swamp;
 
   const t = heights[tx][ty], r = heights[tx + 1][ty];
   const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
@@ -206,31 +206,271 @@ let ruinsLoaded = false;
 ruinsImg.src = 'gfx/ruins.png';
 ruinsImg.onload = () => { ruinsLoaded = true; };
 
-// ── Water Animation ─────────────────────────────────────────────────
-function drawWaterPulse(time) {
-  const sin = Math.sin(time * 0.35);
-  if (sin > 0) {
-    ctx.fillStyle = `rgba(140, 200, 255, ${(sin * 0.35).toFixed(2)})`;
-  } else {
-    ctx.fillStyle = `rgba(0, 10, 40, ${(-sin * 0.3).toFixed(2)})`;
+// ── Pre-rendered Water Frames ───────────────────────────────────────
+const WATER_FRAME_COUNT = 5;
+const WATER_FRAME_INTERVAL = 0.3; // seconds between frame advances
+let waterFrames = null;
+let waterFrameCounter = 0;
+let waterFrameTimer = 0;
+let waterFramesHiRes = null; // track which settingHiRes setting was used
+
+function buildWaterFrames() {
+  if (!texturesLoaded) return false;
+  const S = settingHiRes ? LAND_TILE_SCALE_HI : LAND_TILE_SCALE_LO;
+  const w = TILE_HALF_W * 2 * S;
+  const h = TILE_HALF_H * 2 * S;
+  const thw = TILE_HALF_W * S;
+  const thh = TILE_HALF_H * S;
+  const top = { x: thw, y: 0 };
+  const right = { x: w, y: thh };
+  const bottom = { x: thw, y: h };
+  const left = { x: 0, y: thh };
+
+  // Sparkle definitions per frame (scaled)
+  const sparkles = [
+    [{ x: -5 * S, y: -1 * S, a: 0.8 }, { x: 4 * S, y: 2 * S, a: 0.6 }],
+    [{ x: 3 * S, y: -2 * S, a: 0.5 }],
+    [],
+    [{ x: -3 * S, y: 1 * S, a: 0.7 }, { x: 6 * S, y: -1 * S, a: 0.4 }],
+    [{ x: 1 * S, y: -3 * S, a: 0.6 }],
+  ];
+
+  const tex = terrainTextures.water;
+  const iw = tex.width, ih = tex.height;
+  waterFrames = [];
+  waterFramesHiRes = settingHiRes;
+
+  for (let f = 0; f < WATER_FRAME_COUNT; f++) {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const oc = c.getContext('2d');
+
+    // Diamond path + base color
+    oc.beginPath();
+    oc.moveTo(top.x, top.y);
+    oc.lineTo(right.x, right.y);
+    oc.lineTo(bottom.x, bottom.y);
+    oc.lineTo(left.x, left.y);
+    oc.closePath();
+    oc.fillStyle = WATER_COLOR;
+    oc.fill();
+
+    // Texture triangle 1: Top -> Right -> Bottom
+    oc.save();
+    oc.beginPath();
+    oc.moveTo(top.x, top.y);
+    oc.lineTo(right.x, right.y);
+    oc.lineTo(bottom.x, bottom.y);
+    oc.closePath();
+    oc.clip();
+    oc.globalAlpha = textureOpacity;
+    oc.setTransform(
+      (right.x - top.x) / iw, (right.y - top.y) / iw,
+      (bottom.x - right.x) / ih, (bottom.y - right.y) / ih,
+      top.x, top.y
+    );
+    oc.drawImage(tex, 0, 0);
+    oc.restore();
+
+    // Texture triangle 2: Top -> Bottom -> Left
+    oc.save();
+    oc.beginPath();
+    oc.moveTo(top.x, top.y);
+    oc.lineTo(bottom.x, bottom.y);
+    oc.lineTo(left.x, left.y);
+    oc.closePath();
+    oc.clip();
+    oc.globalAlpha = textureOpacity;
+    oc.setTransform(
+      (bottom.x - left.x) / iw, (bottom.y - left.y) / iw,
+      (left.x - top.x) / ih, (left.y - top.y) / ih,
+      top.x, top.y
+    );
+    oc.drawImage(tex, 0, 0);
+    oc.restore();
+
+    // Sparkles
+    for (const sp of sparkles[f]) {
+      oc.fillStyle = `rgba(255, 255, 255, ${sp.a})`;
+      const spSize = Math.max(1, S);
+      oc.fillRect(thw + sp.x, thh + sp.y, spSize, spSize);
+    }
+
+    waterFrames.push(c);
   }
-  ctx.fill();
+  return true;
 }
 
-function drawWaterSparkles(pTop, pRight, pBottom, pLeft, time, tx, ty) {
-  const seed = tx * 73 + ty * 137;
-  const midX = (pTop.x + pBottom.x) / 2;
-  const midY = (pTop.y + pBottom.y) / 2;
-  const hw = (pRight.x - pLeft.x) / 2;
-  const hh = (pBottom.y - pTop.y) / 2;
-  for (let i = 0; i < 3; i++) {
-    const phase = (time * 1.5 + seed + i * 47.3) % 4.0;
-    if (phase > 0.3) continue;
-    const brightness = 1.0 - (phase / 0.3);
-    const px = midX + Math.sin(seed + i * 3.1) * hw * 0.6;
-    const py = midY + Math.cos(seed + i * 7.7) * hh * 0.5;
-    ctx.fillStyle = `rgba(255, 255, 255, ${(brightness * 0.8).toFixed(2)})`;
-    ctx.fillRect(Math.floor(px), Math.floor(py), 1, 1);
+// ── Pre-rendered Land Tile Frames ──────────────────────────────────
+// Cache indexed: shapeKey * 18 + (colorIdx - 1) * 2 + swampFlag
+// shapeKey = dt*27 + dr*9 + db*3 + dl (base-3 encoding of normalized corner heights)
+// 19 valid shapes × 8 colors × 2 swamp = 304 canvases
+// ── Settings (persisted to localStorage) ──────────────────────────
+let settingHiRes = localStorage.getItem('settingHiRes') !== 'false';          // default true
+let settingEffects = localStorage.getItem('settingEffects') !== 'false';      // default true
+let settingMusic = localStorage.getItem('settingMusic') !== 'false';          // default true
+let settingLowZoomSimplify = localStorage.getItem('settingLowZoomSimplify') === 'true'; // default false (OFF)
+const LAND_TILE_SCALE_HI = 4;
+const LAND_TILE_SCALE_LO = 2;
+const LOW_ZOOM_THRESHOLD = 0.45;
+
+let landTileCache = null;       // Array of offscreen canvases (or null entries for invalid shapes)
+let landTileCacheTexOpacity = -1; // which textureOpacity was baked in
+let landTileCacheHiRes = null;   // which settingHiRes setting was baked in
+
+// Precompute valid shape keys (adjacency constraint: |diff|≤1 between neighbors)
+const VALID_SHAPE_KEYS = [];
+(function() {
+  for (let dt = 0; dt <= 2; dt++)
+    for (let dr = 0; dr <= 2; dr++)
+      for (let db = 0; db <= 2; db++)
+        for (let dl = 0; dl <= 2; dl++) {
+          if (Math.abs(dt - dr) > 1 || Math.abs(dr - db) > 1 ||
+              Math.abs(db - dl) > 1 || Math.abs(dl - dt) > 1) continue;
+          VALID_SHAPE_KEYS.push(dt * 27 + dr * 9 + db * 3 + dl);
+        }
+})();
+
+// Land tile color fill colors — precomputed flat/slope variants
+const LAND_FILL_COLORS = {};
+(function() {
+  for (let idx = 1; idx <= 8; idx++) {
+    LAND_FILL_COLORS[idx] = {
+      flat: TERRAIN_COLORS[idx],
+      slope: darkenColor(TERRAIN_COLORS[idx], SLOPE_DARKEN),
+    };
+  }
+})();
+
+function buildLandTileFrames() {
+  const cacheSize = 81 * 18; // max shapeKey(80) * 18 + 17 = 1475
+  landTileCache = new Array(cacheSize);
+  landTileCacheTexOpacity = textureOpacity;
+  landTileCacheHiRes = settingHiRes;
+
+  const S = settingHiRes ? LAND_TILE_SCALE_HI : LAND_TILE_SCALE_LO;
+  const thw = TILE_HALF_W * S; // 16 * S
+  const thh = TILE_HALF_H * S; // 8 * S
+  const hs = HEIGHT_STEP * S;  // 8 * S
+
+  for (const shapeKey of VALID_SHAPE_KEYS) {
+    // Decode shape
+    const dl = shapeKey % 3;
+    const db = Math.floor(shapeKey / 3) % 3;
+    const dr = Math.floor(shapeKey / 9) % 3;
+    const dt = Math.floor(shapeKey / 27);
+
+    const maxRel = Math.max(dt, dr, db, dl);
+
+    // Canvas dimensions at scale
+    const cw = thw * 2;
+    const ch = thh * 2 + maxRel * hs;
+
+    // Corner positions in scaled canvas coords
+    const topX = thw;
+    const topY = (maxRel - dt) * hs;
+    const rightX = thw * 2;
+    const rightY = thh + (maxRel - dr) * hs;
+    const bottomX = thw;
+    const bottomY = thh * 2 + (maxRel - db) * hs;
+    const leftX = 0;
+    const leftY = thh + (maxRel - dl) * hs;
+
+    const isFlat = (dt === dr && dr === db && db === dl);
+
+    for (let colorIdx = 1; colorIdx <= 8; colorIdx++) {
+      for (let swampFlag = 0; swampFlag <= 1; swampFlag++) {
+        const idx = shapeKey * 18 + (colorIdx - 1) * 2 + swampFlag;
+
+        const c = document.createElement('canvas');
+        c.width = cw;
+        c.height = ch;
+        const oc = c.getContext('2d');
+
+        // Diamond path
+        oc.beginPath();
+        oc.moveTo(topX, topY);
+        oc.lineTo(rightX, rightY);
+        oc.lineTo(bottomX, bottomY);
+        oc.lineTo(leftX, leftY);
+        oc.closePath();
+
+        // Fill base color
+        const colors = LAND_FILL_COLORS[colorIdx];
+        oc.fillStyle = isFlat ? colors.flat : colors.slope;
+        oc.fill();
+
+        // Texture overlay (same 2-triangle affine mapping as original)
+        if (textureOpacity > 0) {
+          let tex;
+          if (swampFlag) {
+            tex = terrainTextures.swamp;
+          } else if (colorIdx <= 1) {
+            tex = terrainTextures.sand;
+          } else if (colorIdx <= 5) {
+            tex = terrainTextures.grass;
+          } else if (colorIdx <= 7) {
+            tex = terrainTextures.rock;
+          } else {
+            tex = terrainTextures.snow;
+          }
+
+          if (tex) {
+            const iw = tex.width, ih = tex.height;
+
+            // Triangle 1: Top -> Right -> Bottom
+            oc.save();
+            oc.beginPath();
+            oc.moveTo(topX, topY);
+            oc.lineTo(rightX, rightY);
+            oc.lineTo(bottomX, bottomY);
+            oc.closePath();
+            oc.clip();
+            oc.globalAlpha = textureOpacity;
+            oc.setTransform(
+              (rightX - topX) / iw, (rightY - topY) / iw,
+              (bottomX - rightX) / ih, (bottomY - rightY) / ih,
+              topX, topY
+            );
+            oc.drawImage(tex, 0, 0);
+            oc.restore();
+
+            // Triangle 2: Top -> Bottom -> Left
+            oc.save();
+            oc.beginPath();
+            oc.moveTo(topX, topY);
+            oc.lineTo(bottomX, bottomY);
+            oc.lineTo(leftX, leftY);
+            oc.closePath();
+            oc.clip();
+            oc.globalAlpha = textureOpacity;
+            oc.setTransform(
+              (bottomX - leftX) / iw, (bottomY - leftY) / iw,
+              (leftX - topX) / ih, (leftY - topY) / ih,
+              topX, topY
+            );
+            oc.drawImage(tex, 0, 0);
+            oc.restore();
+          }
+        }
+
+        // Swamp color overlay (baked in)
+        if (swampFlag) {
+          oc.beginPath();
+          oc.moveTo(topX, topY);
+          oc.lineTo(rightX, rightY);
+          oc.lineTo(bottomX, bottomY);
+          oc.lineTo(leftX, leftY);
+          oc.closePath();
+          oc.fillStyle = 'rgba(80, 100, 30, 0.5)';
+          oc.fill();
+        }
+
+        // Grid NOT baked — drawn at screen resolution in drawTile for crispness
+        landTileCache[idx] = c;
+      }
+    }
   }
 }
 
@@ -260,7 +500,7 @@ function playNextTrack() {
 }
 
 function startMusic() {
-  if (musicStarted) return;
+  if (musicStarted || !settingMusic) return;
   musicStarted = true;
   shuffleTracks();
   playNextTrack();
@@ -474,13 +714,18 @@ let homePos = null;
 
 // Power system state
 let swamps = [];
-let swampSet = new Set();
-let rocks = new Set();
-let trees = new Set();
-let pebbles = new Set();
+// Typed arrays for O(1) tile lookups (indexed by ty * localMapW + tx)
+let swampTiles = new Uint8Array(localMapW * localMapH);
+let rockTiles = new Uint8Array(localMapW * localMapH);
+let treeTiles = new Uint8Array(localMapW * localMapH);
+let pebbleTiles = new Uint8Array(localMapW * localMapH);
+let ruinTiles = new Uint8Array(localMapW * localMapH); // stores team + 1 (0 = no ruin)
+let cropTeamTiles = new Uint8Array(localMapW * localMapH); // stores team + 1 (0 = no crop)
+let fallenTiles = new Uint8Array(localMapW * localMapH);
+// Flat coordinate arrays for minimap iteration
+let treeCoords = [];   // [x1,y1,x2,y2,...]
+let pebbleCoords = []; // [x1,y1,x2,y2,...]
 let ruins = []; // {x, y, team}
-let ruinSet = new Set();
-let cropSets = []; // array of Sets, one per team
 let seaLevel = SEA_LEVEL;
 let leaders = [];
 let armageddon = false;
@@ -493,17 +738,30 @@ let inspectMode = false;
 let inspectData = null; // {type:'settlement'|'walker', screenX, screenY, ...data}
 let magnetMode = false;
 
+// Reallocate typed arrays when map dimensions change
+function reinitTypedArrays() {
+  const sz = localMapW * localMapH;
+  swampTiles = new Uint8Array(sz);
+  rockTiles = new Uint8Array(sz);
+  treeTiles = new Uint8Array(sz);
+  pebbleTiles = new Uint8Array(sz);
+  ruinTiles = new Uint8Array(sz);
+  cropTeamTiles = new Uint8Array(sz);
+  fallenTiles = new Uint8Array(sz);
+  treeCoords = [];
+  pebbleCoords = [];
+  landTileCache = null; // invalidate on map dimension change
+}
+
 // Initialize dynamic arrays
 function initTeamArrays(n) {
   leaders = [];
   magnetLocked = [];
   teamPop = [];
-  cropSets = [];
   for (let i = 0; i < n; i++) {
     leaders.push(-1);
     magnetLocked.push(false);
     teamPop.push(0);
-    cropSets.push(new Set());
   }
 }
 initTeamArrays(2);
@@ -604,19 +862,37 @@ const ctx = canvas.getContext('2d');
 let camX = 0, camY = 0;
 let zoom = 2;
 
+// Hoisted origin — recomputed once per frame at top of render()
+let _originX = 0;
+let _originY = 0;
+
+// Viewport — usable area excluding sidebar. Recomputed per frame.
+const SIDEBAR_WIDTH = 160;
+let _vpLeft = 0;   // left edge of usable viewport (sidebar width when visible)
+let _vpW = 0;      // usable viewport width
+let _vpCX = 0;     // viewport center X
+let _vpCY = 0;     // viewport center Y
+
+function updateViewport() {
+  const sb = document.getElementById('sidebar');
+  _vpLeft = (sb && sb.classList.contains('visible')) ? SIDEBAR_WIDTH : 0;
+  _vpW = canvas.width - _vpLeft;
+  _vpCX = _vpLeft + _vpW / 2;
+  _vpCY = canvas.height / 2;
+}
+
 function getOrigin() {
   return {
-    x: Math.floor(canvas.width / 2) + camX,
+    x: Math.floor(_vpCX) + camX,
     y: 80 + camY,
   };
 }
 
 // Clamp camera so viewport edges never scroll past the map edges.
 function clampCamera() {
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const hvw = cx / zoom; // half viewport width in world space
-  const hvh = cy / zoom; // half viewport height in world space
+  updateViewport();
+  const hvw = (_vpW / 2) / zoom;  // half viewport width in world space
+  const hvh = _vpCY / zoom;       // half viewport height in world space
 
   const pad = 48; // pixels of slack around the map
   const mapL = -localMapH * TILE_HALF_W - pad;
@@ -626,8 +902,8 @@ function clampCamera() {
 
   const minCamX = hvw - mapR;
   const maxCamX = -mapL - hvw;
-  const minCamY = cy + hvh - 80 - mapB;
-  const maxCamY = cy - hvh - 80 - mapT;
+  const minCamY = _vpCY + hvh - 80 - mapB;
+  const maxCamY = _vpCY - hvh - 80 - mapT;
 
   if (minCamX <= maxCamX) {
     camX = Math.max(minCamX, Math.min(maxCamX, camX));
@@ -704,10 +980,146 @@ function drawTile(tx, ty) {
 
   const isWater = (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel);
 
-  const pTop    = project(tx,     ty,     isWater ? 0 : t);
-  const pRight  = project(tx + 1, ty,     isWater ? 0 : r);
-  const pBottom = project(tx + 1, ty + 1, isWater ? 0 : b);
-  const pLeft   = project(tx,     ty + 1, isWater ? 0 : l);
+  // Fast path: blit pre-rendered water frame
+  if (isWater && waterFrames) {
+    const pTopX = _originX + (tx - ty) * TILE_HALF_W;
+    const pTopY = _originY + (tx + ty) * TILE_HALF_H;
+    const fi = (waterFrameCounter + tx + ty) % WATER_FRAME_COUNT;
+    const wf = waterFrames[fi];
+    ctx.drawImage(wf, 0, 0, wf.width, wf.height,
+      pTopX - TILE_HALF_W, pTopY, TILE_HALF_W * 2, TILE_HALF_H * 2);
+    if (GRID_MODES[gridMode]) {
+      ctx.strokeStyle = GRID_MODES[gridMode];
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pTopX, pTopY);
+      ctx.lineTo(pTopX + TILE_HALF_W, pTopY + TILE_HALF_H);
+      ctx.lineTo(pTopX, pTopY + 2 * TILE_HALF_H);
+      ctx.lineTo(pTopX - TILE_HALF_W, pTopY + TILE_HALF_H);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    return;
+  }
+
+  const tileIdx = ty * localMapW + tx;
+
+  // ── LOW ZOOM SIMPLIFY: color-fill only when enabled and zoomed out ──
+  if (settingLowZoomSimplify && zoom < LOW_ZOOM_THRESHOLD) {
+    const pTopX = _originX + (tx - ty) * TILE_HALF_W;
+    const pTopY = _originY + (tx + ty) * TILE_HALF_H - t * HEIGHT_STEP;
+    const pRightX = pTopX + TILE_HALF_W;
+    const pRightY = pTopY + TILE_HALF_H - (r - t) * HEIGHT_STEP;
+    const pBottomX = pTopX;
+    const pBottomY = pTopY + 2 * TILE_HALF_H - (b - t) * HEIGHT_STEP;
+    const pLeftX = pTopX - TILE_HALF_W;
+    const pLeftY = pTopY + TILE_HALF_H - (l - t) * HEIGHT_STEP;
+
+    ctx.beginPath();
+    ctx.moveTo(pTopX, pTopY);
+    ctx.lineTo(pRightX, pRightY);
+    ctx.lineTo(pBottomX, pBottomY);
+    ctx.lineTo(pLeftX, pLeftY);
+    ctx.closePath();
+
+    const avg = (t + r + b + l) / 4;
+    const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+    const isFlat = (t === r && r === b && b === l);
+    const colors = LAND_FILL_COLORS[colorIdx];
+    ctx.fillStyle = isFlat ? colors.flat : colors.slope;
+    ctx.fill();
+
+    if (GRID_MODES[gridMode]) {
+      ctx.strokeStyle = GRID_MODES[gridMode];
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    const cropTeam = cropTeamTiles[tileIdx];
+    if (cropTeam) {
+      ctx.fillStyle = CROP_OVERLAY_COLORS[cropTeam - 1] || CROP_OVERLAY_COLORS[0];
+      ctx.fill();
+    }
+    if (swampTiles[tileIdx]) {
+      ctx.fillStyle = 'rgba(80, 100, 30, 0.5)';
+      ctx.fill();
+    }
+    return;
+  }
+
+  // ── Pre-rendered blit path ──
+  if (landTileCache) {
+    const minH = Math.min(t, r, b, l);
+    const dt = t - minH, dr = r - minH, db = b - minH, dl = l - minH;
+    const shapeKey = dt * 27 + dr * 9 + db * 3 + dl;
+    const avg = (t + r + b + l) / 4;
+    const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+    const swampFlag = swampTiles[tileIdx] ? 1 : 0;
+    const cacheIdx = shapeKey * 18 + (colorIdx - 1) * 2 + swampFlag;
+    const frame = landTileCache[cacheIdx];
+
+    if (frame) {
+      // Inline project pTop only
+      const pTopX = _originX + (tx - ty) * TILE_HALF_W;
+      const pTopY = _originY + (tx + ty) * TILE_HALF_H - t * HEIGHT_STEP;
+      const maxRel = Math.max(dt, dr, db, dl);
+      const blitX = pTopX - TILE_HALF_W;
+      const blitY = pTopY - (maxRel - dt) * HEIGHT_STEP;
+      // Blit scaled frame into world-space dimensions
+      const dstW = TILE_HALF_W * 2;
+      const dstH = TILE_HALF_H * 2 + maxRel * HEIGHT_STEP;
+      ctx.drawImage(frame, 0, 0, frame.width, frame.height, blitX, blitY, dstW, dstH);
+
+      // Grid at screen resolution (crisp at any zoom)
+      if (GRID_MODES[gridMode]) {
+        ctx.beginPath();
+        ctx.moveTo(pTopX, pTopY);
+        ctx.lineTo(pTopX + TILE_HALF_W, pTopY + TILE_HALF_H - (dr - dt) * HEIGHT_STEP);
+        ctx.lineTo(pTopX, pTopY + 2 * TILE_HALF_H - (db - dt) * HEIGHT_STEP);
+        ctx.lineTo(pTopX - TILE_HALF_W, pTopY + TILE_HALF_H - (dl - dt) * HEIGHT_STEP);
+        ctx.closePath();
+        ctx.strokeStyle = GRID_MODES[gridMode];
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Overlay-only path: only compute 4 corners if needed
+      const cropTeam = cropTeamTiles[tileIdx];
+      const needOverlay = cropTeam || rockTiles[tileIdx] || treeTiles[tileIdx] ||
+                          pebbleTiles[tileIdx] || ruinTiles[tileIdx];
+      if (!needOverlay) return;
+
+      // Compute 4 corners for overlays
+      const pRightX = _originX + (tx + 1 - ty) * TILE_HALF_W;
+      const pRightY = _originY + (tx + 1 + ty) * TILE_HALF_H - r * HEIGHT_STEP;
+      const pBottomX = _originX + (tx + 1 - ty - 1) * TILE_HALF_W;
+      const pBottomY = _originY + (tx + 1 + ty + 1) * TILE_HALF_H - b * HEIGHT_STEP;
+      const pLeftX = _originX + (tx - ty - 1) * TILE_HALF_W;
+      const pLeftY = _originY + (tx + ty + 1) * TILE_HALF_H - l * HEIGHT_STEP;
+
+      // Crop overlay
+      if (cropTeam) {
+        ctx.beginPath();
+        ctx.moveTo(pTopX, pTopY);
+        ctx.lineTo(pRightX, pRightY);
+        ctx.lineTo(pBottomX, pBottomY);
+        ctx.lineTo(pLeftX, pLeftY);
+        ctx.closePath();
+        ctx.fillStyle = CROP_OVERLAY_COLORS[cropTeam - 1] || CROP_OVERLAY_COLORS[0];
+        ctx.fill();
+      }
+
+      // Sprite overlays
+      drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY);
+      return;
+    }
+  }
+
+  // ── FALLBACK: original full rendering (before textures load) ──
+  const pTop    = project(tx,     ty,     t);
+  const pRight  = project(tx + 1, ty,     r);
+  const pBottom = project(tx + 1, ty + 1, b);
+  const pLeft   = project(tx,     ty + 1, l);
 
   ctx.beginPath();
   ctx.moveTo(pTop.x, pTop.y);
@@ -775,25 +1187,15 @@ function drawTile(tx, ty) {
     ctx.closePath();
   }
 
-  // Water animation: pulse + sparkles (per-tile)
-  if (isWater) {
-    const time = performance.now() / 1000;
-    drawWaterPulse(time);
-    drawWaterSparkles(pTop, pRight, pBottom, pLeft, time, tx, ty);
-  }
-
-  // Crop overlay — loop through all team crop sets
-  const tileKey = tx + ',' + ty;
-  for (let ci = 0; ci < cropSets.length; ci++) {
-    if (cropSets[ci].has(tileKey)) {
-      ctx.fillStyle = CROP_OVERLAY_COLORS[ci] || CROP_OVERLAY_COLORS[0];
-      ctx.fill();
-      break;
-    }
+  // Crop overlay — single typed array lookup
+  const cropTeam = cropTeamTiles[tileIdx];
+  if (cropTeam) {
+    ctx.fillStyle = CROP_OVERLAY_COLORS[cropTeam - 1] || CROP_OVERLAY_COLORS[0];
+    ctx.fill();
   }
 
   // Swamp overlay
-  if (swampSet.has(tileKey)) {
+  if (swampTiles[tileIdx]) {
     ctx.fillStyle = 'rgba(80, 100, 30, 0.5)';
     ctx.fill();
   }
@@ -804,11 +1206,16 @@ function drawTile(tx, ty) {
     ctx.stroke();
   }
 
+  drawTileSprites(tileIdx, pTop.x, pTop.y, pRight.x, pRight.y, pBottom.x, pBottom.y, pLeft.x, pLeft.y);
+}
+
+// Extracted sprite overlays (boulders, trees, pebbles, ruins)
+function drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY) {
   // Boulder sprite on rock tiles
-  if (rocks.has(tileKey) && boulderLoaded) {
-    const midX = (pTop.x + pBottom.x) / 2;
-    const midY = (pTop.y + pBottom.y) / 2;
-    const tileW = (pRight.x - pLeft.x);
+  if (rockTiles[tileIdx] && boulderLoaded) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
     const scale = tileW * 0.7 / boulderImg.width;
     const sw = boulderImg.width * scale;
     const sh = boulderImg.height * scale;
@@ -816,10 +1223,10 @@ function drawTile(tx, ty) {
   }
 
   // Tree sprite on tree tiles
-  if (trees.has(tileKey) && treeLoaded) {
-    const midX = (pTop.x + pBottom.x) / 2;
-    const midY = (pTop.y + pBottom.y) / 2;
-    const tileW = (pRight.x - pLeft.x);
+  if (treeTiles[tileIdx] && treeLoaded) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
     const scale = tileW * 0.7 / treeImg.width;
     const sw = treeImg.width * scale;
     const sh = treeImg.height * scale;
@@ -827,17 +1234,16 @@ function drawTile(tx, ty) {
   }
 
   // Pebble sprite on pebble tiles
-  if (pebbles.has(tileKey)) {
-    const midX = (pTop.x + pBottom.x) / 2;
-    const midY = (pTop.y + pBottom.y) / 2;
-    const tileW = (pRight.x - pLeft.x);
+  if (pebbleTiles[tileIdx]) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
     if (pebblesLoaded) {
       const scale = tileW * 0.5 / pebblesImg.width;
       const sw = pebblesImg.width * scale;
       const sh = pebblesImg.height * scale;
       ctx.drawImage(pebblesImg, midX - sw / 2, midY - sh * 0.5, sw, sh);
     } else {
-      // Fallback: small grey-brown dots
       ctx.fillStyle = '#8a7a6a';
       for (let i = 0; i < 4; i++) {
         const ox = (i % 2 - 0.5) * tileW * 0.2;
@@ -850,28 +1256,24 @@ function drawTile(tx, ty) {
   }
 
   // Ruins sprite on ruin tiles
-  if (ruinSet.has(tileKey)) {
-    const midX = (pTop.x + pBottom.x) / 2;
-    const midY = (pTop.y + pBottom.y) / 2;
-    const tileW = (pRight.x - pLeft.x);
-    // Find the ruin's team for tinting
-    const ruin = ruins.find(r => r.x === tx && r.y === ty);
+  const ruinTeam = ruinTiles[tileIdx];
+  if (ruinTeam) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
+    const ruinTeamIdx = ruinTeam - 1;
     if (ruinsLoaded) {
       const scale = tileW * 0.6 / ruinsImg.width;
       const sw = ruinsImg.width * scale;
       const sh = ruinsImg.height * scale;
       ctx.drawImage(ruinsImg, midX - sw / 2, midY - sh * 0.6, sw, sh);
-      // Team-color tint overlay
-      if (ruin) {
-        ctx.save();
-        ctx.globalAlpha = 0.2;
-        ctx.fillStyle = TEAM_COLORS[ruin.team];
-        ctx.fillRect(midX - sw / 2, midY - sh * 0.6, sw, sh);
-        ctx.restore();
-      }
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = TEAM_COLORS[ruinTeamIdx];
+      ctx.fillRect(midX - sw / 2, midY - sh * 0.6, sw, sh);
+      ctx.restore();
     } else {
-      // Fallback: brown rubble marks (deterministic positions)
-      ctx.fillStyle = ruin ? (ruin.team === TEAM_BLUE ? '#4a5a6a' : '#6a4a4a') : '#4a3a2a';
+      ctx.fillStyle = ruinTeamIdx === TEAM_BLUE ? '#4a5a6a' : '#6a4a4a';
       const offsets = [[-0.15, -0.06], [0.1, 0.04], [-0.05, 0.08], [0.12, -0.04], [0.0, 0.0]];
       for (const [fx, fy] of offsets) {
         ctx.fillRect(midX + fx * tileW - 1, midY + fy * tileW - 1, 3, 2);
@@ -1239,15 +1641,14 @@ let supernovaStars = [];
 const fallingTiles = [];
 const FALLING_TILE_MAX = 80;
 let fallingTileTimer = 0;
-// Track which tiles have already fallen so we don't repeat
-const fallenTileSet = new Set();
+// Track which tiles have already fallen so we don't repeat (uses fallenTiles Uint8Array declared above)
 // Frontier: tiles eligible to fall next (adjacent to already-fallen or on edge)
 let fallingFrontier = [];
 
 function onArmageddonStart() {
   armageddonStartTime = performance.now() / 1000;
   fallingTiles.length = 0;
-  fallenTileSet.clear();
+  fallenTiles.fill(0);
   fallingTileTimer = 0;
   fallingFrontier = [];
   // Seed frontier with all map edge tiles
@@ -1330,7 +1731,7 @@ function updateArmageddonEffects(dt) {
       // Remove already-fallen entries from frontier
       while (fallingFrontier.length > 0) {
         const last = fallingFrontier[fallingFrontier.length - 1];
-        if (fallenTileSet.has(last[0] + ',' + last[1])) fallingFrontier.pop();
+        if (fallenTiles[last[1] * localMapW + last[0]]) fallingFrontier.pop();
         else break;
       }
       if (fallingFrontier.length === 0) break;
@@ -1341,13 +1742,14 @@ function updateArmageddonEffects(dt) {
       fallingFrontier[idx] = fallingFrontier[fallingFrontier.length - 1];
       fallingFrontier.pop();
 
-      if (fallenTileSet.has(tx + ',' + ty)) continue;
-      fallenTileSet.add(tx + ',' + ty);
+      const fallenIdx = ty * localMapW + tx;
+      if (fallenTiles[fallenIdx]) continue;
+      fallenTiles[fallenIdx] = 1;
 
       // Add neighbors to frontier
       for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
         const nx = tx + dx, ny = ty + dy;
-        if (nx >= 0 && nx < localMapW && ny >= 0 && ny < localMapH && !fallenTileSet.has(nx + ',' + ny)) {
+        if (nx >= 0 && nx < localMapW && ny >= 0 && ny < localMapH && !fallenTiles[ny * localMapW + nx]) {
           fallingFrontier.push([nx, ny]);
         }
       }
@@ -1664,9 +2066,8 @@ function drawEdgeMist() {
 }
 
 function drawMistAt(p) {
-  const cx2 = canvas.width / 2, cy2 = canvas.height / 2;
-  const sx = p.x * zoom + cx2 * (1 - zoom);
-  const sy = p.y * zoom + cy2 * (1 - zoom);
+  const sx = p.x * zoom + _vpCX * (1 - zoom);
+  const sy = p.y * zoom + _vpCY * (1 - zoom);
   if (sx < -60 || sx > canvas.width + 60 || sy < -60 || sy > canvas.height + 200) return;
 
   ctx.save();
@@ -1780,39 +2181,136 @@ function centerOnHome() {
   }
   const h = 3; // approximate land height
   camX = -(home.x - home.y) * TILE_HALF_W;
-  camY = canvas.height / 2 - 80 - (home.x + home.y) * TILE_HALF_H + h * HEIGHT_STEP;
+  updateViewport();
+  camY = _vpCY - 80 - (home.x + home.y) * TILE_HALF_H + h * HEIGHT_STEP;
   clampCamera();
 }
 
+// ── Profiling ──────────────────────────────────────────────────────
+let _profiling = false;
+let _profSamples = [];
+let _profSections = ['interpolate', 'space', 'walkerGrid', 'culling', 'terrain', 'entities', 'fire', 'mist', 'targeting', 'magnets', 'waterfall', 'hud', 'minimap', 'overlays'];
+
+function startTiming() {
+  _profiling = true;
+  _profSamples = [];
+  console.log('%c[Profiler] Started — collecting frame samples...', 'color: #0af');
+}
+
+function stopTimingWithResults() {
+  _profiling = false;
+  if (_profSamples.length === 0) { console.log('No samples collected.'); return; }
+  const n = _profSamples.length;
+  const avg = {};
+  const max = {};
+  for (const key of _profSections.concat(['total', 'tileCount', 'waterCount', 'landCount'])) {
+    avg[key] = 0;
+    max[key] = 0;
+  }
+  for (const s of _profSamples) {
+    for (const key in s) {
+      avg[key] = (avg[key] || 0) + s[key];
+      max[key] = Math.max(max[key] || 0, s[key]);
+    }
+  }
+  for (const key in avg) avg[key] /= n;
+
+  console.log(`%c[Profiler] Results over ${n} frames:`, 'color: #0af; font-weight: bold');
+  console.log(`  Total:       avg ${avg.total.toFixed(2)}ms   max ${max.total.toFixed(2)}ms`);
+  console.log('  ─── Breakdown ───');
+  for (const key of _profSections) {
+    if (avg[key] !== undefined) {
+      const pct = (avg[key] / avg.total * 100).toFixed(0);
+      console.log(`  ${key.padEnd(14)} avg ${avg[key].toFixed(2).padStart(7)}ms   max ${max[key].toFixed(2).padStart(7)}ms   ${pct.padStart(3)}%`);
+    }
+  }
+  console.log('  ─── Tile Stats ───');
+  console.log(`  Tiles drawn: avg ${Math.round(avg.tileCount)}  (water: ${Math.round(avg.waterCount)}, land: ${Math.round(avg.landCount)})`);
+  console.log(`  Visible range: ${_endCol_dbg - _startCol_dbg} cols × ${_endRow_dbg - _startRow_dbg} rows`);
+  console.log(`  Zoom: ${zoom.toFixed(3)}`);
+  return { avg, max, n };
+}
+
+// Expose to console
+window.startTiming = startTiming;
+window.stopTimingWithResults = stopTimingWithResults;
+
+let _startCol_dbg = 0, _endCol_dbg = 0, _startRow_dbg = 0, _endRow_dbg = 0;
+
 function render() {
   if (heights.length === 0) return;
+  const _p = _profiling;
+  let _t0, _tStart, _sample;
+  if (_p) { _t0 = _tStart = performance.now(); _sample = {}; }
+
+  // Update viewport dimensions and hoist origin
+  updateViewport();
+  _originX = Math.floor(_vpCX) + camX;
+  _originY = 80 + camY;
+
+  // Rebuild land tile cache if invalidated
+  if (texturesLoaded) {
+    if (landTileCache === null ||
+        landTileCacheTexOpacity !== textureOpacity ||
+        landTileCacheHiRes !== settingHiRes) {
+      buildLandTileFrames();
+    }
+  }
 
   // Get interpolated walkers for smooth rendering
   walkers = getInterpolatedWalkers();
+  if (_p) { const _t = performance.now(); _sample.interpolate = _t - _t0; _t0 = _t; }
 
   // Space background (screen space, before zoom)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawSpaceBackground(performance.now() / 1000);
+  if (settingEffects) {
+    drawSpaceBackground(performance.now() / 1000);
+  } else {
+    ctx.fillStyle = '#05080f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  if (_p) { const _t = performance.now(); _sample.space = _t - _t0; _t0 = _t; }
 
-  // Apply zoom around screen center (with armageddon screen shake)
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
+  // Apply zoom around viewport center (with armageddon screen shake)
   const shx = armageddon ? armageddonShake.x : 0;
   const shy = armageddon ? armageddonShake.y : 0;
-  ctx.setTransform(zoom, 0, 0, zoom, cx * (1 - zoom) + shx, cy * (1 - zoom) + shy);
+  ctx.setTransform(zoom, 0, 0, zoom, _vpCX * (1 - zoom) + shx, _vpCY * (1 - zoom) + shy);
 
   rebuildWalkerGrid();
+  if (_p) { const _t = performance.now(); _sample.walkerGrid = _t - _t0; _t0 = _t; }
 
   // Falling tiles (behind the map, tumbling into the void during armageddon)
   drawFallingTiles();
 
-  // Pass 1: terrain (skip tiles that have fallen off during armageddon)
-  for (let row = 0; row < localMapH; row++) {
-    for (let col = 0; col < localMapW; col++) {
-      if (fallenTileSet.has(col + ',' + row)) continue;
+  // Compute visible tile range from screen corners (viewport culling)
+  const _c0 = screenToGridFlat(0, 0);
+  const _c1 = screenToGridFlat(canvas.width, 0);
+  const _c2 = screenToGridFlat(0, canvas.height);
+  const _c3 = screenToGridFlat(canvas.width, canvas.height);
+  const _margin = MAX_HEIGHT;
+  const _startCol = Math.max(0, Math.floor(Math.min(_c0.gx, _c1.gx, _c2.gx, _c3.gx)) - _margin);
+  const _endCol = Math.min(localMapW, Math.ceil(Math.max(_c0.gx, _c1.gx, _c2.gx, _c3.gx)) + _margin);
+  const _startRow = Math.max(0, Math.floor(Math.min(_c0.gy, _c1.gy, _c2.gy, _c3.gy)) - _margin);
+  const _endRow = Math.min(localMapH, Math.ceil(Math.max(_c0.gy, _c1.gy, _c2.gy, _c3.gy)) + _margin);
+  _startCol_dbg = _startCol; _endCol_dbg = _endCol; _startRow_dbg = _startRow; _endRow_dbg = _endRow;
+  if (_p) { const _t = performance.now(); _sample.culling = _t - _t0; _t0 = _t; }
+
+  // Pass 1: terrain (only visible tiles, skip fallen during armageddon)
+  let _waterCount = 0, _landCount = 0;
+  for (let row = _startRow; row < _endRow; row++) {
+    for (let col = _startCol; col < _endCol; col++) {
+      if (fallenTiles[row * localMapW + col]) continue;
+      if (_p) {
+        const t = heights[col][row], r = heights[col + 1][row];
+        const b = heights[col + 1][row + 1], l = heights[col][row + 1];
+        if (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel) _waterCount++;
+        else _landCount++;
+      }
       drawTile(col, row);
     }
   }
+
+  if (_p) { const _t = performance.now(); _sample.terrain = _t - _t0; _sample.tileCount = _waterCount + _landCount; _sample.waterCount = _waterCount; _sample.landCount = _landCount; _t0 = _t; }
 
   // Pass 2: settlements, walkers, and fires sorted together by depth (x+y)
   const drawList = [];
@@ -1831,12 +2329,15 @@ function render() {
     else if (item.type === 'w') drawWalker(item.obj);
     else drawSingleFire(item.obj);
   }
+  if (_p) { const _t = performance.now(); _sample.entities = _t - _t0; _t0 = _t; }
 
   // Fire particles (on top of everything in world space)
   drawFireParticles();
+  if (_p) { const _t = performance.now(); _sample.fire = _t - _t0; _t0 = _t; }
 
   // Edge mist (world space, tied to tiles)
-  drawEdgeMist();
+  if (settingEffects) drawEdgeMist();
+  if (_p) { const _t = performance.now(); _sample.mist = _t - _t0; _t0 = _t; }
 
   // Targeting overlay
   if (targetingPower) {
@@ -1891,19 +2392,23 @@ function render() {
     }
   }
 
+  if (_p) { const _t = performance.now(); _sample.targeting = _t - _t0; _t0 = _t; }
+
   // Magnet flags — draw for all teams
   for (let t = 0; t < numTeams; t++) {
     drawMagnetFlag(t);
   }
+  if (_p) { const _t = performance.now(); _sample.magnets = _t - _t0; _t0 = _t; }
 
   // Waterfall particles (front edges, falling into the void)
-  drawWaterfallParticles();
+  if (settingEffects) drawWaterfallParticles();
+  if (_p) { const _t = performance.now(); _sample.waterfall = _t - _t0; _t0 = _t; }
 
   // Reset transform for HUD (drawn in screen space)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Armageddon embers (screen space, in front of everything)
-  drawArmageddonEmbers();
+  if (settingEffects) drawArmageddonEmbers();
 
   // Power bar needs responsive updates (targeting feedback)
   updatePowerBar();
@@ -1913,9 +2418,11 @@ function render() {
     updateSidebar._last = _now;
     updateSidebar();
   }
+  if (_p) { const _t = performance.now(); _sample.hud = _t - _t0; _t0 = _t; }
 
   // Minimap (drawn on top of HUD, in screen space)
   drawMinimap();
+  if (_p) { const _t = performance.now(); _sample.minimap = _t - _t0; _t0 = _t; }
 
   // Inspect tooltip
   if (inspectData) drawInspectTooltip();
@@ -2033,6 +2540,8 @@ function render() {
 
     ctx.restore();
   }
+
+  if (_p) { const _t = performance.now(); _sample.overlays = _t - _t0; _sample.total = _t - _tStart; _profSamples.push(_sample); }
 }
 
 // Rounded rect helper
@@ -2082,7 +2591,7 @@ function returnToLobby() {
   gameOverBtns.lobby = null;
   armageddon = false;
   fallingTiles.length = 0;
-  fallenTileSet.clear();
+  fallenTiles.fill(0);
   fallingFrontier = [];
   armageddonEmbers.length = 0;
   supernovaStars = [];
@@ -2101,13 +2610,14 @@ function returnToLobby() {
   localMapW = MAP_W;
   localMapH = MAP_H;
   numTeams = 2;
-  cropSets = [];
   initTeamArrays(2);
   walkerGrid = new Array(localMapW * localMapH);
+  reinitTypedArrays();
 
   // Show lobby, hide game
   document.getElementById('game').style.display = 'none';
   document.getElementById('sidebar').classList.remove('visible');
+  document.getElementById('settings-popup').classList.remove('visible');
   document.getElementById('lobby').style.display = 'flex';
   document.getElementById('lobby-bg').style.display = 'block';
   const lobbyVol = document.getElementById('lobby-vol');
@@ -2127,10 +2637,8 @@ function returnToLobby() {
 // ── Picking ─────────────────────────────────────────────────────────
 function screenToGrid(sx, sy) {
   // Reverse zoom transform to get world-space screen coords
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  sx = (sx - cx * (1 - zoom)) / zoom;
-  sy = (sy - cy * (1 - zoom)) / zoom;
+  sx = (sx - _vpCX * (1 - zoom)) / zoom;
+  sy = (sy - _vpCY * (1 - zoom)) / zoom;
 
   const o = getOrigin();
   const dx = sx - o.x, dy = sy - o.y;
@@ -2219,8 +2727,9 @@ function handleServerMessage(msg) {
       localMapH = startMapH;
       numTeams = startNumTeams;
 
-      // Reinitialize walker grid for new dimensions
+      // Reinitialize walker grid and typed arrays for new dimensions
       walkerGrid = new Array(localMapW * localMapH);
+      reinitTypedArrays();
 
       // Initialize team arrays
       initTeamArrays(numTeams);
@@ -2316,53 +2825,47 @@ function applyStateSnapshot(msg) {
   teamMode = msg.teamMode;
   myMana = msg.mana;
 
-  // Power system state
+  // Power system state — typed arrays for O(1) lookups
   swamps = msg.swamps || [];
-  swampSet = new Set();
-  for (const s of swamps) swampSet.add(s.x + ',' + s.y);
+  swampTiles.fill(0);
+  for (const s of swamps) swampTiles[s.y * localMapW + s.x] = 1;
 
-  rocks = new Set();
+  rockTiles.fill(0);
   if (msg.rocks) {
-    for (let i = 0; i < msg.rocks.length; i += 2) {
-      rocks.add(msg.rocks[i] + ',' + msg.rocks[i + 1]);
-    }
+    for (let i = 0; i < msg.rocks.length; i += 2)
+      rockTiles[msg.rocks[i + 1] * localMapW + msg.rocks[i]] = 1;
   }
 
-  trees = new Set();
+  treeTiles.fill(0);
+  treeCoords = msg.trees || [];
   if (msg.trees) {
-    for (let i = 0; i < msg.trees.length; i += 2) {
-      trees.add(msg.trees[i] + ',' + msg.trees[i + 1]);
-    }
+    for (let i = 0; i < msg.trees.length; i += 2)
+      treeTiles[msg.trees[i + 1] * localMapW + msg.trees[i]] = 1;
   }
 
-  pebbles = new Set();
+  pebbleTiles.fill(0);
+  pebbleCoords = msg.pebbles || [];
   if (msg.pebbles) {
-    for (let i = 0; i < msg.pebbles.length; i += 2) {
-      pebbles.add(msg.pebbles[i] + ',' + msg.pebbles[i + 1]);
-    }
+    for (let i = 0; i < msg.pebbles.length; i += 2)
+      pebbleTiles[msg.pebbles[i + 1] * localMapW + msg.pebbles[i]] = 1;
   }
 
   ruins = [];
-  ruinSet = new Set();
+  ruinTiles.fill(0);
   if (msg.ruins) {
     for (let i = 0; i < msg.ruins.length; i += 3) {
       ruins.push({ x: msg.ruins[i], y: msg.ruins[i + 1], team: msg.ruins[i + 2] });
-      ruinSet.add(msg.ruins[i] + ',' + msg.ruins[i + 1]);
+      ruinTiles[msg.ruins[i + 1] * localMapW + msg.ruins[i]] = msg.ruins[i + 2] + 1;
     }
   }
 
-  // Crops — build per-team crop sets
-  cropSets = [];
-  for (let i = 0; i < numTeams; i++) {
-    cropSets.push(new Set());
-  }
+  // Crops — single typed array (team + 1)
+  cropTeamTiles.fill(0);
   if (msg.crops) {
     for (let i = 0; i < msg.crops.length; i += 3) {
-      const key = msg.crops[i] + ',' + msg.crops[i + 1];
       const team = msg.crops[i + 2];
-      if (team >= 0 && team < cropSets.length) {
-        cropSets[team].add(key);
-      }
+      if (team >= 0 && team < numTeams)
+        cropTeamTiles[msg.crops[i + 1] * localMapW + msg.crops[i]] = team + 1;
     }
   }
 
@@ -2374,6 +2877,7 @@ function applyStateSnapshot(msg) {
   magnetLocked = msg.magnetLocked || [];
   teamPop = msg.teamPop || [];
   fires = msg.fires || [];
+  minimapDirty = true;
 }
 
 function sendMessage(msg) {
@@ -2485,6 +2989,9 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'g' || e.key === 'G') {
     gridMode = (gridMode + 1) % GRID_MODES.length;
   }
+  if (e.key === 'h' || e.key === 'H') {
+    toggleSetting('hiRes');
+  }
   if (e.key === 'f' || e.key === 'F') {
     magnetMode = !magnetMode;
     if (magnetMode) { inspectMode = false; inspectData = null; targetingPower = null; }
@@ -2537,18 +3044,18 @@ window.addEventListener('mouseup', (e) => { if (e.button === 1) panning = false;
 // Zoom — mouse wheel toward cursor
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  updateViewport();
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  // Min zoom fits entire map diamond in viewport (with padding)
+  // Min zoom fits entire map diamond in usable viewport (excluding sidebar)
   const mapScreenW = localMapW * 2 * TILE_HALF_W;
   const mapScreenH = localMapH * 2 * TILE_HALF_H + MAX_HEIGHT * HEIGHT_STEP;
-  const minZoom = Math.min(canvas.width / mapScreenW, canvas.height / mapScreenH) * 0.9;
+  const minZoom = Math.min(_vpW / mapScreenW, canvas.height / mapScreenH) * 0.9;
   const newZoom = Math.max(minZoom, Math.min(5, zoom * factor));
   const mx = e.clientX, my = e.clientY;
-  const cx = canvas.width / 2, cy = canvas.height / 2;
-  const wx = (mx - cx * (1 - zoom)) / zoom;
-  const wy = (my - cy * (1 - zoom)) / zoom;
-  const sx = wx * newZoom + cx * (1 - newZoom);
-  const sy = wy * newZoom + cy * (1 - newZoom);
+  const wx = (mx - _vpCX * (1 - zoom)) / zoom;
+  const wy = (my - _vpCY * (1 - zoom)) / zoom;
+  const sx = wx * newZoom + _vpCX * (1 - newZoom);
+  const sy = wy * newZoom + _vpCY * (1 - newZoom);
   camX += (mx - sx) / newZoom;
   camY += (my - sy) / newZoom;
   zoom = newZoom;
@@ -2641,6 +3148,77 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   if (!inspectMode) inspectData = null;
 });
 
+// ── Settings Panel ─────────────────────────────────────────────────
+function toggleSetting(key) {
+  switch (key) {
+    case 'hiRes':
+      settingHiRes = !settingHiRes;
+      localStorage.setItem('settingHiRes', String(settingHiRes));
+      landTileCache = null;
+      waterFrames = null;
+      break;
+    case 'effects':
+      settingEffects = !settingEffects;
+      localStorage.setItem('settingEffects', String(settingEffects));
+      break;
+    case 'music':
+      settingMusic = !settingMusic;
+      localStorage.setItem('settingMusic', String(settingMusic));
+      if (!settingMusic) {
+        // Stop playback
+        if (musicAudio) { musicAudio.pause(); musicAudio = null; }
+        musicStarted = false;
+      } else {
+        startMusic();
+      }
+      break;
+    case 'lowZoomSimplify':
+      settingLowZoomSimplify = !settingLowZoomSimplify;
+      localStorage.setItem('settingLowZoomSimplify', String(settingLowZoomSimplify));
+      break;
+  }
+  syncSettingsUI();
+}
+
+function syncSettingsUI() {
+  const btns = document.querySelectorAll('.setting-btn');
+  const vals = {
+    hiRes: settingHiRes,
+    effects: settingEffects,
+    music: settingMusic,
+    lowZoomSimplify: settingLowZoomSimplify,
+  };
+  for (const btn of btns) {
+    const key = btn.dataset.setting;
+    if (key in vals) btn.classList.toggle('on', vals[key]);
+  }
+  // Show/hide volume slider based on music setting
+  const volRow = document.getElementById('music-vol-row');
+  if (volRow) volRow.style.display = settingMusic ? 'flex' : 'none';
+}
+
+// Wire setting buttons
+for (const btn of document.querySelectorAll('.setting-btn')) {
+  btn.addEventListener('click', () => toggleSetting(btn.dataset.setting));
+}
+
+// Gear icon toggles settings popup
+const settingsPopup = document.getElementById('settings-popup');
+document.getElementById('btn-settings-gear').addEventListener('click', (e) => {
+  e.stopPropagation();
+  settingsPopup.classList.toggle('visible');
+});
+// Close popup when clicking outside
+window.addEventListener('mousedown', (e) => {
+  if (settingsPopup.classList.contains('visible') &&
+      !settingsPopup.contains(e.target) &&
+      e.target.id !== 'btn-settings-gear') {
+    settingsPopup.classList.remove('visible');
+  }
+});
+
+syncSettingsUI();
+
 // ── Minimap ─────────────────────────────────────────────────────────
 const MM_SIZE = 200;
 const MM_MARGIN = 10;
@@ -2681,9 +3259,8 @@ function centerCameraOnGrid(gx, gy) {
 
 // Reverse-project screen point to grid coords ignoring height (for viewport outline)
 function screenToGridFlat(sx, sy) {
-  const cx = canvas.width / 2, cy = canvas.height / 2;
-  const wx = (sx - cx * (1 - zoom)) / zoom;
-  const wy = (sy - cy * (1 - zoom)) / zoom;
+  const wx = (sx - _vpCX * (1 - zoom)) / zoom;
+  const wy = (sy - _vpCY * (1 - zoom)) / zoom;
   const o = getOrigin();
   const dx = wx - o.x, dy = wy - o.y;
   return {
@@ -2692,92 +3269,109 @@ function screenToGridFlat(sx, sy) {
   };
 }
 
-function drawMinimap() {
-  const mm = getMinimapRect();
+// Minimap offscreen cache — redrawn only when state changes
+let minimapCanvas = null;
+let minimapCtx = null;
+let minimapDirty = true;
+
+function ensureMinimapCanvas() {
+  if (!minimapCanvas || minimapCanvas.width !== MM_SIZE || minimapCanvas.height !== MM_SIZE) {
+    minimapCanvas = document.createElement('canvas');
+    minimapCanvas.width = MM_SIZE;
+    minimapCanvas.height = MM_SIZE;
+    minimapCtx = minimapCanvas.getContext('2d');
+    minimapDirty = true;
+  }
+}
+
+function redrawMinimapContent() {
+  const mc = minimapCtx;
   const mmScale = getMMScale();
   const cs = Math.ceil(mmScale);
 
+  // Background
+  mc.fillStyle = 'rgba(0, 0, 0, 1)';
+  mc.fillRect(0, 0, MM_SIZE, MM_SIZE);
+
+  // Pass 1: terrain + crops (single pass, skip fallen tiles)
+  for (let ty = 0; ty < localMapH; ty++) {
+    for (let tx = 0; tx < localMapW; tx++) {
+      if (fallenTiles[ty * localMapW + tx]) continue;
+      mc.fillStyle = getTileColor(tx, ty);
+      mc.fillRect(tx * mmScale, ty * mmScale, cs, cs);
+      const ct = cropTeamTiles[ty * localMapW + tx];
+      if (ct) {
+        mc.fillStyle = MINIMAP_CROP_COLORS[ct - 1] || MINIMAP_CROP_COLORS[0];
+        mc.fillRect(tx * mmScale, ty * mmScale, cs, cs);
+      }
+    }
+  }
+
+  // Pass 2b: trees — iterate flat coord array
+  mc.fillStyle = '#2a6a2a';
+  for (let i = 0; i < treeCoords.length; i += 2) {
+    mc.fillRect(treeCoords[i] * mmScale, treeCoords[i + 1] * mmScale, cs, cs);
+  }
+
+  // Pass 2c: swamps
+  mc.fillStyle = '#3a5a1a';
+  for (const s of swamps) {
+    mc.fillRect(s.x * mmScale, s.y * mmScale, cs, cs);
+  }
+
+  // Pass 2d: pebbles — iterate flat coord array
+  mc.fillStyle = '#8a7a6a';
+  for (let i = 0; i < pebbleCoords.length; i += 2) {
+    mc.fillRect(pebbleCoords[i] * mmScale, pebbleCoords[i + 1] * mmScale, cs, cs);
+  }
+
+  // Pass 2e: ruins
+  mc.fillStyle = '#4a3a2a';
+  for (const r of ruins) {
+    mc.fillRect(r.x * mmScale, r.y * mmScale, cs, cs);
+  }
+
+  // Pass 3: settlements (team-colored squares sized to footprint)
+  for (const s of settlements) {
+    mc.fillStyle = TEAM_COLORS[s.t];
+    const sz = Math.ceil(s.sz * mmScale);
+    mc.fillRect(s.ox * mmScale, s.oy * mmScale, sz, sz);
+  }
+
+  // Pass 4: walkers (single bright pixels)
+  for (const w of walkers) {
+    mc.fillStyle = TEAM_COLORS[w.team];
+    mc.fillRect(Math.floor(w.x * mmScale), Math.floor(w.y * mmScale), 1, 1);
+  }
+
+  // Pass 5: magnet flags (bright white dots) — loop all teams
+  mc.fillStyle = '#fff';
+  for (let t = 0; t < numTeams; t++) {
+    if (t >= magnetPos.length) continue;
+    const mp = magnetPos[t];
+    if (!mp) continue;
+    mc.fillRect(Math.floor(mp.x * mmScale) - 1, Math.floor(mp.y * mmScale) - 1, 3, 3);
+  }
+
+  minimapDirty = false;
+}
+
+function drawMinimap() {
+  ensureMinimapCanvas();
+  if (minimapDirty) redrawMinimapContent();
+
+  const mm = getMinimapRect();
+  const mmScale = getMMScale();
+
+  // Blit cached minimap content
+  ctx.drawImage(minimapCanvas, mm.x, mm.y);
+
+  // Pass 6: viewport bounds (changes every frame with camera)
   ctx.save();
   ctx.beginPath();
   ctx.rect(mm.x, mm.y, MM_SIZE, MM_SIZE);
   ctx.clip();
 
-  // Background
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(mm.x, mm.y, MM_SIZE, MM_SIZE);
-
-  // Pass 1: terrain (skip fallen tiles)
-  for (let ty = 0; ty < localMapH; ty++) {
-    for (let tx = 0; tx < localMapW; tx++) {
-      if (fallenTileSet.has(tx + ',' + ty)) continue;
-      ctx.fillStyle = getTileColor(tx, ty);
-      ctx.fillRect(mm.x + tx * mmScale, mm.y + ty * mmScale, cs, cs);
-    }
-  }
-
-  // Pass 2a: crops — loop through all team crop sets
-  for (let ty = 0; ty < localMapH; ty++) {
-    for (let tx = 0; tx < localMapW; tx++) {
-      const key = tx + ',' + ty;
-      for (let ci = 0; ci < cropSets.length; ci++) {
-        if (cropSets[ci].has(key)) {
-          ctx.fillStyle = MINIMAP_CROP_COLORS[ci] || MINIMAP_CROP_COLORS[0];
-          ctx.fillRect(mm.x + tx * mmScale, mm.y + ty * mmScale, cs, cs);
-          break;
-        }
-      }
-    }
-  }
-
-  // Pass 2b: trees
-  ctx.fillStyle = '#2a6a2a';
-  for (const key of trees) {
-    const [tx, ty] = key.split(',');
-    ctx.fillRect(mm.x + tx * mmScale, mm.y + ty * mmScale, cs, cs);
-  }
-
-  // Pass 2c: swamps
-  ctx.fillStyle = '#3a5a1a';
-  for (const s of swamps) {
-    ctx.fillRect(mm.x + s.x * mmScale, mm.y + s.y * mmScale, cs, cs);
-  }
-
-  // Pass 2d: pebbles
-  ctx.fillStyle = '#8a7a6a';
-  for (const key of pebbles) {
-    const [px, py] = key.split(',');
-    ctx.fillRect(mm.x + px * mmScale, mm.y + py * mmScale, cs, cs);
-  }
-
-  // Pass 2e: ruins
-  ctx.fillStyle = '#4a3a2a';
-  for (const r of ruins) {
-    ctx.fillRect(mm.x + r.x * mmScale, mm.y + r.y * mmScale, cs, cs);
-  }
-
-  // Pass 3: settlements (team-colored squares sized to footprint)
-  for (const s of settlements) {
-    ctx.fillStyle = TEAM_COLORS[s.t];
-    const sz = Math.ceil(s.sz * mmScale);
-    ctx.fillRect(mm.x + s.ox * mmScale, mm.y + s.oy * mmScale, sz, sz);
-  }
-
-  // Pass 4: walkers (single bright pixels)
-  for (const w of walkers) {
-    ctx.fillStyle = TEAM_COLORS[w.team];
-    ctx.fillRect(mm.x + Math.floor(w.x * mmScale), mm.y + Math.floor(w.y * mmScale), 1, 1);
-  }
-
-  // Pass 5: magnet flags (bright white dots) — loop all teams
-  ctx.fillStyle = '#fff';
-  for (let t = 0; t < numTeams; t++) {
-    if (t >= magnetPos.length) continue;
-    const mp = magnetPos[t];
-    if (!mp) continue;
-    ctx.fillRect(mm.x + Math.floor(mp.x * mmScale) - 1, mm.y + Math.floor(mp.y * mmScale) - 1, 3, 3);
-  }
-
-  // Pass 6: viewport bounds
   const corners = [
     screenToGridFlat(0, 0),
     screenToGridFlat(canvas.width, 0),
@@ -2794,7 +3388,6 @@ function drawMinimap() {
   }
   ctx.closePath();
   ctx.stroke();
-
   ctx.restore();
 
   // Border
@@ -2949,14 +3542,13 @@ function updatePerfCounter(dt, renderMs) {
 // ── Game Loop ───────────────────────────────────────────────────────
 let lastFrame = 0;
 
-const SIDEBAR_W = 160;
 function updateEdgePan(dt) {
   if (!gameStarted || panning) return;
   const w = canvas.width, h = canvas.height;
   let dx = 0, dy = 0;
 
-  if (mouseX < SIDEBAR_W) { /* skip left edge pan */ }
-  else if (mouseX < SIDEBAR_W + EDGE_SIZE) dx = 1 - (mouseX - SIDEBAR_W) / EDGE_SIZE;
+  if (mouseX < _vpLeft) { /* skip left edge pan (behind sidebar) */ }
+  else if (mouseX < _vpLeft + EDGE_SIZE) dx = 1 - (mouseX - _vpLeft) / EDGE_SIZE;
   else if (mouseX > w - EDGE_SIZE) dx = -((mouseX - (w - EDGE_SIZE)) / EDGE_SIZE);
 
   if (mouseY < EDGE_SIZE) dy = 1 - mouseY / EDGE_SIZE;
@@ -2975,9 +3567,18 @@ function gameLoop(now) {
   lastFrame = now;
   updateEdgePan(dt);
   updateFireParticles(dt);
-  updateArmageddonEffects(dt);
-  spawnWaterfallParticles(dt);
-  updateWaterfallParticles(dt);
+  if (settingEffects) {
+    updateArmageddonEffects(dt);
+    spawnWaterfallParticles(dt);
+    updateWaterfallParticles(dt);
+  }
+  // Water frame animation
+  if (texturesLoaded && (!waterFrames || waterFramesHiRes !== settingHiRes)) buildWaterFrames();
+  waterFrameTimer += dt;
+  if (waterFrameTimer >= WATER_FRAME_INTERVAL) {
+    waterFrameTimer -= WATER_FRAME_INTERVAL;
+    waterFrameCounter = (waterFrameCounter + 1) % WATER_FRAME_COUNT;
+  }
   const t0 = performance.now();
   render();
   const renderMs = performance.now() - t0;
@@ -2989,5 +3590,6 @@ function gameLoop(now) {
 function resize() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  updateViewport();
 }
 window.addEventListener('resize', resize);
