@@ -48,6 +48,85 @@ server.listen(PORT, () => {
 
 // ── Room Management ─────────────────────────────────────────────────
 const rooms = new Map();
+const lobbyClients = new Set();       // ws connections in lobby (not in a game)
+const playerNames = new WeakMap();    // ws → name string
+
+function sanitizeName(name) {
+  if (!name || typeof name !== 'string') return 'Player';
+  return name.replace(/[<>&"']/g, '').trim().slice(0, 16) || 'Player';
+}
+
+const chatRateMap = new WeakMap(); // ws → array of timestamps
+function chatAllowed(ws) {
+  const now = Date.now();
+  let times = chatRateMap.get(ws);
+  if (!times) { times = []; chatRateMap.set(ws, times); }
+  // Remove entries older than 10s
+  while (times.length && times[0] < now - 10000) times.shift();
+  if (times.length >= 5) return false;
+  times.push(now);
+  return true;
+}
+
+function buildGameList() {
+  const games = [];
+  for (const [code, room] of rooms) {
+    if (!room.isPublic || room.started) continue;
+    let humanCount = 0;
+    for (let i = 0; i < room.maxPlayers; i++) {
+      if (room.players[i] !== null) humanCount++;
+    }
+    games.push({
+      code,
+      name: room.name || '',
+      players: humanCount + room.aiCount,
+      maxPlayers: room.maxPlayers,
+      mapSize: room.mapSize || 'small',
+      creatorName: room.creatorName || 'Player',
+    });
+  }
+  return games;
+}
+
+function broadcastGameList() {
+  const msg = JSON.stringify({ type: 'game_list', games: buildGameList() });
+  for (const c of lobbyClients) {
+    if (c.readyState === 1) c.send(msg);
+  }
+}
+
+function broadcastLobbyChat(name, text) {
+  const msg = JSON.stringify({ type: 'lobby_chat', name, text, time: Date.now() });
+  for (const c of lobbyClients) {
+    if (c.readyState === 1) c.send(msg);
+  }
+}
+
+function broadcastWaitingUpdate(room) {
+  let humanCount = 0;
+  const names = [];
+  for (let i = 0; i < room.maxPlayers; i++) {
+    if (room.players[i] !== null) {
+      humanCount++;
+      names.push(playerNames.get(room.players[i]) || 'Player');
+    }
+  }
+  const msg = JSON.stringify({
+    type: 'waiting_update',
+    connectedPlayers: humanCount + room.aiCount,
+    maxPlayers: room.maxPlayers,
+    playerNames: names,
+    aiCount: room.aiCount,
+  });
+  for (let i = 0; i < room.maxPlayers; i++) {
+    if (room.players[i] && room.players[i].readyState === 1) {
+      room.players[i].send(msg);
+    }
+  }
+}
+
+// Periodic game list broadcast every 30s
+setInterval(broadcastGameList, 30000);
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -59,7 +138,8 @@ function generateRoomCode() {
   return code;
 }
 
-function createRoom(maxPlayers, mapSize) {
+function createRoom(maxPlayers, mapSize, opts) {
+  opts = opts || {};
   const code = generateRoomCode();
   maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, maxPlayers || 2));
   const preset = C.MAP_SIZE_PRESETS[mapSize] || C.MAP_SIZE_PRESETS.small;
@@ -76,6 +156,10 @@ function createRoom(maxPlayers, mapSize) {
     ai: false,
     aiCount: 0,
     aiTimer: 0,
+    name: sanitizeName(opts.gameName) || '',
+    isPublic: !!opts.isPublic,
+    creatorName: opts.creatorName || 'Player',
+    chatLog: [],
   };
   rooms.set(code, room);
   return room;
@@ -1399,13 +1483,12 @@ function getTeamStats(state, team) {
 }
 
 // ── State Serialization ─────────────────────────────────────────────
-function serializeState(state, team) {
-  const W = state.mapW, H = state.mapH;
 
-  // Height delta compression
+// Compute heights payload once per tick (shared across all players)
+function computeHeightsPayload(state) {
+  const W = state.mapW, H = state.mapH;
   let heightsPayload;
   if (!state.prevHeights) {
-    // First frame: send full
     const flatHeights = [];
     for (let y = 0; y <= H; y++) {
       for (let x = 0; x <= W; x++) {
@@ -1413,13 +1496,11 @@ function serializeState(state, team) {
       }
     }
     heightsPayload = { full: flatHeights };
-    // Store copy for next delta
     state.prevHeights = [];
     for (let x = 0; x <= W; x++) {
       state.prevHeights[x] = state.heights[x].slice();
     }
   } else {
-    // Delta: only changed points
     const delta = [];
     for (let x = 0; x <= W; x++) {
       for (let y = 0; y <= H; y++) {
@@ -1430,7 +1511,6 @@ function serializeState(state, team) {
       }
     }
     if (delta.length > (W + 1) * (H + 1) * 0.5) {
-      // Too many changes, send full
       const flatHeights = [];
       for (let y = 0; y <= H; y++) {
         for (let x = 0; x <= W; x++) {
@@ -1442,6 +1522,10 @@ function serializeState(state, team) {
       heightsPayload = { delta };
     }
   }
+  return heightsPayload;
+}
+
+function serializeState(state, team, heightsPayload) {
 
   const walkerData = [];
   for (const w of state.walkers) {
@@ -1972,11 +2056,12 @@ function startGame(room) {
       }
     }
 
-    // Send state to each player
+    // Send state to each player (compute heights once, share across all)
+    const heightsPayload = computeHeightsPayload(state);
     for (let i = 0; i < room.maxPlayers; i++) {
       const ws = room.players[i];
       if (ws && ws.readyState === 1) {
-        const msg = serializeState(state, i);
+        const msg = serializeState(state, i, heightsPayload);
         ws.send(JSON.stringify(msg));
       }
     }
@@ -2001,6 +2086,10 @@ wss.on('connection', (ws) => {
   let playerRoom = null;
   let playerTeam = -1;
 
+  // Add to lobby clients and send current game list
+  lobbyClients.add(ws);
+  ws.send(JSON.stringify({ type: 'game_list', games: buildGameList() }));
+
   ws.on('message', (raw) => {
     let msg;
     try {
@@ -2010,13 +2099,116 @@ wss.on('connection', (ws) => {
     }
 
     switch (msg.type) {
+      case 'set_name': {
+        const name = sanitizeName(msg.name);
+        playerNames.set(ws, name);
+        break;
+      }
+
+      case 'request_game_list': {
+        ws.send(JSON.stringify({ type: 'game_list', games: buildGameList() }));
+        break;
+      }
+
+      case 'lobby_chat': {
+        if (!lobbyClients.has(ws)) return;
+        if (!chatAllowed(ws)) return;
+        const text = (msg.text || '').replace(/[<>&"']/g, '').trim().slice(0, 200);
+        if (!text) return;
+        const name = playerNames.get(ws) || 'Player';
+        broadcastLobbyChat(name, text);
+        break;
+      }
+
+      case 'room_chat': {
+        if (!playerRoom || playerRoom.started) return;
+        if (!chatAllowed(ws)) return;
+        const text = (msg.text || '').replace(/[<>&"']/g, '').trim().slice(0, 200);
+        if (!text) return;
+        const name = playerNames.get(ws) || 'Player';
+        const chatEntry = { name, text, time: Date.now() };
+        playerRoom.chatLog.push(chatEntry);
+        if (playerRoom.chatLog.length > 100) playerRoom.chatLog.shift();
+        const chatMsg = JSON.stringify({ type: 'room_chat', name, text, time: chatEntry.time });
+        for (let i = 0; i < playerRoom.maxPlayers; i++) {
+          if (playerRoom.players[i] && playerRoom.players[i].readyState === 1) {
+            playerRoom.players[i].send(chatMsg);
+          }
+        }
+        break;
+      }
+
+      case 'add_ai': {
+        if (!playerRoom || playerRoom.started) return;
+        if (playerTeam !== 0) return; // Only creator
+        let humanCount = 0;
+        for (let i = 0; i < playerRoom.maxPlayers; i++) {
+          if (playerRoom.players[i] !== null) humanCount++;
+        }
+        if (humanCount + playerRoom.aiCount >= playerRoom.maxPlayers) return;
+        playerRoom.ai = true;
+        playerRoom.aiCount++;
+        broadcastWaitingUpdate(playerRoom);
+        if (playerRoom.isPublic) broadcastGameList();
+        break;
+      }
+
+      case 'remove_ai': {
+        if (!playerRoom || playerRoom.started) return;
+        if (playerTeam !== 0) return; // Only creator
+        if (playerRoom.aiCount <= 0) return;
+        playerRoom.aiCount--;
+        if (playerRoom.aiCount === 0) playerRoom.ai = false;
+        broadcastWaitingUpdate(playerRoom);
+        if (playerRoom.isPublic) broadcastGameList();
+        break;
+      }
+
+      case 'start_game': {
+        if (!playerRoom || playerRoom.started) return;
+        if (playerTeam !== 0) return; // Only host can start
+        // Need at least 2 participants (humans + AI)
+        let humanCount = 0;
+        for (let i = 0; i < playerRoom.maxPlayers; i++) {
+          if (playerRoom.players[i] !== null) humanCount++;
+        }
+        if (humanCount + playerRoom.aiCount < 2) return;
+        // Fill remaining slots with AI
+        const slotsNeeded = playerRoom.maxPlayers - humanCount - playerRoom.aiCount;
+        playerRoom.aiCount += slotsNeeded;
+        if (playerRoom.aiCount > 0) playerRoom.ai = true;
+        const spawnZones = computeSpawnZones(playerRoom.mapW, playerRoom.mapH, playerRoom.maxPlayers);
+        for (let i = 0; i < playerRoom.maxPlayers; i++) {
+          if (playerRoom.players[i] && playerRoom.players[i].readyState === 1) {
+            playerRoom.players[i].send(JSON.stringify({
+              type: 'start',
+              team: i,
+              numTeams: playerRoom.maxPlayers,
+              mapW: playerRoom.mapW,
+              mapH: playerRoom.mapH,
+              spawnZones,
+            }));
+          }
+        }
+        startGame(playerRoom);
+        if (playerRoom.isPublic) broadcastGameList();
+        break;
+      }
+
       case 'create': {
         const maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, msg.maxPlayers || 2));
         const mapSize = msg.mapSize || 'small';
-        const room = createRoom(maxPlayers, mapSize);
+        const pName = sanitizeName(msg.playerName);
+        playerNames.set(ws, pName);
+        const room = createRoom(maxPlayers, mapSize, {
+          gameName: msg.gameName,
+          isPublic: msg.isPublic,
+          creatorName: pName,
+        });
         room.players[0] = ws;
         playerRoom = room;
         playerTeam = 0;
+        lobbyClients.delete(ws);
         ws.send(JSON.stringify({
           type: 'created',
           code: room.code,
@@ -2024,20 +2216,26 @@ wss.on('connection', (ws) => {
           maxPlayers: room.maxPlayers,
           mapW: room.mapW,
           mapH: room.mapH,
+          gameName: room.name,
         }));
-        console.log(`Room ${room.code} created (${maxPlayers}p, ${mapSize})`);
+        broadcastWaitingUpdate(room);
+        if (room.isPublic) broadcastGameList();
+        console.log(`Room ${room.code} created (${maxPlayers}p, ${mapSize}, ${room.isPublic ? 'public' : 'private'})`);
         break;
       }
 
       case 'create_ai': {
         const maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, msg.maxPlayers || 2));
         const mapSize = msg.mapSize || 'small';
-        const room = createRoom(maxPlayers, mapSize);
+        const pName = sanitizeName(msg.playerName);
+        playerNames.set(ws, pName);
+        const room = createRoom(maxPlayers, mapSize, { creatorName: pName });
         room.players[0] = ws;
         room.ai = true;
         room.aiCount = maxPlayers - 1;
         playerRoom = room;
         playerTeam = 0;
+        lobbyClients.delete(ws);
         const spawnZones = computeSpawnZones(room.mapW, room.mapH, maxPlayers);
         ws.send(JSON.stringify({
           type: 'start',
@@ -2063,10 +2261,23 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'error', message: 'Game already started' }));
           return;
         }
-        // Find first empty slot
+
+        const pName = sanitizeName(msg.playerName);
+        playerNames.set(ws, pName);
+
+        // If room has AI and a human is joining, displace one AI slot
         let slot = -1;
         for (let i = 0; i < room.maxPlayers; i++) {
           if (room.players[i] === null) { slot = i; break; }
+        }
+        if (slot < 0 && room.aiCount > 0) {
+          // Displace one AI to make room for human
+          room.aiCount--;
+          if (room.aiCount === 0) room.ai = false;
+          // Find first empty slot now (there should be one since we reduced AI)
+          for (let i = 0; i < room.maxPlayers; i++) {
+            if (room.players[i] === null) { slot = i; break; }
+          }
         }
         if (slot < 0) {
           ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
@@ -2075,6 +2286,7 @@ wss.on('connection', (ws) => {
         room.players[slot] = ws;
         playerRoom = room;
         playerTeam = slot;
+        lobbyClients.delete(ws);
         ws.send(JSON.stringify({
           type: 'joined',
           code: room.code,
@@ -2082,43 +2294,15 @@ wss.on('connection', (ws) => {
           maxPlayers: room.maxPlayers,
           mapW: room.mapW,
           mapH: room.mapH,
+          gameName: room.name,
+          chatLog: room.chatLog,
         }));
         console.log(`Player joined room ${room.code} as team ${slot}`);
 
-        // Count connected players
-        let connected = 0;
-        for (let i = 0; i < room.maxPlayers; i++) {
-          if (room.players[i] !== null) connected++;
-        }
+        broadcastWaitingUpdate(room);
+        if (room.isPublic) broadcastGameList();
 
-        // Broadcast waiting update to all connected players
-        for (let i = 0; i < room.maxPlayers; i++) {
-          if (room.players[i] && room.players[i].readyState === 1) {
-            room.players[i].send(JSON.stringify({
-              type: 'waiting_update',
-              connectedPlayers: connected,
-              maxPlayers: room.maxPlayers,
-            }));
-          }
-        }
-
-        // Start when all slots filled
-        if (connected >= room.maxPlayers) {
-          const spawnZones = computeSpawnZones(room.mapW, room.mapH, room.maxPlayers);
-          for (let i = 0; i < room.maxPlayers; i++) {
-            if (room.players[i] && room.players[i].readyState === 1) {
-              room.players[i].send(JSON.stringify({
-                type: 'start',
-                team: i,
-                numTeams: room.maxPlayers,
-                mapW: room.mapW,
-                mapH: room.mapH,
-                spawnZones,
-              }));
-            }
-          }
-          startGame(room);
-        }
+        // Count connected players + AI
         break;
       }
 
@@ -2240,6 +2424,8 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    lobbyClients.delete(ws);
+
     if (!playerRoom) return;
     const room = playerRoom;
 
@@ -2277,23 +2463,16 @@ wss.on('connection', (ws) => {
     } else if (!room.started) {
       // Remove from waiting room
       room.players[playerTeam] = null;
-      // Broadcast update
       let connected = 0;
       for (let i = 0; i < room.maxPlayers; i++) {
         if (room.players[i] !== null) connected++;
       }
       if (connected === 0) {
         cleanupRoom(room.code);
+        broadcastGameList();
       } else {
-        for (let i = 0; i < room.maxPlayers; i++) {
-          if (room.players[i] && room.players[i].readyState === 1) {
-            room.players[i].send(JSON.stringify({
-              type: 'waiting_update',
-              connectedPlayers: connected,
-              maxPlayers: room.maxPlayers,
-            }));
-          }
-        }
+        broadcastWaitingUpdate(room);
+        if (room.isPublic) broadcastGameList();
       }
       return;
     }

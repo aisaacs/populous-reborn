@@ -2622,16 +2622,22 @@ function returnToLobby() {
   document.getElementById('lobby-bg').style.display = 'block';
   const lobbyVol = document.getElementById('lobby-vol');
   if (lobbyVol) lobbyVol.style.display = 'flex';
-  document.getElementById('create-section').style.display = '';
-  document.getElementById('join-section').style.display = '';
+  document.getElementById('create-join-section').style.display = '';
   document.getElementById('waiting-section').style.display = 'none';
   document.getElementById('error-text').textContent = '';
+  document.getElementById('room-chat-messages').innerHTML = '';
+  document.getElementById('lobby-chat-messages').innerHTML = '';
+  document.getElementById('start-game-row').style.display = 'none';
+  isCreator = false;
   canvas.style.cursor = 'crosshair';
 
   // Restart lobby background
   lobbyActive = true;
   resizeLobbyBg();
   requestAnimationFrame(renderLobby);
+
+  // Reconnect fresh for lobby browsing
+  connectToServer();
 }
 
 // ── Picking ─────────────────────────────────────────────────────────
@@ -2668,13 +2674,118 @@ let gameWinner = -1;
 let room_wasAI = false;
 let room_lastMaxPlayers = 2;
 let room_lastMapSize = 'small';
+let isCreator = false;
+let lobbyReconnectTimer = null;
+
+// Player name persistence
+function getPlayerName() {
+  const input = document.getElementById('player-name');
+  let name = (input ? input.value.trim() : '') || 'Player';
+  name = name.replace(/[<>&"']/g, '').slice(0, 16) || 'Player';
+  localStorage.setItem('playerName', name);
+  return name;
+}
+
+function loadPlayerName() {
+  const saved = localStorage.getItem('playerName');
+  const input = document.getElementById('player-name');
+  if (saved && input) input.value = saved;
+}
+
+// Escape HTML for chat
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Append chat message to a container
+function appendChatMessage(containerId, name, text) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  div.innerHTML = '<span class="chat-msg-name">' + escapeHtml(name) + ':</span> <span class="chat-msg-text">' + escapeHtml(text) + '</span>';
+  container.appendChild(div);
+  // Cap at 100 messages
+  while (container.children.length > 100) container.removeChild(container.firstChild);
+  container.scrollTop = container.scrollHeight;
+}
+
+// Render game browser
+function renderGameBrowser(games) {
+  const browser = document.getElementById('game-browser');
+  if (!browser) return;
+  // Update tab badge
+  const browseTab = document.querySelector('.lobby-tab[data-tab="browse"]');
+  if (browseTab) {
+    browseTab.textContent = games && games.length > 0 ? 'Browser (' + games.length + ')' : 'Game Browser';
+  }
+  if (!games || games.length === 0) {
+    browser.innerHTML = '<div class="game-browser-empty">No public games available</div>';
+    return;
+  }
+  browser.innerHTML = '';
+  for (const g of games) {
+    const item = document.createElement('div');
+    item.className = 'game-browser-item';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'gb-name';
+    nameSpan.textContent = g.name || g.creatorName + "'s game";
+    const infoSpan = document.createElement('span');
+    infoSpan.className = 'gb-info';
+    infoSpan.textContent = g.players + '/' + g.maxPlayers + ' · ' + g.mapSize;
+    const joinBtn = document.createElement('button');
+    joinBtn.className = 'gb-join';
+    joinBtn.textContent = 'Join';
+    joinBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendMessage({ type: 'join', code: g.code, playerName: getPlayerName() });
+    });
+    item.appendChild(nameSpan);
+    item.appendChild(infoSpan);
+    item.appendChild(joinBtn);
+    browser.appendChild(item);
+  }
+}
+
+// Render waiting room players
+function renderWaitingPlayers(names, aiCount, maxPlayers) {
+  const list = document.getElementById('waiting-player-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const totalHumans = names ? names.length : 0;
+  for (let i = 0; i < totalHumans; i++) {
+    const tag = document.createElement('span');
+    tag.className = 'waiting-player-tag';
+    tag.textContent = names[i] || 'Player';
+    list.appendChild(tag);
+  }
+  for (let i = 0; i < (aiCount || 0); i++) {
+    const tag = document.createElement('span');
+    tag.className = 'waiting-player-tag ai-tag';
+    tag.textContent = 'AI';
+    list.appendChild(tag);
+  }
+  const emptySlots = maxPlayers - totalHumans - (aiCount || 0);
+  for (let i = 0; i < emptySlots; i++) {
+    const tag = document.createElement('span');
+    tag.className = 'waiting-player-tag empty-tag';
+    tag.textContent = '...';
+    list.appendChild(tag);
+  }
+}
 
 function connectToServer() {
+  if (ws && (ws.readyState === 0 || ws.readyState === 1)) return; // Already connected/connecting
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(protocol + '//' + location.host);
 
   ws.onopen = () => {
     console.log('Connected to server');
+    // Send player name
+    ws.send(JSON.stringify({ type: 'set_name', name: getPlayerName() }));
+    // Flush any pending messages
+    const queued = pendingMessages.splice(0);
+    for (const m of queued) ws.send(JSON.stringify(m));
   };
 
   ws.onmessage = (event) => {
@@ -2684,33 +2795,72 @@ function connectToServer() {
 
   ws.onclose = () => {
     console.log('Disconnected from server');
+    // Auto-reconnect if still in lobby
+    if (!gameStarted) {
+      if (lobbyReconnectTimer) clearTimeout(lobbyReconnectTimer);
+      lobbyReconnectTimer = setTimeout(() => {
+        if (!gameStarted) connectToServer();
+      }, 2000);
+    }
   };
 }
 
+// Connect immediately on page load
+loadPlayerName();
+connectToServer();
+
 function handleServerMessage(msg) {
   switch (msg.type) {
+    case 'game_list':
+      renderGameBrowser(msg.games);
+      break;
+
+    case 'lobby_chat':
+      appendChatMessage('lobby-chat-messages', msg.name, msg.text);
+      break;
+
+    case 'room_chat':
+      appendChatMessage('room-chat-messages', msg.name, msg.text);
+      break;
+
     case 'created':
       myTeam = msg.team;
+      isCreator = true;
       document.getElementById('room-code').textContent = msg.code;
-      document.getElementById('create-section').style.display = 'none';
-      document.getElementById('join-section').style.display = 'none';
+      document.getElementById('create-join-section').style.display = 'none';
       document.getElementById('waiting-section').style.display = 'block';
-      if (msg.maxPlayers && msg.maxPlayers > 2) {
-        document.getElementById('waiting-text').textContent = 'Waiting for players... (1 of ' + msg.maxPlayers + ')';
-      }
+      document.getElementById('waiting-game-name').textContent = msg.gameName || '';
+      document.getElementById('waiting-ai-btns').style.display = 'flex';
+      document.getElementById('start-game-row').style.display = 'block';
+      document.getElementById('btn-start-game').disabled = true;
+      document.getElementById('room-chat-messages').innerHTML = '';
       break;
 
     case 'joined':
       myTeam = msg.team;
-      document.getElementById('create-section').style.display = 'none';
-      document.getElementById('join-section').style.display = 'none';
+      isCreator = false;
+      document.getElementById('create-join-section').style.display = 'none';
       document.getElementById('waiting-section').style.display = 'block';
-      document.getElementById('waiting-text').textContent = 'Joining game...';
+      document.getElementById('waiting-game-name').textContent = msg.gameName || '';
+      document.getElementById('waiting-ai-btns').style.display = 'none';
+      document.getElementById('start-game-row').style.display = 'none';
+      document.getElementById('room-code').textContent = msg.code;
+      // Load chat history
+      document.getElementById('room-chat-messages').innerHTML = '';
+      if (msg.chatLog) {
+        for (const entry of msg.chatLog) {
+          appendChatMessage('room-chat-messages', entry.name, entry.text);
+        }
+      }
       break;
 
     case 'waiting_update':
       document.getElementById('waiting-text').textContent =
         'Waiting for players... (' + msg.connectedPlayers + ' of ' + msg.maxPlayers + ')';
+      renderWaitingPlayers(msg.playerNames, msg.aiCount, msg.maxPlayers);
+      if (isCreator) {
+        document.getElementById('btn-start-game').disabled = msg.connectedPlayers < 2;
+      }
       break;
 
     case 'start': {
@@ -2880,9 +3030,13 @@ function applyStateSnapshot(msg) {
   minimapDirty = true;
 }
 
+let pendingMessages = [];
+
 function sendMessage(msg) {
   if (ws && ws.readyState === 1) {
     ws.send(JSON.stringify(msg));
+  } else {
+    pendingMessages.push(msg);
   }
 }
 
@@ -3076,14 +3230,14 @@ document.getElementById('btn-create').addEventListener('click', () => {
   room_wasAI = false;
   const selPlayers = document.getElementById('sel-players');
   const selMapsize = document.getElementById('sel-mapsize');
+  const selVis = document.getElementById('sel-visibility');
   const maxPlayers = selPlayers ? parseInt(selPlayers.value) || 2 : 2;
   const mapSize = selMapsize ? selMapsize.value : 'small';
+  const isPublic = selVis ? selVis.value === 'public' : true;
+  const gameName = (document.getElementById('game-name').value || '').trim();
   room_lastMaxPlayers = maxPlayers;
   room_lastMapSize = mapSize;
-  connectToServer();
-  ws.onopen = () => {
-    sendMessage({ type: 'create', maxPlayers, mapSize });
-  };
+  sendMessage({ type: 'create', maxPlayers, mapSize, playerName: getPlayerName(), gameName, isPublic });
 });
 
 document.getElementById('btn-ai').addEventListener('click', () => {
@@ -3094,10 +3248,7 @@ document.getElementById('btn-ai').addEventListener('click', () => {
   const mapSize = selMapsize ? selMapsize.value : 'small';
   room_lastMaxPlayers = maxPlayers;
   room_lastMapSize = mapSize;
-  connectToServer();
-  ws.onopen = () => {
-    sendMessage({ type: 'create_ai', maxPlayers, mapSize });
-  };
+  sendMessage({ type: 'create_ai', maxPlayers, mapSize, playerName: getPlayerName() });
 });
 
 document.getElementById('btn-join').addEventListener('click', () => {
@@ -3106,15 +3257,62 @@ document.getElementById('btn-join').addEventListener('click', () => {
     document.getElementById('error-text').textContent = 'Enter a 4-letter room code';
     return;
   }
-  connectToServer();
-  ws.onopen = () => {
-    sendMessage({ type: 'join', code });
-  };
+  sendMessage({ type: 'join', code, playerName: getPlayerName() });
 });
 
 // Allow pressing Enter in the join input
 document.getElementById('join-code').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('btn-join').click();
+});
+
+// Player name change handler
+document.getElementById('player-name').addEventListener('change', () => {
+  const name = getPlayerName();
+  sendMessage({ type: 'set_name', name });
+});
+
+// Lobby tab switching
+document.querySelectorAll('.lobby-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+    document.querySelectorAll('.lobby-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === target));
+    document.querySelectorAll('.lobby-tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + target));
+  });
+});
+
+// Add AI / Remove AI buttons
+document.getElementById('btn-add-ai').addEventListener('click', () => {
+  sendMessage({ type: 'add_ai' });
+});
+document.getElementById('btn-remove-ai').addEventListener('click', () => {
+  sendMessage({ type: 'remove_ai' });
+});
+document.getElementById('btn-start-game').addEventListener('click', () => {
+  sendMessage({ type: 'start_game' });
+});
+
+// Lobby chat handlers
+document.getElementById('lobby-chat-send').addEventListener('click', () => {
+  const input = document.getElementById('lobby-chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  sendMessage({ type: 'lobby_chat', text });
+  input.value = '';
+});
+document.getElementById('lobby-chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('lobby-chat-send').click();
+});
+
+// Room chat handlers
+document.getElementById('room-chat-send').addEventListener('click', () => {
+  const input = document.getElementById('room-chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  sendMessage({ type: 'room_chat', text });
+  input.value = '';
+});
+document.getElementById('room-chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('room-chat-send').click();
 });
 
 // Power bar button click handlers
