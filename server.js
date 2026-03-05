@@ -2469,7 +2469,11 @@ function startGame(room) {
 
     // Send game over
     if (state.gameOver) {
-      const goMsg = JSON.stringify({ type: 'gameover', winner: state.winner });
+      const winnerWs = room.players[state.winner];
+      const winnerName = winnerWs
+        ? (playerNames.get(winnerWs) || C.TEAM_NAMES[state.winner])
+        : C.TEAM_NAMES[state.winner];
+      const goMsg = JSON.stringify({ type: 'gameover', winner: state.winner, winnerName });
       for (let i = 0; i < room.maxPlayers; i++) {
         const ws = room.players[i];
         if (ws && ws.readyState === 1) ws.send(goMsg);
@@ -2591,6 +2595,12 @@ wss.on('connection', (ws) => {
         playerRoom.aiCount += slotsNeeded;
         if (playerRoom.aiCount > 0) playerRoom.ai = true;
         const spawnZones = computeSpawnZones(playerRoom.mapW, playerRoom.mapH, playerRoom.maxPlayers);
+        const names = [];
+        for (let i = 0; i < playerRoom.maxPlayers; i++) {
+          names[i] = playerRoom.players[i]
+            ? (playerNames.get(playerRoom.players[i]) || C.TEAM_NAMES[i])
+            : C.TEAM_NAMES[i];
+        }
         for (let i = 0; i < playerRoom.maxPlayers; i++) {
           if (playerRoom.players[i] && playerRoom.players[i].readyState === 1) {
             playerRoom.players[i].send(JSON.stringify({
@@ -2600,6 +2610,7 @@ wss.on('connection', (ws) => {
               mapW: playerRoom.mapW,
               mapH: playerRoom.mapH,
               spawnZones,
+              playerNames: names,
             }));
           }
         }
@@ -2654,6 +2665,8 @@ wss.on('connection', (ws) => {
         broadcastLobbySystem(pName + ' has left');
         broadcastLobbyCount();
         const spawnZones = computeSpawnZones(room.mapW, room.mapH, maxPlayers);
+        const names = [pName];
+        for (let i = 1; i < maxPlayers; i++) names[i] = C.TEAM_NAMES[i];
         ws.send(JSON.stringify({
           type: 'start',
           team: 0,
@@ -2661,6 +2674,7 @@ wss.on('connection', (ws) => {
           mapW: room.mapW,
           mapH: room.mapH,
           spawnZones,
+          playerNames: names,
         }));
         startGame(room);
         console.log(`Room ${room.code} created (vs ${room.aiCount} AI, ${mapSize})`);

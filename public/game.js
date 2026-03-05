@@ -2361,11 +2361,12 @@ function buildPopBars(n) {
   container.innerHTML = '';
   for (let i = 0; i < n; i++) {
     const color = TEAM_COLORS[i] || '#888';
-    const label = TEAM_NAMES[i] ? TEAM_NAMES[i].charAt(0) : '?';
+    const name = (teamPlayerNames[i] || TEAM_NAMES[i] || '?');
+    const label = name.length > 10 ? name.slice(0, 9) + '\u2026' : name;
     const row = document.createElement('div');
     row.className = 'pop-row';
     row.innerHTML =
-      '<span class="pop-label" style="color:' + color + '">' + label + '</span>' +
+      '<span class="pop-label" style="color:' + color + ';min-width:60px;font-size:10px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + name + '">' + label + '</span>' +
       '<div class="pop-bar-bg"><div class="pop-bar-fill" id="pop-bar-' + i + '" style="width:0;background:' + color + '"></div></div>' +
       '<span class="pop-val" id="pop-val-' + i + '">0</span>';
     container.appendChild(row);
@@ -2419,7 +2420,7 @@ function updateSidebar() {
       if (t === myTeam) continue;
       const oppStats = getTeamStats(t);
       const color = TEAM_COLORS[t] || '#888';
-      const name = TEAM_NAMES[t] || 'Team ' + t;
+      const name = teamPlayerNames[t] || TEAM_NAMES[t] || 'Team ' + t;
       html += '<div class="stat-line" style="color:' + color + '">' + name + ': <span class="stat-val">' + oppStats.set + 's / ' + oppStats.walk + 'w</span></div>';
     }
     oppDiv.innerHTML = html;
@@ -2848,8 +2849,8 @@ function render() {
     ctx.letterSpacing = '4px';
     ctx.fillStyle = 'rgba(200, 210, 230, 0.7)';
     const subText = won
-      ? 'Your people have conquered this world'
-      : `The ${TEAM_NAMES[gameWinner]} god has prevailed`;
+      ? `${teamPlayerNames[myTeam] || 'You'}, the ${TEAM_NAMES[myTeam]} God`
+      : `${gameWinnerName}, the ${TEAM_NAMES[gameWinner]} God has prevailed`;
     ctx.fillText(subText, cx, cy + 10);
 
     const lineW = 160;
@@ -2936,6 +2937,8 @@ function returnToLobby() {
   gameStarted = false;
   gameOver = false;
   gameWinner = -1;
+  gameWinnerName = '';
+  teamPlayerNames = [];
   gameOverHover = null;
   gameOverBtns.again = null;
   gameOverBtns.lobby = null;
@@ -3021,6 +3024,8 @@ let ws = null;
 let gameStarted = false;
 let gameOver = false;
 let gameWinner = -1;
+let gameWinnerName = '';
+let teamPlayerNames = [];
 let room_wasAI = false;
 let room_lastMaxPlayers = 2;
 let room_lastMapSize = 'small';
@@ -3288,6 +3293,9 @@ function handleServerMessage(msg) {
         homePos = { x: localMapW / 2, y: localMapH / 2 };
       }
 
+      // Store player names
+      teamPlayerNames = msg.playerNames || TEAM_NAMES.slice(0, numTeams);
+
       // Build population bars for N teams
       buildPopBars(numTeams);
 
@@ -3315,6 +3323,7 @@ function handleServerMessage(msg) {
     case 'gameover':
       gameOver = true;
       gameWinner = msg.winner;
+      gameWinnerName = msg.winnerName || TEAM_NAMES[msg.winner];
       break;
 
     case 'error':
@@ -4443,7 +4452,7 @@ function drawInspectTooltip() {
     lines.push(d.name.charAt(0).toUpperCase() + d.name.slice(1) + ' (Lv' + d.level + ')');
     lines.push('Pop: ' + d.pop + ' / ' + d.cap);
     lines.push('Tech: ' + d.tech);
-    lines.push('Team: ' + TEAM_NAMES[d.team]);
+    lines.push('Team: ' + (teamPlayerNames[d.team] || TEAM_NAMES[d.team]));
     if (d.hasLeader) lines.push('Leader inside');
   } else {
     let label = 'Walker';
@@ -4451,7 +4460,7 @@ function drawInspectTooltip() {
     else if (d.isLeader) label = 'Leader';
     lines.push(label);
     lines.push('Strength: ' + d.strength);
-    lines.push('Team: ' + TEAM_NAMES[d.team]);
+    lines.push('Team: ' + (teamPlayerNames[d.team] || TEAM_NAMES[d.team]));
   }
 
   ctx.font = '11px monospace';
