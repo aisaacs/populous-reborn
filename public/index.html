@@ -97,7 +97,7 @@
     .lobby-box button:active {
       transform: scale(0.97);
     }
-    .lobby-box input {
+    .lobby-box input[type="text"] {
       background: rgba(5, 5, 20, 0.8);
       color: #b8d8ff;
       border: 1px solid rgba(100, 140, 255, 0.25);
@@ -110,14 +110,47 @@
       letter-spacing: 6px;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .lobby-box input:focus {
+    .lobby-box input[type="text"]:focus {
       outline: none;
       border-color: rgba(100, 140, 255, 0.5);
       box-shadow: 0 0 15px rgba(68, 136, 255, 0.15);
     }
-    .lobby-box input::placeholder {
+    .lobby-box input[type="text"]::placeholder {
       color: rgba(100, 130, 180, 0.35);
       letter-spacing: 3px;
+    }
+    .lobby-box select {
+      background: rgba(5, 5, 20, 0.8);
+      color: #b8d8ff;
+      border: 1px solid rgba(100, 140, 255, 0.25);
+      padding: 8px 12px;
+      font: 600 13px 'Raleway', sans-serif;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      margin: 4px;
+    }
+    .lobby-box select:focus {
+      outline: none;
+      border-color: rgba(100, 140, 255, 0.5);
+    }
+    .lobby-box select option {
+      background: #0a0a1a;
+      color: #b8d8ff;
+    }
+    .lobby-settings {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .lobby-setting-label {
+      font: 300 11px 'Raleway', sans-serif;
+      color: rgba(160, 180, 220, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 2px;
     }
     .divider {
       color: rgba(100, 140, 200, 0.3);
@@ -243,7 +276,7 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-bottom: 5px;
+      margin-bottom: 3px;
     }
     .pop-label {
       font: bold 10px monospace;
@@ -252,7 +285,7 @@
     }
     .pop-bar-bg {
       flex: 1;
-      height: 12px;
+      height: 10px;
       background: #1a1a1a;
       border: 1px solid #333;
       border-radius: 2px;
@@ -423,6 +456,26 @@
       <div class="subtitle">Multiplayer God Game</div>
 
       <div id="create-section">
+        <div class="lobby-settings">
+          <div>
+            <div class="lobby-setting-label">Players</div>
+            <select id="sel-players">
+              <option value="2">2 Players</option>
+              <option value="3">3 Players</option>
+              <option value="4">4 Players</option>
+              <option value="5">5 Players</option>
+              <option value="6">6 Players</option>
+            </select>
+          </div>
+          <div>
+            <div class="lobby-setting-label">Map Size</div>
+            <select id="sel-mapsize">
+              <option value="small">Small (64x64)</option>
+              <option value="medium">Medium (96x96)</option>
+              <option value="large">Large (128x128)</option>
+            </select>
+          </div>
+        </div>
         <button id="btn-create">Create Game</button>
         <button id="btn-ai">Play vs AI</button>
       </div>
@@ -436,7 +489,7 @@
 
       <div id="waiting-section">
         <div class="room-code-display" id="room-code"></div>
-        <div id="waiting-text">Waiting for opponent...</div>
+        <div id="waiting-text">Waiting for players...</div>
       </div>
 
       <div id="error-text"></div>
@@ -453,19 +506,10 @@
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <!-- Population -->
-    <div class="sb-section">
+    <!-- Population (dynamically built) -->
+    <div class="sb-section" id="pop-section">
       <div class="sb-label">Population</div>
-      <div class="pop-row">
-        <span class="pop-label" style="color:#4488ff">B</span>
-        <div class="pop-bar-bg"><div id="pop-bar-blue" class="pop-bar-fill" style="width:0;background:#4488ff"></div></div>
-        <span id="pop-val-blue" class="pop-val">0</span>
-      </div>
-      <div class="pop-row">
-        <span class="pop-label" style="color:#ff4444">R</span>
-        <div class="pop-bar-bg"><div id="pop-bar-red" class="pop-bar-fill" style="width:0;background:#ff4444"></div></div>
-        <span id="pop-val-red" class="pop-val">0</span>
-      </div>
+      <div id="pop-bars"></div>
     </div>
 
     <!-- Mana -->
@@ -512,10 +556,9 @@
       <div class="stat-line">Settlements: <span id="stat-my-set" class="stat-val">0</span></div>
       <div class="stat-line">Walkers: <span id="stat-my-walk" class="stat-val">0</span></div>
     </div>
-    <div class="sb-section">
-      <div class="sb-label">Opponent</div>
-      <div class="stat-line">Settlements: <span id="stat-opp-set" class="stat-val">0</span></div>
-      <div class="stat-line">Walkers: <span id="stat-opp-walk" class="stat-val">0</span></div>
+    <div class="sb-section" id="opp-stats-section">
+      <div class="sb-label">Opponents</div>
+      <div id="opp-stats"></div>
     </div>
 
     <!-- Settings -->

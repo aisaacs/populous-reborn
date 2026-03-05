@@ -10,10 +10,23 @@ const MAX_HEIGHT = 8;
 const SEA_LEVEL = 0;
 
 // ── Teams ───────────────────────────────────────────────────────────
+const MAX_TEAMS = 6;
 const TEAM_BLUE = 0;
 const TEAM_RED = 1;
-const TEAM_COLORS = ['#4488ff', '#ff4444'];
-const TEAM_NAMES = ['Blue', 'Red'];
+const TEAM_GREEN = 2;
+const TEAM_YELLOW = 3;
+const TEAM_PURPLE = 4;
+const TEAM_ORANGE = 5;
+const TEAM_COLORS = ['#4488ff', '#ff4444', '#44cc44', '#cccc22', '#aa44ff', '#ff8800'];
+const TEAM_NAMES = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange'];
+const TEAM_SPRITE_NAMES = ['blue', 'red', 'green', 'yellow', 'purple', 'orange'];
+
+// ── Map Size Presets ────────────────────────────────────────────────
+const MAP_SIZE_PRESETS = {
+  small:  { w: 64,  h: 64 },
+  medium: { w: 96,  h: 96 },
+  large:  { w: 128, h: 128 },
+};
 
 // ── Modes ───────────────────────────────────────────────────────────
 const MODE_SETTLE = 0;
@@ -99,7 +112,8 @@ const TICK_INTERVAL = 50;
 if (typeof module !== 'undefined') {
   module.exports = {
     MAP_W, MAP_H, TILE_HALF_W, TILE_HALF_H, HEIGHT_STEP, MAX_HEIGHT, SEA_LEVEL,
-    TEAM_BLUE, TEAM_RED, TEAM_COLORS, TEAM_NAMES,
+    MAX_TEAMS, TEAM_BLUE, TEAM_RED, TEAM_GREEN, TEAM_YELLOW, TEAM_PURPLE, TEAM_ORANGE,
+    TEAM_COLORS, TEAM_NAMES, TEAM_SPRITE_NAMES, MAP_SIZE_PRESETS,
     MODE_SETTLE, MODE_MAGNET, MODE_FIGHT, MODE_GATHER, MODE_NAMES,
     WALKER_SPEED, MAX_LEVEL, LEVEL_CAPACITY, SETTLEMENT_LEVELS,
     POWERS, EARTHQUAKE_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT, KNIGHT_ATTRITION_PER_SEC,

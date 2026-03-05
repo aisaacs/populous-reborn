@@ -59,9 +59,24 @@ function generateRoomCode() {
   return code;
 }
 
-function createRoom() {
+function createRoom(maxPlayers, mapSize) {
   const code = generateRoomCode();
-  const room = { code, players: [null, null], state: null, tickInterval: null, started: false, ai: false, aiTimer: 0 };
+  maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, maxPlayers || 2));
+  const preset = C.MAP_SIZE_PRESETS[mapSize] || C.MAP_SIZE_PRESETS.small;
+  const room = {
+    code,
+    players: new Array(maxPlayers).fill(null),
+    maxPlayers,
+    mapSize: mapSize || 'small',
+    mapW: preset.w,
+    mapH: preset.h,
+    state: null,
+    tickInterval: null,
+    started: false,
+    ai: false,
+    aiCount: 0,
+    aiTimer: 0,
+  };
   rooms.set(code, room);
   return room;
 }
@@ -73,25 +88,64 @@ function cleanupRoom(code) {
   rooms.delete(code);
 }
 
+// ── Spawn Zone Computation ──────────────────────────────────────────
+function computeSpawnZones(mapW, mapH, numTeams) {
+  const zones = [];
+  const cx = mapW / 2, cy = mapH / 2;
+  const radius = Math.min(mapW, mapH) * 0.35;
+  for (let i = 0; i < numTeams; i++) {
+    const angle = (2 * Math.PI * i / numTeams) - Math.PI / 2;
+    zones.push({
+      cx: Math.round(cx + Math.cos(angle) * radius),
+      cy: Math.round(cy + Math.sin(angle) * radius),
+    });
+  }
+  return zones;
+}
+
 // ── Game State ──────────────────────────────────────────────────────
-function createGameState() {
+function createGameState(mapW, mapH, numTeams) {
+  mapW = mapW || C.MAP_W;
+  mapH = mapH || C.MAP_H;
+  numTeams = numTeams || 2;
+
   const heights = [];
-  for (let x = 0; x <= C.MAP_W; x++) {
+  for (let x = 0; x <= mapW; x++) {
     heights[x] = [];
-    for (let y = 0; y <= C.MAP_H; y++) {
+    for (let y = 0; y <= mapH; y++) {
       heights[x][y] = 0;
     }
   }
 
+  const teamMode = [];
+  const mana = [];
+  const magnetPos = [];
+  const leaders = [];
+  const magnetLocked = [];
+  const eliminated = [];
+  const spawnZones = computeSpawnZones(mapW, mapH, numTeams);
+
+  for (let t = 0; t < numTeams; t++) {
+    teamMode.push(C.MODE_SETTLE);
+    mana.push(C.START_MANA);
+    magnetPos.push({ x: spawnZones[t].cx, y: spawnZones[t].cy });
+    leaders.push(-1);
+    magnetLocked.push(false);
+    eliminated.push(false);
+  }
+
   return {
     heights,
+    mapW,
+    mapH,
+    numTeams,
     walkers: [],
     settlements: [],
-    settlementMap: new Int32Array(C.MAP_W * C.MAP_H).fill(-1),
-    walkerGrid: new Array(C.MAP_W * C.MAP_H),
-    teamMode: [C.MODE_SETTLE, C.MODE_SETTLE],
-    magnetPos: [{ x: 10, y: 10 }, { x: 50, y: 50 }],
-    mana: [C.START_MANA, C.START_MANA],
+    settlementMap: new Int32Array(mapW * mapH).fill(-1),
+    walkerGrid: new Array(mapW * mapH),
+    teamMode,
+    magnetPos,
+    mana,
     swamps: [],
     swampSet: new Set(),
     rocks: new Set(),
@@ -101,25 +155,28 @@ function createGameState() {
     ruinSet: new Set(),
     crops: [],
     cropCounts: [],
-    cropOwnerMap: new Int32Array(C.MAP_W * C.MAP_H).fill(-1),
-    fires: [], // {x, y, age} — burning settlement ruins
+    cropOwnerMap: new Int32Array(mapW * mapH).fill(-1),
+    fires: [],
     seaLevel: C.SEA_LEVEL,
-    leaders: [-1, -1],
-    magnetLocked: [false, false],
+    leaders,
+    magnetLocked,
+    eliminated,
+    spawnZones,
     armageddon: false,
     levelEvalTimer: 0,
     pruneTimer: 0,
     nextWalkerId: 1,
     gameOver: false,
     winner: -1,
+    _tickCount: 0,
+    prevHeights: null, // for delta compression
   };
 }
 
 // ── Terrain Generation ──────────────────────────────────────────────
-const TERRAIN_FLATNESS = 0.3; // 0 = very mountainous, 1 = very flat
-const TERRAIN_ROCKS = 0.03;   // fraction of land tiles that get rocks (0-1)
+const TERRAIN_FLATNESS = 0.3;
+const TERRAIN_ROCKS = 0.03;
 
-// 2D value noise with smoothstep interpolation
 function makeNoise2D() {
   const SIZE = 256;
   const perm = new Uint8Array(SIZE * 2);
@@ -144,13 +201,14 @@ function makeNoise2D() {
 }
 
 function enforceAdjacency(state) {
+  const W = state.mapW, H = state.mapH;
   for (let pass = 0; pass < 30; pass++) {
     let changed = false;
-    for (let x = 0; x <= C.MAP_W; x++) {
-      for (let y = 0; y <= C.MAP_H; y++) {
+    for (let x = 0; x <= W; x++) {
+      for (let y = 0; y <= H; y++) {
         const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
         for (const [nx, ny] of nb) {
-          if (nx < 0 || nx > C.MAP_W || ny < 0 || ny > C.MAP_H) continue;
+          if (nx < 0 || nx > W || ny < 0 || ny > H) continue;
           if (state.heights[x][y] - state.heights[nx][ny] > 1) {
             state.heights[x][y] = state.heights[nx][ny] + 1;
             changed = true;
@@ -162,13 +220,13 @@ function enforceAdjacency(state) {
   }
 }
 
-// Check if a 5x5 flat area exists near a position
 function hasSpawnFlat(state, cx, cy) {
+  const W = state.mapW, H = state.mapH;
   for (let r = 0; r < 15; r++) {
     for (let ox = cx - r; ox <= cx + r; ox++) {
       for (let oy = cy - r; oy <= cy + r; oy++) {
         if (Math.abs(ox - cx) !== r && Math.abs(oy - cy) !== r) continue;
-        if (ox < 0 || ox + 5 > C.MAP_W || oy < 0 || oy + 5 > C.MAP_H) continue;
+        if (ox < 0 || ox + 5 > W || oy < 0 || oy + 5 > H) continue;
         let flat = true;
         const h = state.heights[ox][oy];
         if (h <= state.seaLevel) continue;
@@ -185,28 +243,27 @@ function hasSpawnFlat(state, cx, cy) {
 }
 
 function generateTerrain(state) {
-  const W = C.MAP_W, H = C.MAP_H;
-  const spawns = [{ cx: 10, cy: 10 }, { cx: 50, cy: 50 }];
+  const W = state.mapW, H = state.mapH;
+  const spawns = state.spawnZones;
 
   for (let attempt = 0; attempt < 20; attempt++) {
     const noise = makeNoise2D();
 
-    // Randomize parameters each game
     const freq = 0.03 + Math.random() * 0.05;
     const heightMul = (2.0 - TERRAIN_FLATNESS * 1.5) * (0.85 + Math.random() * 0.3);
-    const numCenters = 2 + Math.floor(Math.random() * 4); // 2–5
+    const numCenters = Math.max(spawns.length, 2 + Math.floor(Math.random() * 4));
     const centers = [];
 
-    // Always include centers near spawn zones so both teams have land
+    // Always include centers near spawn zones
     for (const sp of spawns) {
       centers.push({
         x: sp.cx + (Math.random() - 0.5) * 10,
         y: sp.cy + (Math.random() - 0.5) * 10,
-        r: 0.4 + Math.random() * 0.25, // radius as fraction of map
+        r: 0.4 + Math.random() * 0.25,
       });
     }
 
-    // Additional random centers, biased away from edges
+    // Additional random centers
     for (let i = centers.length; i < numCenters; i++) {
       centers.push({
         x: 8 + Math.random() * (W - 16),
@@ -215,14 +272,11 @@ function generateTerrain(state) {
       });
     }
 
-    // Generate height field
     for (let x = 0; x <= W; x++) {
       for (let y = 0; y <= H; y++) {
-        // 3 octaves of noise
         const nx = x * freq, ny = y * freq;
         let v = noise(nx, ny) * 0.6 + noise(nx * 2.1, ny * 2.1) * 0.25 + noise(nx * 4.3, ny * 4.3) * 0.15;
 
-        // Multi-center island mask — take max influence from all centers
         let mask = 0;
         for (const c of centers) {
           const dx = (x - c.x) / (W * c.r);
@@ -231,7 +285,6 @@ function generateTerrain(state) {
           mask = Math.max(mask, Math.max(0, 1 - d));
         }
 
-        // Edge fade — ensure nothing spawns at map borders
         const ex = Math.min(x, W - x) / 5;
         const ey = Math.min(y, H - y) / 5;
         mask *= Math.min(1, ex, ey);
@@ -243,61 +296,69 @@ function generateTerrain(state) {
 
     enforceAdjacency(state);
 
-    // Scatter natural rocks on ~5-10% of land tiles (avoid spawn zones)
+    // Scatter rocks
     state.rocks.clear();
-    for (let x = 0; x < C.MAP_W; x++) {
-      for (let y = 0; y < C.MAP_H; y++) {
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) {
         if (isTileWater(state, x, y)) continue;
-        // Keep spawn zones clear (radius 8 around each spawn)
-        const d0 = Math.abs(x - 10) + Math.abs(y - 10);
-        const d1 = Math.abs(x - 50) + Math.abs(y - 50);
-        if (d0 < 8 || d1 < 8) continue;
+        let nearSpawn = false;
+        for (const sp of spawns) {
+          if (Math.abs(x - sp.cx) + Math.abs(y - sp.cy) < 8) { nearSpawn = true; break; }
+        }
+        if (nearSpawn) continue;
         if (Math.random() < TERRAIN_ROCKS) state.rocks.add(x + ',' + y);
       }
     }
 
-    // Scatter trees on land tiles (avoid spawn zones)
+    // Scatter trees
     state.trees.clear();
-    for (let x = 0; x < C.MAP_W; x++) {
-      for (let y = 0; y < C.MAP_H; y++) {
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) {
         if (isTileWater(state, x, y)) continue;
         if (state.rocks.has(x + ',' + y)) continue;
-        const d0 = Math.abs(x - 10) + Math.abs(y - 10);
-        const d1 = Math.abs(x - 50) + Math.abs(y - 50);
-        if (d0 < 8 || d1 < 8) continue;
+        let nearSpawn = false;
+        for (const sp of spawns) {
+          if (Math.abs(x - sp.cx) + Math.abs(y - sp.cy) < 8) { nearSpawn = true; break; }
+        }
+        if (nearSpawn) continue;
         if (Math.random() < C.TERRAIN_TREES) state.trees.add(x + ',' + y);
       }
     }
 
-    // Scatter pebbles on land tiles (avoid spawn zones, rocks, trees)
+    // Scatter pebbles
     state.pebbles.clear();
-    for (let x = 0; x < C.MAP_W; x++) {
-      for (let y = 0; y < C.MAP_H; y++) {
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) {
         if (isTileWater(state, x, y)) continue;
         const key = x + ',' + y;
         if (state.rocks.has(key)) continue;
         if (state.trees.has(key)) continue;
-        const d0 = Math.abs(x - 10) + Math.abs(y - 10);
-        const d1 = Math.abs(x - 50) + Math.abs(y - 50);
-        if (d0 < 8 || d1 < 8) continue;
+        let nearSpawn = false;
+        for (const sp of spawns) {
+          if (Math.abs(x - sp.cx) + Math.abs(y - sp.cy) < 8) { nearSpawn = true; break; }
+        }
+        if (nearSpawn) continue;
         if (Math.random() < C.TERRAIN_PEBBLES) state.pebbles.add(key);
       }
     }
 
-    // Validate: both spawn zones must have a 5x5 flat area nearby
-    if (hasSpawnFlat(state, 10, 10) && hasSpawnFlat(state, 50, 50)) return;
+    // Validate: all spawn zones must have a 5x5 flat area nearby
+    let allValid = true;
+    for (const sp of spawns) {
+      if (!hasSpawnFlat(state, sp.cx, sp.cy)) { allValid = false; break; }
+    }
+    if (allValid) return;
 
     // Reset heights for retry
     for (let x = 0; x <= W; x++) {
       for (let y = 0; y <= H; y++) state.heights[x][y] = 0;
     }
   }
-  // Fallback: last attempt is kept even if validation fails
 }
 
 // ── Utility Functions ───────────────────────────────────────────────
 function isTileWater(state, tx, ty) {
-  if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return true;
+  if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) return true;
   return state.heights[tx][ty] <= state.seaLevel &&
          state.heights[tx + 1][ty] <= state.seaLevel &&
          state.heights[tx + 1][ty + 1] <= state.seaLevel &&
@@ -305,7 +366,7 @@ function isTileWater(state, tx, ty) {
 }
 
 function isTileFlat(state, tx, ty) {
-  if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return false;
+  if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) return false;
   const h = state.heights[tx][ty];
   if (h <= state.seaLevel) return false;
   const key = tx + ',' + ty;
@@ -318,10 +379,10 @@ function isTileFlat(state, tx, ty) {
 
 function heightAt(state, fx, fy) {
   const ix = Math.floor(fx), iy = Math.floor(fy);
-  const cx = Math.max(0, Math.min(C.MAP_W, ix));
-  const cy = Math.max(0, Math.min(C.MAP_H, iy));
-  const cx1 = Math.min(C.MAP_W, cx + 1);
-  const cy1 = Math.min(C.MAP_H, cy + 1);
+  const cx = Math.max(0, Math.min(state.mapW, ix));
+  const cy = Math.max(0, Math.min(state.mapH, iy));
+  const cx1 = Math.min(state.mapW, cx + 1);
+  const cy1 = Math.min(state.mapH, cy + 1);
   const fx2 = fx - ix, fy2 = fy - iy;
   const h00 = state.heights[cx][cy], h10 = state.heights[cx1][cy];
   const h01 = state.heights[cx][cy1], h11 = state.heights[cx1][cy1];
@@ -330,29 +391,29 @@ function heightAt(state, fx, fy) {
 }
 
 function getSettlement(state, tx, ty) {
-  if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return null;
-  const idx = state.settlementMap[ty * C.MAP_W + tx];
+  if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) return null;
+  const idx = state.settlementMap[ty * state.mapW + tx];
   if (idx < 0) return null;
   const s = state.settlements[idx];
   return (s && !s.dead) ? s : null;
 }
 
 function setSettlement(state, tx, ty, s) {
-  if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return;
-  state.settlementMap[ty * C.MAP_W + tx] = s ? state.settlements.indexOf(s) : -1;
+  if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) return;
+  state.settlementMap[ty * state.mapW + tx] = s ? state.settlements.indexOf(s) : -1;
 }
 
 function clearSettlementMap(state, tx, ty) {
-  if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return;
-  state.settlementMap[ty * C.MAP_W + tx] = -1;
+  if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) return;
+  state.settlementMap[ty * state.mapW + tx] = -1;
 }
 
 function clearSettlementFootprint(state, s) {
   for (let fx = 0; fx < s.sqSize; fx++) {
     for (let fy = 0; fy < s.sqSize; fy++) {
       const mx = s.sqOx + fx, my = s.sqOy + fy;
-      if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
-        state.settlementMap[my * C.MAP_W + mx] = -1;
+      if (mx >= 0 && mx < state.mapW && my >= 0 && my < state.mapH) {
+        state.settlementMap[my * state.mapW + mx] = -1;
       }
     }
   }
@@ -372,7 +433,6 @@ function isTileInSettlementFootprint(state, tx, ty, exclude) {
   return false;
 }
 
-// Physical footprint size per level: 1 tile for levels 1-8, 3×3 for castle (level 9)
 const LEVEL_SQ_SIZE = [0, 1, 1, 1, 1, 1, 1, 1, 1, 5];
 
 function getLevelFromCropCount(count) {
@@ -388,15 +448,13 @@ function updateSettlementFootprint(s) {
   s.sqOy = s.ty - Math.floor((s.sqSize - 1) / 2);
 }
 
-// Check that the 5×5 area centered on home tile is all flat and unoccupied
 function isCastleAreaValid(state, s) {
   for (let dx = -2; dx <= 2; dx++) {
     for (let dy = -2; dy <= 2; dy++) {
       const cx = s.tx + dx, cy = s.ty + dy;
       if (!isTileFlat(state, cx, cy)) return false;
-      // Check no other settlement's home tile is in this 5×5
       if (dx === 0 && dy === 0) continue;
-      const idx = state.settlementMap[cy * C.MAP_W + cx];
+      const idx = state.settlementMap[cy * state.mapW + cx];
       if (idx >= 0 && idx !== state.settlements.indexOf(s)) return false;
     }
   }
@@ -413,17 +471,16 @@ function raisePoint(state, px, py) {
     const h = state.heights[x][y];
     const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
     for (const [nx, ny] of nb) {
-      if (nx < 0 || nx > C.MAP_W || ny < 0 || ny > C.MAP_H) continue;
+      if (nx < 0 || nx > state.mapW || ny < 0 || ny > state.mapH) continue;
       if (h - state.heights[nx][ny] > 1) {
         state.heights[nx][ny] = h - 1;
         queue.push([nx, ny]);
       }
     }
   }
-  // Remove pebbles and ruins on tiles sharing this point
   for (const [dx, dy] of [[0,0],[-1,0],[0,-1],[-1,-1]]) {
     const tx = px + dx, ty = py + dy;
-    if (tx >= 0 && tx < C.MAP_W && ty >= 0 && ty < C.MAP_H) {
+    if (tx >= 0 && tx < state.mapW && ty >= 0 && ty < state.mapH) {
       const key = tx + ',' + ty;
       state.pebbles.delete(key);
       if (state.ruinSet.has(key)) {
@@ -443,17 +500,16 @@ function lowerPoint(state, px, py) {
     const h = state.heights[x][y];
     const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
     for (const [nx, ny] of nb) {
-      if (nx < 0 || nx > C.MAP_W || ny < 0 || ny > C.MAP_H) continue;
+      if (nx < 0 || nx > state.mapW || ny < 0 || ny > state.mapH) continue;
       if (state.heights[nx][ny] - h > 1) {
         state.heights[nx][ny] = h + 1;
         queue.push([nx, ny]);
       }
     }
   }
-  // Remove pebbles and ruins on tiles sharing this point
   for (const [dx, dy] of [[0,0],[-1,0],[0,-1],[-1,-1]]) {
     const tx = px + dx, ty = py + dy;
-    if (tx >= 0 && tx < C.MAP_W && ty >= 0 && ty < C.MAP_H) {
+    if (tx >= 0 && tx < state.mapW && ty >= 0 && ty < state.mapH) {
       const key = tx + ',' + ty;
       state.pebbles.delete(key);
       if (state.ruinSet.has(key)) {
@@ -468,17 +524,15 @@ function lowerPoint(state, px, py) {
 function invalidateSwamps(state) {
   state.swamps = state.swamps.filter(s => {
     const tx = s.x, ty = s.y;
-    if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) return false;
+    if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) return false;
     if (isTileWater(state, tx, ty)) return false;
     if (!isTileFlat(state, tx, ty)) return false;
     return true;
   });
-  // Rebuild swampSet
   state.swampSet.clear();
   for (const s of state.swamps) state.swampSet.add(s.x + ',' + s.y);
 }
 
-// Remove rocks on tiles that are now underwater
 function invalidateRocks(state) {
   for (const key of state.rocks) {
     const [x, y] = key.split(',').map(Number);
@@ -486,7 +540,6 @@ function invalidateRocks(state) {
   }
 }
 
-// Remove trees on tiles that are now underwater
 function invalidateTrees(state) {
   for (const key of state.trees) {
     const [x, y] = key.split(',').map(Number);
@@ -494,7 +547,6 @@ function invalidateTrees(state) {
   }
 }
 
-// Remove ruins on tiles that are now underwater
 function invalidateRuins(state) {
   state.ruins = state.ruins.filter(r => {
     if (isTileWater(state, r.x, r.y)) return false;
@@ -504,7 +556,6 @@ function invalidateRuins(state) {
   for (const r of state.ruins) state.ruinSet.add(r.x + ',' + r.y);
 }
 
-// Remove pebbles on tiles that are now underwater
 function invalidatePebbles(state) {
   for (const key of state.pebbles) {
     const [x, y] = key.split(',').map(Number);
@@ -512,7 +563,6 @@ function invalidatePebbles(state) {
   }
 }
 
-// Build proximity: can only terraform near own units
 function canBuildAtPoint(state, team, px, py) {
   const r = C.BUILD_PROXIMITY_RADIUS;
   for (const w of state.walkers) {
@@ -526,8 +576,6 @@ function canBuildAtPoint(state, team, px, py) {
   return false;
 }
 
-
-// ── Walker Alive Helper ────────────────────────────────────────────
 function isWalkerAlive(state, id) {
   if (id < 0) return false;
   for (const w of state.walkers) {
@@ -538,7 +586,7 @@ function isWalkerAlive(state, id) {
 
 // ── Armageddon Targeting ───────────────────────────────────────────
 function pickArmageddonTarget(state, w) {
-  const cx = C.MAP_W / 2, cy = C.MAP_H / 2;
+  const cx = state.mapW / 2, cy = state.mapH / 2;
   const dx = cx - w.x, dy = cy - w.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
   if (dist < 5) {
@@ -564,20 +612,15 @@ function spawnWalker(state, team, strength, x, y, tech) {
 }
 
 function spawnInitialWalkers(state) {
-  const spawnZones = [
-    { cx: 10, cy: 10 },
-    { cx: 50, cy: 50 },
-  ];
-
-  for (let team = 0; team < 2; team++) {
-    const zone = spawnZones[team];
+  for (let team = 0; team < state.numTeams; team++) {
+    const zone = state.spawnZones[team];
     let spawned = 0;
     for (let r = 0; r < 20 && spawned < C.START_WALKERS; r++) {
       for (let dx = -r; dx <= r && spawned < C.START_WALKERS; dx++) {
         for (let dy = -r; dy <= r && spawned < C.START_WALKERS; dy++) {
           if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
           const tx = zone.cx + dx, ty = zone.cy + dy;
-          if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
+          if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
           if (!isTileWater(state, tx, ty) && state.heights[tx][ty] > state.seaLevel) {
             spawnWalker(state, team, C.START_STRENGTH, tx + 0.5, ty + 0.5);
             spawned++;
@@ -595,7 +638,7 @@ function pickRandomTarget(state, w) {
   const nx = w.x + Math.cos(angle) * dist;
   const ny = w.y + Math.sin(angle) * dist;
   const tx = Math.floor(nx), ty = Math.floor(ny);
-  if (tx >= 0 && tx < C.MAP_W && ty >= 0 && ty < C.MAP_H && !isTileWater(state, tx, ty)) {
+  if (tx >= 0 && tx < state.mapW && ty >= 0 && ty < state.mapH && !isTileWater(state, tx, ty)) {
     w.tx = nx;
     w.ty = ny;
   } else {
@@ -607,10 +650,8 @@ function pickRandomTarget(state, w) {
 function isTileSettleable(state, tx, ty) {
   if (!isTileFlat(state, tx, ty)) return false;
   if (isTileInSettlementFootprint(state, tx, ty)) return false;
-  if (state.cropOwnerMap[ty * C.MAP_W + tx] !== -1) return false; // blocks owned (>=0) and contested (-2)
-  // Ruins block settlement placement
+  if (state.cropOwnerMap[ty * state.mapW + tx] !== -1) return false;
   if (state.ruinSet.has(tx + ',' + ty)) return false;
-  // Hard rocks in orthogonal neighbors block settlement placement
   for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
     const nx = tx + dx, ny = ty + dy;
     if (state.rocks.has(nx + ',' + ny)) return false;
@@ -631,7 +672,7 @@ function pickSettleTarget(state, w) {
   for (let dx = -searchR; dx <= searchR; dx++) {
     for (let dy = -searchR; dy <= searchR; dy++) {
       const tx = cx + dx, ty = cy + dy;
-      if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
+      if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
       if (isTileSettleable(state, tx, ty)) {
         const d = dx * dx + dy * dy;
         if (d < bestDist) { bestDist = d; bestTx = tx; bestTy = ty; }
@@ -699,13 +740,13 @@ function pickWalkerTarget(state, w) {
 }
 
 function rebuildWalkerGrid(state) {
-  for (let i = 0; i < C.MAP_W * C.MAP_H; i++) state.walkerGrid[i] = null;
+  for (let i = 0; i < state.mapW * state.mapH; i++) state.walkerGrid[i] = null;
   for (let i = 0; i < state.walkers.length; i++) {
     const w = state.walkers[i];
     if (w.dead) continue;
     const tx = Math.floor(w.x), ty = Math.floor(w.y);
-    if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
-    const key = ty * C.MAP_W + tx;
+    if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
+    const key = ty * state.mapW + tx;
     if (!state.walkerGrid[key]) state.walkerGrid[key] = [];
     state.walkerGrid[key].push(w);
   }
@@ -716,12 +757,11 @@ function updateWalkers(state, dt) {
     if (w.dead) continue;
 
     const ctx2 = Math.floor(w.x), cty = Math.floor(w.y);
-    if (ctx2 < 0 || ctx2 >= C.MAP_W || cty < 0 || cty >= C.MAP_H || isTileWater(state, ctx2, cty)) {
+    if (ctx2 < 0 || ctx2 >= state.mapW || cty < 0 || cty >= state.mapH || isTileWater(state, ctx2, cty)) {
       w.dead = true;
       continue;
     }
 
-    // Swamp death check (knights avoid swamps, so they skip this)
     if (!w.isKnight) {
       const swKey = ctx2 + ',' + cty;
       if (state.swampSet.has(swKey)) {
@@ -733,11 +773,10 @@ function updateWalkers(state, dt) {
     }
     if (w.dead) continue;
 
-    // Leader assignment: walker near own magnet and no leader exists
     if (!w.isLeader && !w.isKnight && state.leaders[w.team] < 0) {
       const mp = state.magnetPos[w.team];
       const ldx = mp.x - w.x, ldy = mp.y - w.y;
-      if (ldx * ldx + ldy * ldy < 4) { // radius 2
+      if (ldx * ldx + ldy * ldy < 4) {
         w.isLeader = true;
         state.leaders[w.team] = w.id;
         state.magnetLocked[w.team] = false;
@@ -748,7 +787,6 @@ function updateWalkers(state, dt) {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist < 0.1) {
-      // Choose target based on state
       if (state.armageddon) {
         pickArmageddonTarget(state, w);
       } else if (w.isKnight) {
@@ -760,7 +798,7 @@ function updateWalkers(state, dt) {
       const speed = w.isKnight ? C.WALKER_SPEED * C.KNIGHT_SPEED_MULT : C.WALKER_SPEED;
       const step = speed * dt;
 
-      // Knight swamp avoidance: check if next tile is an enemy swamp
+      // Knight swamp avoidance
       if (w.isKnight && step < dist) {
         const nextX = w.x + (dx / dist) * step;
         const nextY = w.y + (dy / dist) * step;
@@ -769,7 +807,6 @@ function updateWalkers(state, dt) {
         if (state.swampSet.has(nextKey)) {
           const sw = state.swamps.find(s => s.x === nextTx && s.y === nextTy);
           if (sw && sw.team !== w.team) {
-            // Try perpendicular directions
             const perpX1 = -dy / dist, perpY1 = dx / dist;
             const perpX2 = dy / dist, perpY2 = -dx / dist;
             let moved = false;
@@ -777,21 +814,21 @@ function updateWalkers(state, dt) {
               const altX = w.x + px * step;
               const altY = w.y + py * step;
               const altTx = Math.floor(altX), altTy = Math.floor(altY);
-              if (altTx >= 0 && altTx < C.MAP_W && altTy >= 0 && altTy < C.MAP_H &&
+              if (altTx >= 0 && altTx < state.mapW && altTy >= 0 && altTy < state.mapH &&
                   !isTileWater(state, altTx, altTy)) {
                 const altKey = altTx + ',' + altTy;
                 const altSw = state.swampSet.has(altKey) &&
                   state.swamps.find(s => s.x === altTx && s.y === altTy && s.team !== w.team);
                 if (!altSw) {
-                  w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, altX));
-                  w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, altY));
+                  w.x = Math.max(0.1, Math.min(state.mapW - 0.1, altX));
+                  w.y = Math.max(0.1, Math.min(state.mapH - 0.1, altY));
                   moved = true;
                   break;
                 }
               }
             }
-            if (!moved) { /* wait — don't move */ }
-            continue; // skip normal movement for this walker
+            if (!moved) { /* wait */ }
+            continue;
           }
         }
       }
@@ -804,12 +841,11 @@ function updateWalkers(state, dt) {
         w.y += (dy / dist) * step;
       }
 
-      w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, w.x));
-      w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, w.y));
+      w.x = Math.max(0.1, Math.min(state.mapW - 0.1, w.x));
+      w.y = Math.max(0.1, Math.min(state.mapH - 0.1, w.y));
 
       const ntx = Math.floor(w.x), nty = Math.floor(w.y);
-      if (ntx >= 0 && ntx < C.MAP_W && nty >= 0 && nty < C.MAP_H && isTileWater(state, ntx, nty)) {
-        // Armageddon: auto-raise terrain instead of bouncing
+      if (ntx >= 0 && ntx < state.mapW && nty >= 0 && nty < state.mapH && isTileWater(state, ntx, nty)) {
         if (state.armageddon) {
           raisePoint(state, ntx, nty);
           raisePoint(state, ntx + 1, nty);
@@ -818,15 +854,15 @@ function updateWalkers(state, dt) {
         } else {
           w.x -= (dx / dist) * step;
           w.y -= (dy / dist) * step;
-          w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, w.x));
-          w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, w.y));
+          w.x = Math.max(0.1, Math.min(state.mapW - 0.1, w.x));
+          w.y = Math.max(0.1, Math.min(state.mapH - 0.1, w.y));
           pickRandomTarget(state, w);
         }
       }
     }
   }
 
-  // Walker attrition — walkers gradually lose strength over time (knights decay faster)
+  // Walker attrition
   for (const w of state.walkers) {
     if (w.dead) continue;
     const attrRate = w.isKnight ? C.KNIGHT_ATTRITION_PER_SEC : C.WALKER_ATTRITION_PER_SEC;
@@ -857,82 +893,64 @@ function settleWalker(state, w, tx, ty) {
   state.settlements.push(s);
   setSettlement(state, tx, ty, s);
 
-  // Auto-clear tree on home tile
   state.trees.delete(tx + ',' + ty);
 
-  // Immediately evaluate level from surrounding crop fields
   const cropCount = countSettlementCrops(state, s);
   let level = getLevelFromCropCount(cropCount);
   if (level >= C.MAX_LEVEL && !isCastleAreaValid(state, s)) level = C.MAX_LEVEL - 1;
   s.level = level;
   updateSettlementFootprint(s);
-  // Update settlementMap for new footprint (may be larger than 1x1 if enough crops)
   const newSi = state.settlements.indexOf(s);
   for (let fx = 0; fx < s.sqSize; fx++) {
     for (let fy = 0; fy < s.sqSize; fy++) {
       const mx = s.sqOx + fx, my = s.sqOy + fy;
-      if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
-        state.settlementMap[my * C.MAP_W + mx] = newSi;
+      if (mx >= 0 && mx < state.mapW && my >= 0 && my < state.mapH) {
+        state.settlementMap[my * state.mapW + mx] = newSi;
       }
     }
   }
 
-  // Deposit population: cap at capacity, walker keeps remainder (chain-settling)
   const cap = C.LEVEL_CAPACITY[s.level];
   if (w.strength <= cap) {
     s.population = w.strength;
-    // Leader enters the settlement
     if (w.isLeader) {
       s.hasLeader = true;
       w.isLeader = false;
-      // leaders[team] stays set — leader is "inside" the settlement
     }
     w.dead = true;
   } else {
     s.population = cap;
     w.strength -= cap;
-    // Push walker out so it walks on to find more land
     const angle = Math.random() * Math.PI * 2;
     w.x = tx + 0.5 + Math.cos(angle) * 1.5;
     w.y = ty + 0.5 + Math.sin(angle) * 1.5;
-    w.x = Math.max(0.1, Math.min(C.MAP_W - 0.1, w.x));
-    w.y = Math.max(0.1, Math.min(C.MAP_H - 0.1, w.y));
-    // Leader keeps walking — don't transfer to settlement
+    w.x = Math.max(0.1, Math.min(state.mapW - 0.1, w.x));
+    w.y = Math.max(0.1, Math.min(state.mapH - 0.1, w.y));
     pickRandomTarget(state, w);
   }
 
-  // Recompute crops so new settlement's claims are immediately visible
   computeCrops(state);
 }
 
-// Count crop fields for a settlement (for instant evaluation at settle time).
-// Uses computeCrops result if available, otherwise quick local count.
 function countSettlementCrops(state, s) {
-  // After settling, computeCrops() is called, but for the initial level
-  // we do a quick local scan. Enemy crops block (check cropOwnerMap from
-  // last tick's computeCrops — close enough for initial placement).
   let count = 0;
   const r = C.CROP_ZONE_RADIUS;
-  // Extend crop scan from footprint edges for multi-tile settlements
   const halfFp = Math.floor(s.sqSize / 2);
   const scanR = halfFp + r;
   for (let dx = -scanR; dx <= scanR; dx++) {
     for (let dy = -scanR; dy <= scanR; dy++) {
       const cx = s.tx + dx, cy = s.ty + dy;
-      if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
-      // Skip home tile
+      if (cx < 0 || cx >= state.mapW || cy < 0 || cy >= state.mapH) continue;
       if (cx === s.tx && cy === s.ty) continue;
       if (!isTileFlat(state, cx, cy)) continue;
-      // Skip tiles in OTHER settlements' footprints
-      const smIdx = state.settlementMap[cy * C.MAP_W + cx];
+      const smIdx = state.settlementMap[cy * state.mapW + cx];
       if (smIdx >= 0 && smIdx !== state.settlements.indexOf(s)) continue;
       const key = cx + ',' + cy;
       if (state.swampSet.has(key)) continue;
       if (state.pebbles.has(key)) continue;
       if (state.ruinSet.has(key)) continue;
-      // Enemy or contested crops from previous tick block this tile
-      const ownerIdx = state.cropOwnerMap[cy * C.MAP_W + cx];
-      if (ownerIdx === -2) continue; // contested tile
+      const ownerIdx = state.cropOwnerMap[cy * state.mapW + cx];
+      if (ownerIdx === -2) continue;
       if (ownerIdx >= 0) {
         const owner = state.settlements[ownerIdx];
         if (owner && !owner.dead && owner.team !== s.team) continue;
@@ -949,7 +967,6 @@ function evaluateSettlementLevels(state) {
     const s = state.settlements[si];
     if (s.dead) continue;
 
-    // Home tile must still be flat (covers water, rock, non-flat terrain)
     if (!isTileFlat(state, s.tx, s.ty)) {
       s.dead = true;
       clearSettlementFootprint(state, s);
@@ -973,32 +990,27 @@ function evaluateSettlementLevels(state) {
       continue;
     }
 
-    // Level from crop count (computed by computeCrops each tick)
     const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
     let newLevel = getLevelFromCropCount(cropCount);
 
-    // Castle (max level) requires a valid 5×5 flat area around home tile
     if (newLevel >= C.MAX_LEVEL && !isCastleAreaValid(state, s)) {
       newLevel = C.MAX_LEVEL - 1;
     }
 
     if (newLevel !== s.level) {
-      // Clear old footprint from settlementMap before changing size
       clearSettlementFootprint(state, s);
       s.level = newLevel;
       updateSettlementFootprint(s);
-      // Register new footprint in settlementMap
       for (let fx = 0; fx < s.sqSize; fx++) {
         for (let fy = 0; fy < s.sqSize; fy++) {
           const mx = s.sqOx + fx, my = s.sqOy + fy;
-          if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
-            state.settlementMap[my * C.MAP_W + mx] = si;
+          if (mx >= 0 && mx < state.mapW && my >= 0 && my < state.mapH) {
+            state.settlementMap[my * state.mapW + mx] = si;
           }
         }
       }
     }
 
-    // Eject if over capacity
     const cap = C.LEVEL_CAPACITY[s.level];
     if (s.population > cap) {
       const excess = s.population - Math.floor(cap / 2);
@@ -1008,7 +1020,6 @@ function evaluateSettlementLevels(state) {
       const ew = spawnWalker(state, s.team, excess,
         s.tx + 0.5 + Math.cos(angle) * 1.2,
         s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
-      // If settlement contains leader, ejected walker becomes leader
       if (s.hasLeader) {
         ew.isLeader = true;
         state.leaders[s.team] = ew.id;
@@ -1019,38 +1030,30 @@ function evaluateSettlementLevels(state) {
 }
 
 // ── Crop Computation ────────────────────────────────────────────────
-// Populous-faithful rules:
-// - Same-team settlements SHARE cropland (both count the tile)
-// - Enemy cropland blocks yours (contested tiles hamper both sides)
-// - Swamps, rocks, settlement footprints block crops
-// - Trees auto-cleared by crop zones
 function computeCrops(state) {
   state.cropOwnerMap.fill(-1);
 
   const r = C.CROP_ZONE_RADIUS;
 
-  // Phase 1: Each settlement claims flat tiles in radius. Track per-team claims.
-  // settlementClaims[si] = Set of "x,y" keys
+  // Phase 1: Each settlement claims flat tiles. Track per-team claims (N-way).
   const settlementClaims = new Array(state.settlements.length);
-  const teamTiles = [new Set(), new Set()]; // team → Set of "x,y"
+  const teamTiles = [];
+  for (let t = 0; t < state.numTeams; t++) teamTiles.push(new Set());
 
   for (let si = 0; si < state.settlements.length; si++) {
     const claims = new Set();
     settlementClaims[si] = claims;
     const s = state.settlements[si];
     if (s.dead) continue;
-    // Extend crop scan from footprint edges, not just home tile
     const halfFp = Math.floor(s.sqSize / 2);
     const scanR = halfFp + r;
     for (let dx = -scanR; dx <= scanR; dx++) {
       for (let dy = -scanR; dy <= scanR; dy++) {
         const cx = s.tx + dx, cy = s.ty + dy;
-        if (cx < 0 || cx >= C.MAP_W || cy < 0 || cy >= C.MAP_H) continue;
-        // Skip home tile
+        if (cx < 0 || cx >= state.mapW || cy < 0 || cy >= state.mapH) continue;
         if (cx === s.tx && cy === s.ty) continue;
         if (!isTileFlat(state, cx, cy)) continue;
-        // Skip tiles in OTHER settlements' footprints (own footprint tiles count as crops)
-        const smIdx = state.settlementMap[cy * C.MAP_W + cx];
+        const smIdx = state.settlementMap[cy * state.mapW + cx];
         if (smIdx >= 0 && smIdx !== si) continue;
         const key = cx + ',' + cy;
         if (state.swampSet.has(key)) continue;
@@ -1063,21 +1066,26 @@ function computeCrops(state) {
     }
   }
 
-  // Phase 2: Contested tiles — claimed by both teams — block both
+  // Phase 2: N-way contested tiles — claimed by 2+ different teams
   const contested = new Set();
-  for (const key of teamTiles[0]) {
-    if (teamTiles[1].has(key)) contested.add(key);
+  // Build a map: tile key -> set of teams claiming it
+  const tileTeamCount = new Map();
+  for (let t = 0; t < state.numTeams; t++) {
+    for (const key of teamTiles[t]) {
+      if (!tileTeamCount.has(key)) tileTeamCount.set(key, new Set());
+      tileTeamCount.get(key).add(t);
+    }
+  }
+  for (const [key, teams] of tileTeamCount) {
+    if (teams.size > 1) contested.add(key);
   }
 
-  // Mark contested tiles in cropOwnerMap so they block settlement placement
-  // Value -2 = contested (distinct from -1 = unclaimed and >= 0 = owned)
   for (const key of contested) {
     const [x, y] = key.split(',').map(Number);
-    state.cropOwnerMap[y * C.MAP_W + x] = -2;
+    state.cropOwnerMap[y * state.mapW + x] = -2;
   }
 
-  // Phase 3: Count crops per settlement. Same-team sharing: all same-team
-  // settlements in range count the tile. Contested tiles excluded.
+  // Phase 3: Count crops per settlement
   const cropCounts = new Array(state.settlements.length).fill(0);
   const cropList = [];
   const addedCrops = new Set();
@@ -1092,7 +1100,7 @@ function computeCrops(state) {
         addedCrops.add(key);
         const [x, y] = key.split(',').map(Number);
         cropList.push({ x, y, t: s.team });
-        state.cropOwnerMap[y * C.MAP_W + x] = si;
+        state.cropOwnerMap[y * state.mapW + x] = si;
       }
     }
   }
@@ -1102,9 +1110,6 @@ function computeCrops(state) {
 }
 
 // ── Population Growth & Ejection ────────────────────────────────────
-// Growth: continuous per-second based on crop count
-// Ejection: dwell at cap then eject, only in Settle mode
-
 function updatePopulationGrowth(state, dt) {
   for (let si = 0; si < state.settlements.length; si++) {
     const s = state.settlements[si];
@@ -1113,7 +1118,6 @@ function updatePopulationGrowth(state, dt) {
     const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
 
     if (s.population < cap && cropCount > 0) {
-      // Grow: n crops × GROWTH_PER_CROP_PER_SEC per second
       s.popFrac = (s.popFrac || 0) + cropCount * C.GROWTH_PER_CROP_PER_SEC * dt;
       const whole = Math.floor(s.popFrac);
       if (whole > 0) {
@@ -1122,12 +1126,10 @@ function updatePopulationGrowth(state, dt) {
       }
       s.atCapTime = 0;
     } else if (s.population >= cap && cap > 0) {
-      // Only eject in Settle mode
       if (state.teamMode[s.team] !== C.MODE_SETTLE) {
         s.atCapTime = 0;
         continue;
       }
-      // Dwell at cap before ejecting
       s.atCapTime = (s.atCapTime || 0) + dt;
       if (s.atCapTime >= C.EJECT_DWELL_TIME) {
         s.atCapTime = 0;
@@ -1138,9 +1140,7 @@ function updatePopulationGrowth(state, dt) {
         const sx = s.tx + 0.5 + Math.cos(angle) * 1.2;
         const sy = s.ty + 0.5 + Math.sin(angle) * 1.2;
         const w = spawnWalker(state, s.team, ejectStrength, sx, sy);
-        // Ejected walkers inherit tech from settlement
         w.tech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
-        // If settlement contains leader, ejected walker becomes the leader
         if (s.hasLeader) {
           w.isLeader = true;
           state.leaders[s.team] = w.id;
@@ -1166,8 +1166,8 @@ function handleWalkerCollisions(state) {
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const tx = cx + dx, ty = cy + dy;
-        if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
-        const wlist = state.walkerGrid[ty * C.MAP_W + tx];
+        if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
+        const wlist = state.walkerGrid[ty * state.mapW + tx];
         if (!wlist) continue;
         for (const other of wlist) {
           if (other === w || other.dead) continue;
@@ -1176,11 +1176,9 @@ function handleWalkerCollisions(state) {
           if (dist > 0.5 * 0.5) continue;
 
           if (other.team === w.team) {
-            // Knights don't merge with friendlies
             if (w.isKnight || other.isKnight) continue;
             w.strength = Math.min(255, w.strength + other.strength);
             w.tech = Math.max(w.tech || 0, other.tech || 0);
-            // Preserve leadership: if absorbed walker was leader, survivor inherits
             if (other.isLeader) {
               w.isLeader = true;
               state.leaders[w.team] = w.id;
@@ -1188,15 +1186,13 @@ function handleWalkerCollisions(state) {
             }
             other.dead = true;
           } else {
-            // Tech-based combat: higher tech deals more effective damage
             const wTech = w.tech || 0, oTech = other.tech || 0;
             const wMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, wTech - oTech));
             const oMult = Math.pow(C.TECH_ADVANTAGE_MULT, Math.max(0, oTech - wTech));
             const wEff = w.strength * wMult;
             const oEff = other.strength * oMult;
             if (wEff > oEff) {
-              // w wins: time for other to die, then subtract damage taken
-              const t = other.strength / wMult; // time units
+              const t = other.strength / wMult;
               w.strength = Math.max(1, Math.round(w.strength - oMult * t));
               other.dead = true;
             } else if (oEff > wEff) {
@@ -1217,7 +1213,6 @@ function handleWalkerCollisions(state) {
     const stx = Math.floor(w.x), sty = Math.floor(w.y);
     const es = getSettlement(state, stx, sty);
 
-    // Walker reinforcement: deposit strength into friendly settlement
     if (es && es.team === w.team && !w.isKnight && !w.isLeader) {
       const cap = C.LEVEL_CAPACITY[es.level] || 0;
       if (es.population < cap) {
@@ -1231,13 +1226,12 @@ function handleWalkerCollisions(state) {
     }
 
     if (es && es.team !== w.team) {
-      // Track this walker as an attacker of this settlement
       if (!es._attackers) es._attackers = [];
       es._attackers.push(w);
     }
   }
 
-  // Process settlement assaults — retaliation is split among all attackers
+  // Process settlement assaults
   for (const es of state.settlements) {
     if (es.dead || !es._attackers || es._attackers.length === 0) continue;
     const attackers = es._attackers;
@@ -1246,19 +1240,15 @@ function handleWalkerCollisions(state) {
     const dt = 1 / C.TICK_RATE;
     const sTech = C.SETTLEMENT_LEVELS[es.level] ? C.SETTLEMENT_LEVELS[es.level].tech : 0;
 
-    // Total damage dealt to settlement by all attackers this tick
     let totalDmgToSett = 0;
     for (const w of attackers) {
       const wTech = w.tech || 0;
       const techDiff = wTech - sTech;
       const wMult = techDiff > 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, techDiff) : 1;
-      const atkMult = 1; // knights rely on raw strength, no bonus multiplier
-      // Stronger walkers deal more damage (scaled by strength)
       const strMult = Math.max(1, w.strength / 5);
-      totalDmgToSett += C.ASSAULT_DMG_PER_SEC * dt * wMult * atkMult * strMult;
+      totalDmgToSett += C.ASSAULT_DMG_PER_SEC * dt * wMult * strMult;
     }
 
-    // Apply damage to settlement
     es.assaultFrac = (es.assaultFrac || 0) + totalDmgToSett;
     if (es.assaultFrac >= 1) {
       const loss = Math.floor(es.assaultFrac);
@@ -1266,8 +1256,6 @@ function handleWalkerCollisions(state) {
       es.population -= loss;
     }
 
-    // Settlement retaliates — fixed firepower divided among attackers
-    // Scales with settlement population (weaker settlement = weaker retaliation)
     const popScale = Math.max(0.2, es.population / 20);
     const totalRetal = C.ASSAULT_DMG_PER_SEC * dt * C.ASSAULT_RETALIATE_FRAC * popScale;
     const retalPerWalker = totalRetal / attackers.length;
@@ -1286,7 +1274,6 @@ function handleWalkerCollisions(state) {
       if (w.strength <= 0) w.dead = true;
     }
 
-    // Settlement falls
     if (es.population <= 0) {
       if (es.hasLeader) {
         state.magnetPos[es.team] = { x: es.tx + 0.5, y: es.ty + 0.5 };
@@ -1294,17 +1281,15 @@ function handleWalkerCollisions(state) {
         state.leaders[es.team] = -1;
         es.hasLeader = false;
       }
-      // Find strongest surviving attacker for conquest
       let best = null;
       for (const w of attackers) {
         if (!w.dead && (!best || w.strength > best.strength)) best = w;
       }
       if (best && best.isKnight) {
-        // Create ruins at all tiles in the settlement footprint
         for (let rdx = 0; rdx < es.sqSize; rdx++) {
           for (let rdy = 0; rdy < es.sqSize; rdy++) {
             const rx = es.sqOx + rdx, ry = es.sqOy + rdy;
-            if (rx >= 0 && rx < C.MAP_W && ry >= 0 && ry < C.MAP_H) {
+            if (rx >= 0 && rx < state.mapW && ry >= 0 && ry < state.mapH) {
               const rkey = rx + ',' + ry;
               if (!state.ruinSet.has(rkey)) {
                 state.ruins.push({ x: rx, y: ry, team: es.team });
@@ -1318,7 +1303,6 @@ function handleWalkerCollisions(state) {
         state.fires.push({ x: es.tx, y: es.ty, age: 0 });
         pickFightTarget(state, best);
       } else if (best) {
-        // Conquer
         es.team = best.team;
         es.population = Math.max(1, best.strength);
         es.popFrac = 0;
@@ -1326,14 +1310,12 @@ function handleWalkerCollisions(state) {
         es.assaultFrac = 0;
         best.dead = true;
       } else {
-        // All attackers died but settlement fell too — just destroy it
         es.dead = true;
         clearSettlementFootprint(state, es);
       }
     }
   }
 
-  // Clean up _attackers on any settlements that weren't processed
   for (const es of state.settlements) {
     delete es._attackers;
   }
@@ -1341,17 +1323,14 @@ function handleWalkerCollisions(state) {
 
 // ── Entity Pruning ──────────────────────────────────────────────────
 function pruneDeadEntities(state) {
-  // Clear leaders if their walker is dead — but not if leader is inside a settlement
-  for (let t = 0; t < 2; t++) {
+  for (let t = 0; t < state.numTeams; t++) {
     if (state.leaders[t] >= 0) {
       const leaderW = state.walkers.find(w => w.id === state.leaders[t]);
       if (!leaderW || leaderW.dead) {
-        // Check if leader entered a settlement (hasLeader flag)
         const leaderInSettlement = state.settlements.some(
           s => !s.dead && s.team === t && s.hasLeader
         );
         if (!leaderInSettlement) {
-          // Leader truly dead — drop magnet
           if (leaderW) {
             state.magnetPos[t] = { x: leaderW.x, y: leaderW.y };
           }
@@ -1362,7 +1341,6 @@ function pruneDeadEntities(state) {
     }
   }
 
-  // Handle dead settlements that had leaders — drop magnet at settlement location
   for (const s of state.settlements) {
     if (s.dead && s.hasLeader) {
       const t = s.team;
@@ -1380,12 +1358,11 @@ function pruneDeadEntities(state) {
   state.settlements = alive;
   for (let i = 0; i < state.settlements.length; i++) {
     const s = state.settlements[i];
-    // Rebuild full footprint (1x1 for most, 5x5 for castles)
     for (let fx = 0; fx < s.sqSize; fx++) {
       for (let fy = 0; fy < s.sqSize; fy++) {
         const mx = s.sqOx + fx, my = s.sqOy + fy;
-        if (mx >= 0 && mx < C.MAP_W && my >= 0 && my < C.MAP_H) {
-          state.settlementMap[my * C.MAP_W + mx] = i;
+        if (mx >= 0 && mx < state.mapW && my >= 0 && my < state.mapH) {
+          state.settlementMap[my * state.mapW + mx] = i;
         }
       }
     }
@@ -1394,7 +1371,7 @@ function pruneDeadEntities(state) {
 
 // ── Mana ────────────────────────────────────────────────────────────
 function updateMana(state, dt) {
-  for (let team = 0; team < 2; team++) {
+  for (let team = 0; team < state.numTeams; team++) {
     let totalPop = 0;
     for (const s of state.settlements) {
       if (s.dead || s.team !== team) continue;
@@ -1423,15 +1400,49 @@ function getTeamStats(state, team) {
 
 // ── State Serialization ─────────────────────────────────────────────
 function serializeState(state, team) {
-  // Heights: flat array iterating x then y
-  const flatHeights = [];
-  for (let y = 0; y <= C.MAP_H; y++) {
-    for (let x = 0; x <= C.MAP_W; x++) {
-      flatHeights.push(state.heights[x][y]);
+  const W = state.mapW, H = state.mapH;
+
+  // Height delta compression
+  let heightsPayload;
+  if (!state.prevHeights) {
+    // First frame: send full
+    const flatHeights = [];
+    for (let y = 0; y <= H; y++) {
+      for (let x = 0; x <= W; x++) {
+        flatHeights.push(state.heights[x][y]);
+      }
+    }
+    heightsPayload = { full: flatHeights };
+    // Store copy for next delta
+    state.prevHeights = [];
+    for (let x = 0; x <= W; x++) {
+      state.prevHeights[x] = state.heights[x].slice();
+    }
+  } else {
+    // Delta: only changed points
+    const delta = [];
+    for (let x = 0; x <= W; x++) {
+      for (let y = 0; y <= H; y++) {
+        if (state.heights[x][y] !== state.prevHeights[x][y]) {
+          delta.push(x, y, state.heights[x][y]);
+          state.prevHeights[x][y] = state.heights[x][y];
+        }
+      }
+    }
+    if (delta.length > (W + 1) * (H + 1) * 0.5) {
+      // Too many changes, send full
+      const flatHeights = [];
+      for (let y = 0; y <= H; y++) {
+        for (let x = 0; x <= W; x++) {
+          flatHeights.push(state.heights[x][y]);
+        }
+      }
+      heightsPayload = { full: flatHeights };
+    } else {
+      heightsPayload = { delta };
     }
   }
 
-  // Walkers: living only, minimal fields
   const walkerData = [];
   for (const w of state.walkers) {
     if (w.dead) continue;
@@ -1449,7 +1460,6 @@ function serializeState(state, team) {
     walkerData.push(wd);
   }
 
-  // Settlements: living only, minimal fields
   const settlementData = [];
   for (const s of state.settlements) {
     if (s.dead) continue;
@@ -1464,37 +1474,31 @@ function serializeState(state, team) {
     settlementData.push(sd);
   }
 
-  // Swamps: array of {x, y}
   const swampData = state.swamps.map(s => ({ x: s.x, y: s.y, t: s.team }));
 
-  // Rocks: flat array [x1,y1,x2,y2,...]
   const rockData = [];
   for (const key of state.rocks) {
     const parts = key.split(',');
     rockData.push(+parts[0], +parts[1]);
   }
 
-  // Trees: flat array [x1,y1,x2,y2,...]
   const treeData = [];
   for (const key of state.trees) {
     const parts = key.split(',');
     treeData.push(+parts[0], +parts[1]);
   }
 
-  // Pebbles: flat array [x1,y1,x2,y2,...]
   const pebbleData = [];
   for (const key of state.pebbles) {
     const parts = key.split(',');
     pebbleData.push(+parts[0], +parts[1]);
   }
 
-  // Ruins: flat array [x1,y1,t1,x2,y2,t2,...] (x, y, team triplets)
   const ruinData = [];
   for (const r of state.ruins) {
     ruinData.push(r.x, r.y, r.team);
   }
 
-  // Crops: flat array [x1,y1,t1,x2,y2,t2,...] (x, y, team triplets)
   const cropData = [];
   if (state.crops) {
     for (const c of state.crops) {
@@ -1502,15 +1506,24 @@ function serializeState(state, team) {
     }
   }
 
+  // Build teamPop for all teams
+  const teamPop = [];
+  for (let t = 0; t < state.numTeams; t++) {
+    teamPop.push(getTeamStats(state, t).pop);
+  }
+
   return {
     type: 'state',
-    heights: flatHeights,
+    heights: heightsPayload,
     walkers: walkerData,
     settlements: settlementData,
     magnetPos: state.magnetPos,
     teamMode: state.teamMode,
     mana: Math.floor(state.mana[team]),
     team,
+    numTeams: state.numTeams,
+    mapW: state.mapW,
+    mapH: state.mapH,
     swamps: swampData,
     rocks: rockData,
     trees: treeData,
@@ -1521,8 +1534,8 @@ function serializeState(state, team) {
     seaLevel: state.seaLevel,
     leaders: state.leaders,
     armageddon: state.armageddon,
-    magnetLocked: [state.magnetLocked[0], state.magnetLocked[1]],
-    teamPop: [getTeamStats(state, C.TEAM_BLUE).pop, getTeamStats(state, C.TEAM_RED).pop],
+    magnetLocked: state.magnetLocked.slice(),
+    teamPop,
   };
 }
 
@@ -1530,12 +1543,12 @@ function serializeState(state, team) {
 function executePowerEarthquake(state, team, px, py) {
   const r = C.EARTHQUAKE_RADIUS;
   const r2 = r * r;
-  for (let x = Math.max(0, px - r); x <= Math.min(C.MAP_W, px + r); x++) {
-    for (let y = Math.max(0, py - r); y <= Math.min(C.MAP_H, py + r); y++) {
+  for (let x = Math.max(0, px - r); x <= Math.min(state.mapW, px + r); x++) {
+    for (let y = Math.max(0, py - r); y <= Math.min(state.mapH, py + r); y++) {
       const dx = x - px, dy = y - py;
       if (dx * dx + dy * dy < r2) {
         const action = Math.random() < 0.5 ? 'raise' : 'lower';
-        const times = Math.floor(Math.random() * 3); // 0-2
+        const times = Math.floor(Math.random() * 3);
         for (let i = 0; i < times; i++) {
           if (action === 'raise') raisePoint(state, x, y);
           else lowerPoint(state, x, y);
@@ -1553,12 +1566,12 @@ function executePowerEarthquake(state, team, px, py) {
 function executePowerSwamp(state, team, tx, ty) {
   const placed = [];
   const attempts = 20;
-  const targetCount = 3 + Math.floor(Math.random() * 3); // 3-5
+  const targetCount = 3 + Math.floor(Math.random() * 3);
   for (let i = 0; i < attempts && placed.length < targetCount; i++) {
     const dx = i === 0 ? 0 : Math.floor(Math.random() * 7) - 3;
     const dy = i === 0 ? 0 : Math.floor(Math.random() * 7) - 3;
     const sx = tx + dx, sy = ty + dy;
-    if (sx < 0 || sx >= C.MAP_W || sy < 0 || sy >= C.MAP_H) continue;
+    if (sx < 0 || sx >= state.mapW || sy < 0 || sy >= state.mapH) continue;
     const key = sx + ',' + sy;
     if (state.swampSet.has(key)) continue;
     if (!isTileFlat(state, sx, sy)) continue;
@@ -1573,7 +1586,6 @@ function executePowerKnight(state, team) {
   const leaderId = state.leaders[team];
   if (leaderId < 0) return false;
 
-  // Check if leader is inside a settlement (hasLeader flag)
   let hostSettlement = null;
   for (const s of state.settlements) {
     if (s.dead || s.team !== team) continue;
@@ -1584,34 +1596,28 @@ function executePowerKnight(state, team) {
   }
 
   if (hostSettlement) {
-    // Leader is inside the settlement — extract as knight
     const sx = hostSettlement.tx + 0.5;
     const sy = hostSettlement.ty + 0.5;
     const knightStrength = Math.min(255, hostSettlement.population * C.KNIGHT_STRENGTH_MULT);
     const sTech = C.SETTLEMENT_LEVELS[hostSettlement.level] ? C.SETTLEMENT_LEVELS[hostSettlement.level].tech : 0;
 
-    // Spawn knight walker from settlement
     const knight = spawnWalker(state, team, knightStrength, sx, sy, sTech);
     knight.isKnight = true;
 
-    // Destroy host settlement
     hostSettlement.dead = true;
     hostSettlement.hasLeader = false;
     clearSettlementFootprint(state, hostSettlement);
 
-    // Magnet drops at destroyed settlement
     state.magnetPos[team] = { x: hostSettlement.tx, y: hostSettlement.ty };
     state.magnetLocked[team] = true;
     state.leaders[team] = -1;
 
-    // Set building on fire
     state.fires.push({ x: hostSettlement.tx, y: hostSettlement.ty, age: 0 });
 
     pickFightTarget(state, knight);
     return true;
   }
 
-  // Leader is a walker — check if standing near a friendly settlement
   let leader = null;
   for (const w of state.walkers) {
     if (w.id === leaderId && !w.dead) { leader = w; break; }
@@ -1628,22 +1634,18 @@ function executePowerKnight(state, team) {
   }
   if (!hostSettlement) return false;
 
-  // Promote to knight
   leader.isKnight = true;
   leader.strength = Math.min(255, leader.strength * C.KNIGHT_STRENGTH_MULT);
   leader.isLeader = false;
   state.leaders[team] = -1;
 
-  // Destroy host settlement
   hostSettlement.dead = true;
   hostSettlement.hasLeader = false;
   clearSettlementFootprint(state, hostSettlement);
 
-  // Magnet drops at destroyed settlement
   state.magnetPos[team] = { x: hostSettlement.tx, y: hostSettlement.ty };
   state.magnetLocked[team] = true;
 
-  // Set building on fire
   state.fires.push({ x: hostSettlement.tx, y: hostSettlement.ty, age: 0 });
 
   pickFightTarget(state, leader);
@@ -1653,9 +1655,8 @@ function executePowerKnight(state, team) {
 function executePowerVolcano(state, team, px, py) {
   const r = C.VOLCANO_RADIUS;
   const r2 = r * r;
-  // Raise terrain
-  for (let x = Math.max(0, px - r); x <= Math.min(C.MAP_W, px + r); x++) {
-    for (let y = Math.max(0, py - r); y <= Math.min(C.MAP_H, py + r); y++) {
+  for (let x = Math.max(0, px - r); x <= Math.min(state.mapW, px + r); x++) {
+    for (let y = Math.max(0, py - r); y <= Math.min(state.mapH, py + r); y++) {
       const dx = x - px, dy = y - py;
       const d2 = dx * dx + dy * dy;
       if (d2 < r2) {
@@ -1667,18 +1668,16 @@ function executePowerVolcano(state, team, px, py) {
       }
     }
   }
-  // Add rock tiles in inner radius
   const innerR = Math.floor(r / 2);
   const innerR2 = innerR * innerR;
-  for (let tx = Math.max(0, px - innerR); tx < Math.min(C.MAP_W, px + innerR); tx++) {
-    for (let ty = Math.max(0, py - innerR); ty < Math.min(C.MAP_H, py + innerR); ty++) {
+  for (let tx = Math.max(0, px - innerR); tx < Math.min(state.mapW, px + innerR); tx++) {
+    for (let ty = Math.max(0, py - innerR); ty < Math.min(state.mapH, py + innerR); ty++) {
       const dx = tx + 0.5 - px, dy = ty + 0.5 - py;
       if (dx * dx + dy * dy < innerR2) {
         state.rocks.add(tx + ',' + ty);
       }
     }
   }
-  // Kill walkers and destroy settlements within radius
   for (const w of state.walkers) {
     if (w.dead) continue;
     const dx = w.x - px, dy = w.y - py;
@@ -1707,20 +1706,17 @@ function executePowerVolcano(state, team, px, py) {
 }
 
 function executePowerFlood(state, team) {
-  // Lower all terrain by 1 instead of raising sea level — preserves natural slopes
-  for (let x = 0; x <= C.MAP_W; x++) {
-    for (let y = 0; y <= C.MAP_H; y++) {
+  for (let x = 0; x <= state.mapW; x++) {
+    for (let y = 0; y <= state.mapH; y++) {
       state.heights[x][y] = Math.max(0, state.heights[x][y] - 1);
     }
   }
-  // Kill walkers on newly submerged tiles
   for (const w of state.walkers) {
     if (w.dead) continue;
     const tx = Math.floor(w.x), ty = Math.floor(w.y);
-    if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
+    if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
     if (isTileWater(state, tx, ty)) w.dead = true;
   }
-  // Destroy settlements on newly submerged tiles
   for (const s of state.settlements) {
     if (s.dead) continue;
     if (isTileWater(state, s.tx, s.ty)) {
@@ -1744,7 +1740,6 @@ function executePowerFlood(state, team) {
 
 function executePowerArmageddon(state, team) {
   state.armageddon = true;
-  // Destroy all settlements, eject population as walkers
   for (const s of state.settlements) {
     if (s.dead) continue;
     if (s.population > 0) {
@@ -1753,14 +1748,12 @@ function executePowerArmageddon(state, team) {
       const w = spawnWalker(state, s.team, s.population,
         s.tx + 0.5 + Math.cos(angle) * 1.2,
         s.ty + 0.5 + Math.sin(angle) * 1.2, sTech);
-      // If settlement had a leader, ejected walker becomes leader
       if (s.hasLeader) {
         w.isLeader = true;
         state.leaders[s.team] = w.id;
         s.hasLeader = false;
       }
     } else if (s.hasLeader) {
-      // Empty settlement with leader — leader dies
       state.magnetPos[s.team] = { x: s.tx + 0.5, y: s.ty + 0.5 };
       state.magnetLocked[s.team] = true;
       state.leaders[s.team] = -1;
@@ -1777,137 +1770,142 @@ function updateAI(state, room, dt) {
   if (room.aiTimer < 1.5) return;
   room.aiTimer = 0;
 
-  const team = C.TEAM_RED;
-  const mana = state.mana[team];
-  const redStats = getTeamStats(state, team);
-  const blueStats = getTeamStats(state, C.TEAM_BLUE);
+  // Run AI for each AI-controlled team
+  for (let team = 0; team < room.maxPlayers; team++) {
+    // Skip human players (slot 0) and eliminated teams
+    if (room.players[team] !== null) continue;
+    if (state.eliminated[team]) continue;
 
-  // ── Mode selection ──
-  if (redStats.set < 3 || redStats.walk > redStats.set * 3) {
-    state.teamMode[team] = C.MODE_SETTLE;
-  } else if (redStats.pop > blueStats.pop * 1.3 && redStats.walk >= 4) {
-    state.teamMode[team] = C.MODE_FIGHT;
-  } else if (redStats.set >= 5 && redStats.walk < 2) {
-    state.teamMode[team] = C.MODE_GATHER;
-  } else {
-    state.teamMode[team] = C.MODE_SETTLE;
-  }
+    const mana = state.mana[team];
+    const myStats = getTeamStats(state, team);
 
-  // ── Powers (checked every AI tick) ──
-  if (!state.armageddon) {
-    // Armageddon: if dominating and late game
-    if (redStats.pop > blueStats.pop * 2.5 && redStats.pop > 200 && mana >= 100) {
-      executePowerArmageddon(state, team);
-      return;
+    // Find strongest enemy
+    let bestEnemyPop = 0;
+    for (let t = 0; t < state.numTeams; t++) {
+      if (t === team || state.eliminated[t]) continue;
+      const ep = getTeamStats(state, t).pop;
+      if (ep > bestEnemyPop) bestEnemyPop = ep;
     }
 
-    // Knight: if we have a leader and enough mana, and enemy is nearby
-    if (mana >= 200 && state.leaders[team] >= 0) {
-      const success = executePowerKnight(state, team);
-      if (success) { state.mana[team] -= 200; return; }
+    // Mode selection
+    if (myStats.set < 3 || myStats.walk > myStats.set * 3) {
+      state.teamMode[team] = C.MODE_SETTLE;
+    } else if (myStats.pop > bestEnemyPop * 1.3 && myStats.walk >= 4) {
+      state.teamMode[team] = C.MODE_FIGHT;
+    } else if (myStats.set >= 5 && myStats.walk < 2) {
+      state.teamMode[team] = C.MODE_GATHER;
+    } else {
+      state.teamMode[team] = C.MODE_SETTLE;
     }
 
-    // Swamp: place near enemy settlements to slow them down
-    if (mana >= 60) {
-      let enemySett = null;
-      for (const s of state.settlements) {
-        if (s.dead || s.team === team) continue;
-        enemySett = s;
-        break;
+    // Powers
+    if (!state.armageddon) {
+      if (myStats.pop > bestEnemyPop * 2.5 && myStats.pop > 200 && mana >= 100) {
+        executePowerArmageddon(state, team);
+        return;
       }
-      if (enemySett && Math.random() < 0.3) {
-        const sx = enemySett.tx + Math.floor(Math.random() * 7) - 3;
-        const sy = enemySett.ty + Math.floor(Math.random() * 7) - 3;
-        if (sx >= 0 && sx < C.MAP_W && sy >= 0 && sy < C.MAP_H && isTileFlat(state, sx, sy)) {
-          const ok = executePowerSwamp(state, team, sx, sy);
-          if (ok) { state.mana[team] -= 60; return; }
+
+      if (mana >= 200 && state.leaders[team] >= 0) {
+        const success = executePowerKnight(state, team);
+        if (success) { state.mana[team] -= 200; continue; }
+      }
+
+      if (mana >= 60) {
+        let enemySett = null;
+        for (const s of state.settlements) {
+          if (s.dead || s.team === team) continue;
+          enemySett = s;
+          break;
+        }
+        if (enemySett && Math.random() < 0.3) {
+          const sx = enemySett.tx + Math.floor(Math.random() * 7) - 3;
+          const sy = enemySett.ty + Math.floor(Math.random() * 7) - 3;
+          if (sx >= 0 && sx < state.mapW && sy >= 0 && sy < state.mapH && isTileFlat(state, sx, sy)) {
+            const ok = executePowerSwamp(state, team, sx, sy);
+            if (ok) { state.mana[team] -= 60; continue; }
+          }
+        }
+      }
+
+      if (mana >= 1500 && Math.random() < 0.4) {
+        let enemySett = null;
+        for (const s of state.settlements) {
+          if (s.dead || s.team === team) continue;
+          if (!enemySett || s.population > enemySett.population) enemySett = s;
+        }
+        if (enemySett) {
+          state.mana[team] -= 1500;
+          executePowerEarthquake(state, team, enemySett.tx, enemySett.ty);
+          continue;
+        }
+      }
+
+      if (mana >= 500 && Math.random() < 0.25) {
+        let lowEnemy = 0;
+        for (const s of state.settlements) {
+          if (s.dead || s.team === team) continue;
+          if (state.heights[s.tx][s.ty] <= state.seaLevel + 1) lowEnemy++;
+        }
+        if (lowEnemy >= 2) {
+          state.mana[team] -= 500;
+          executePowerFlood(state, team);
+          continue;
+        }
+      }
+
+      if (mana >= 5000 && Math.random() < 0.3) {
+        let bestEnemy = null;
+        for (const s of state.settlements) {
+          if (s.dead || s.team === team) continue;
+          if (!bestEnemy || s.level > bestEnemy.level) bestEnemy = s;
+        }
+        if (bestEnemy && bestEnemy.level >= 5) {
+          state.mana[team] -= 5000;
+          executePowerVolcano(state, team, bestEnemy.tx, bestEnemy.ty);
+          continue;
         }
       }
     }
 
-    // Earthquake: target enemy cluster when we can afford it
-    if (mana >= 1500 && Math.random() < 0.4) {
-      let enemySett = null;
-      for (const s of state.settlements) {
-        if (s.dead || s.team === team) continue;
-        if (!enemySett || s.population > enemySett.population) enemySett = s;
-      }
-      if (enemySett) {
-        state.mana[team] -= 1500;
-        executePowerEarthquake(state, team, enemySett.tx, enemySett.ty);
-        return;
-      }
-    }
+    // Terrain flattening
+    const ownSettlements = state.settlements.filter(s => !s.dead && s.team === team);
+    if (ownSettlements.length === 0) continue;
+    const target = ownSettlements[Math.floor(Math.random() * ownSettlements.length)];
 
-    // Flood: if enemy has lots of low-lying settlements
-    if (mana >= 500 && Math.random() < 0.25) {
-      let lowEnemy = 0;
-      for (const s of state.settlements) {
-        if (s.dead || s.team === team) continue;
-        if (state.heights[s.tx][s.ty] <= state.seaLevel + 1) lowEnemy++;
-      }
-      if (lowEnemy >= 2) {
-        state.mana[team] -= 500;
-        executePowerFlood(state, team);
-        return;
+    const th = state.heights[target.tx][target.ty];
+    const cx = target.tx, cy = target.ty;
+    const flatR = 4;
+
+    const offsets = [];
+    for (let ddx = -flatR; ddx <= flatR; ddx++) {
+      for (let ddy = -flatR; ddy <= flatR; ddy++) {
+        offsets.push([ddx, ddy]);
       }
     }
-
-    // Volcano: save for high-value targets
-    if (mana >= 5000 && Math.random() < 0.3) {
-      let bestEnemy = null;
-      for (const s of state.settlements) {
-        if (s.dead || s.team === team) continue;
-        if (!bestEnemy || s.level > bestEnemy.level) bestEnemy = s;
-      }
-      if (bestEnemy && bestEnemy.level >= 5) {
-        state.mana[team] -= 5000;
-        executePowerVolcano(state, team, bestEnemy.tx, bestEnemy.ty);
-        return;
-      }
+    for (let i = offsets.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
     }
-  }
 
-  // ── Terrain flattening ──
-  // Pick a random own settlement to expand around
-  const ownSettlements = state.settlements.filter(s => !s.dead && s.team === team);
-  if (ownSettlements.length === 0) return;
-  const target = ownSettlements[Math.floor(Math.random() * ownSettlements.length)];
-
-  const th = state.heights[target.tx][target.ty];
-  const cx = target.tx, cy = target.ty;
-  const flatR = 4;
-
-  // Shuffle directions so it doesn't always flatten the same corner first
-  const offsets = [];
-  for (let ddx = -flatR; ddx <= flatR; ddx++) {
-    for (let ddy = -flatR; ddy <= flatR; ddy++) {
-      offsets.push([ddx, ddy]);
-    }
-  }
-  for (let i = offsets.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
-  }
-
-  let modsLeft = 3; // up to 3 terrain mods per AI tick
-  for (const [ddx, ddy] of offsets) {
-    if (modsLeft <= 0) break;
-    const tx = cx + ddx, ty = cy + ddy;
-    if (tx < 0 || tx >= C.MAP_W || ty < 0 || ty >= C.MAP_H) continue;
-    if (isTileFlat(state, tx, ty) && state.heights[tx][ty] === th) continue;
-    for (const [px, py] of [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]]) {
-      if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) continue;
-      if (state.heights[px][py] < th && mana >= C.TERRAIN_RAISE_COST) {
-        state.mana[team] -= C.TERRAIN_RAISE_COST;
-        raisePoint(state, px, py);
-        modsLeft--;
-        break;
-      } else if (state.heights[px][py] > th && mana >= C.TERRAIN_LOWER_COST) {
-        state.mana[team] -= C.TERRAIN_LOWER_COST;
-        lowerPoint(state, px, py);
-        modsLeft--;
-        break;
+    let modsLeft = 3;
+    for (const [ddx, ddy] of offsets) {
+      if (modsLeft <= 0) break;
+      const tx = cx + ddx, ty = cy + ddy;
+      if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
+      if (isTileFlat(state, tx, ty) && state.heights[tx][ty] === th) continue;
+      for (const [px, py] of [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]]) {
+        if (px < 0 || px > state.mapW || py < 0 || py > state.mapH) continue;
+        if (state.heights[px][py] < th && state.mana[team] >= C.TERRAIN_RAISE_COST) {
+          state.mana[team] -= C.TERRAIN_RAISE_COST;
+          raisePoint(state, px, py);
+          modsLeft--;
+          break;
+        } else if (state.heights[px][py] > th && state.mana[team] >= C.TERRAIN_LOWER_COST) {
+          state.mana[team] -= C.TERRAIN_LOWER_COST;
+          lowerPoint(state, px, py);
+          modsLeft--;
+          break;
+        }
       }
     }
   }
@@ -1915,7 +1913,7 @@ function updateAI(state, room, dt) {
 
 // ── Tick Loop ───────────────────────────────────────────────────────
 function startGame(room) {
-  const state = createGameState();
+  const state = createGameState(room.mapW, room.mapH, room.maxPlayers);
   generateTerrain(state);
   spawnInitialWalkers(state);
   room.state = state;
@@ -1926,15 +1924,13 @@ function startGame(room) {
   room.tickInterval = setInterval(() => {
     if (state.gameOver) return;
 
-    // Run simulation
     updateWalkers(state, dt);
     handleWalkerCollisions(state);
     updateMana(state, dt);
 
-    // AI update (if vs AI room)
-    if (room.ai) updateAI(state, room, dt);
+    // AI update
+    if (room.aiCount > 0) updateAI(state, room, dt);
 
-    // Compute crops every tick for rendering + growth
     computeCrops(state);
 
     if (!state.armageddon) {
@@ -1957,29 +1953,27 @@ function startGame(room) {
       pruneDeadEntities(state);
     }
 
-    // Check win condition (after initial grace period of 30 seconds)
-    const elapsed = state.levelEvalTimer + state.pruneTimer;
-    if (!state.gameOver) {
-      const blueStats = getTeamStats(state, C.TEAM_BLUE);
-      const redStats = getTeamStats(state, C.TEAM_RED);
-
-      // Only check after both teams have had time to establish
-      const tickCount = (state._tickCount || 0) + 1;
-      state._tickCount = tickCount;
-
-      if (tickCount > C.TICK_RATE * 30) { // 30 second grace period
-        if (blueStats.pop <= 0 && redStats.pop > 0) {
-          state.gameOver = true;
-          state.winner = C.TEAM_RED;
-        } else if (redStats.pop <= 0 && blueStats.pop > 0) {
-          state.gameOver = true;
-          state.winner = C.TEAM_BLUE;
+    // Win condition: last team standing (after 30s grace)
+    state._tickCount++;
+    if (!state.gameOver && state._tickCount > C.TICK_RATE * 30) {
+      let aliveTeams = [];
+      for (let t = 0; t < state.numTeams; t++) {
+        if (state.eliminated[t]) continue;
+        const stats = getTeamStats(state, t);
+        if (stats.pop > 0) {
+          aliveTeams.push(t);
+        } else {
+          state.eliminated[t] = true;
         }
+      }
+      if (aliveTeams.length <= 1) {
+        state.gameOver = true;
+        state.winner = aliveTeams.length === 1 ? aliveTeams[0] : -1;
       }
     }
 
     // Send state to each player
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < room.maxPlayers; i++) {
       const ws = room.players[i];
       if (ws && ws.readyState === 1) {
         const msg = serializeState(state, i);
@@ -1990,7 +1984,7 @@ function startGame(room) {
     // Send game over
     if (state.gameOver) {
       const goMsg = JSON.stringify({ type: 'gameover', winner: state.winner });
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < room.maxPlayers; i++) {
         const ws = room.players[i];
         if (ws && ws.readyState === 1) ws.send(goMsg);
       }
@@ -2001,7 +1995,7 @@ function startGame(room) {
 }
 
 // ── WebSocket Handler ───────────────────────────────────────────────
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, perMessageDeflate: true });
 
 wss.on('connection', (ws) => {
   let playerRoom = null;
@@ -2017,24 +2011,44 @@ wss.on('connection', (ws) => {
 
     switch (msg.type) {
       case 'create': {
-        const room = createRoom();
+        const maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, msg.maxPlayers || 2));
+        const mapSize = msg.mapSize || 'small';
+        const room = createRoom(maxPlayers, mapSize);
         room.players[0] = ws;
         playerRoom = room;
         playerTeam = 0;
-        ws.send(JSON.stringify({ type: 'created', code: room.code, team: 0 }));
-        console.log(`Room ${room.code} created`);
+        ws.send(JSON.stringify({
+          type: 'created',
+          code: room.code,
+          team: 0,
+          maxPlayers: room.maxPlayers,
+          mapW: room.mapW,
+          mapH: room.mapH,
+        }));
+        console.log(`Room ${room.code} created (${maxPlayers}p, ${mapSize})`);
         break;
       }
 
       case 'create_ai': {
-        const room = createRoom();
+        const maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, msg.maxPlayers || 2));
+        const mapSize = msg.mapSize || 'small';
+        const room = createRoom(maxPlayers, mapSize);
         room.players[0] = ws;
         room.ai = true;
+        room.aiCount = maxPlayers - 1;
         playerRoom = room;
         playerTeam = 0;
-        ws.send(JSON.stringify({ type: 'start' }));
+        const spawnZones = computeSpawnZones(room.mapW, room.mapH, maxPlayers);
+        ws.send(JSON.stringify({
+          type: 'start',
+          team: 0,
+          numTeams: maxPlayers,
+          mapW: room.mapW,
+          mapH: room.mapH,
+          spawnZones,
+        }));
         startGame(room);
-        console.log(`Room ${room.code} created (vs AI)`);
+        console.log(`Room ${room.code} created (vs ${room.aiCount} AI, ${mapSize})`);
         break;
       }
 
@@ -2045,27 +2059,66 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
           return;
         }
-        if (room.players[1]) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
-          return;
-        }
         if (room.started) {
           ws.send(JSON.stringify({ type: 'error', message: 'Game already started' }));
           return;
         }
-        room.players[1] = ws;
+        // Find first empty slot
+        let slot = -1;
+        for (let i = 0; i < room.maxPlayers; i++) {
+          if (room.players[i] === null) { slot = i; break; }
+        }
+        if (slot < 0) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+          return;
+        }
+        room.players[slot] = ws;
         playerRoom = room;
-        playerTeam = 1;
-        ws.send(JSON.stringify({ type: 'joined', code: room.code, team: 1 }));
-        console.log(`Player joined room ${room.code}`);
+        playerTeam = slot;
+        ws.send(JSON.stringify({
+          type: 'joined',
+          code: room.code,
+          team: slot,
+          maxPlayers: room.maxPlayers,
+          mapW: room.mapW,
+          mapH: room.mapH,
+        }));
+        console.log(`Player joined room ${room.code} as team ${slot}`);
 
-        // Notify both players and start
-        for (let i = 0; i < 2; i++) {
+        // Count connected players
+        let connected = 0;
+        for (let i = 0; i < room.maxPlayers; i++) {
+          if (room.players[i] !== null) connected++;
+        }
+
+        // Broadcast waiting update to all connected players
+        for (let i = 0; i < room.maxPlayers; i++) {
           if (room.players[i] && room.players[i].readyState === 1) {
-            room.players[i].send(JSON.stringify({ type: 'start' }));
+            room.players[i].send(JSON.stringify({
+              type: 'waiting_update',
+              connectedPlayers: connected,
+              maxPlayers: room.maxPlayers,
+            }));
           }
         }
-        startGame(room);
+
+        // Start when all slots filled
+        if (connected >= room.maxPlayers) {
+          const spawnZones = computeSpawnZones(room.mapW, room.mapH, room.maxPlayers);
+          for (let i = 0; i < room.maxPlayers; i++) {
+            if (room.players[i] && room.players[i].readyState === 1) {
+              room.players[i].send(JSON.stringify({
+                type: 'start',
+                team: i,
+                numTeams: room.maxPlayers,
+                mapW: room.mapW,
+                mapH: room.mapH,
+                spawnZones,
+              }));
+            }
+          }
+          startGame(room);
+        }
         break;
       }
 
@@ -2075,7 +2128,7 @@ wss.on('connection', (ws) => {
         const state = playerRoom.state;
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
-        if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) return;
+        if (px < 0 || px > state.mapW || py < 0 || py > state.mapH) return;
         if (!canBuildAtPoint(state, playerTeam, px, py)) return;
         if (state.mana[playerTeam] < C.TERRAIN_RAISE_COST) return;
         state.mana[playerTeam] -= C.TERRAIN_RAISE_COST;
@@ -2095,7 +2148,7 @@ wss.on('connection', (ws) => {
         const state = playerRoom.state;
         const { px, py } = msg;
         if (typeof px !== 'number' || typeof py !== 'number') return;
-        if (px < 0 || px > C.MAP_W || py < 0 || py > C.MAP_H) return;
+        if (px < 0 || px > state.mapW || py < 0 || py > state.mapH) return;
         if (!canBuildAtPoint(state, playerTeam, px, py)) return;
         if (state.mana[playerTeam] < C.TERRAIN_LOWER_COST) return;
         state.mana[playerTeam] -= C.TERRAIN_LOWER_COST;
@@ -2119,7 +2172,7 @@ wss.on('connection', (ws) => {
         if (powerDef.targeted) {
           const { x, y } = msg;
           if (typeof x !== 'number' || typeof y !== 'number') return;
-          if (x < 0 || x > C.MAP_W || y < 0 || y > C.MAP_H) return;
+          if (x < 0 || x > state.mapW || y < 0 || y > state.mapH) return;
         }
         let success = true;
         switch (powerDef.id) {
@@ -2144,7 +2197,7 @@ wss.on('connection', (ws) => {
         }
         if (success !== false) {
           if (powerDef.id === 'armageddon') {
-            state.mana[playerTeam] = 0; // costs all mana
+            state.mana[playerTeam] = 0;
           } else {
             state.mana[playerTeam] -= powerDef.cost;
           }
@@ -2175,7 +2228,6 @@ wss.on('connection', (ws) => {
         const { x, y } = msg;
         if (typeof x !== 'number' || typeof y !== 'number') return;
         playerRoom.state.magnetPos[playerTeam] = { x, y };
-        // Magnet placement removes swamps at that position
         const mx = Math.floor(x), my = Math.floor(y);
         const mkey = mx + ',' + my;
         if (playerRoom.state.swampSet.has(mkey)) {
@@ -2191,18 +2243,68 @@ wss.on('connection', (ws) => {
     if (!playerRoom) return;
     const room = playerRoom;
 
-    // If game is in progress and not AI room, other player wins
-    if (room.started && !room.state.gameOver && !room.ai) {
-      room.state.gameOver = true;
-      room.state.winner = playerTeam === 0 ? 1 : 0;
-      const goMsg = JSON.stringify({ type: 'gameover', winner: room.state.winner });
-      for (let i = 0; i < 2; i++) {
-        const ws2 = room.players[i];
-        if (ws2 && ws2 !== ws && ws2.readyState === 1) ws2.send(goMsg);
+    if (room.started && !room.state.gameOver) {
+      // Mark this team as eliminated
+      room.state.eliminated[playerTeam] = true;
+      room.players[playerTeam] = null;
+
+      // Check if only one human/ai team remains
+      let aliveTeams = [];
+      for (let t = 0; t < room.maxPlayers; t++) {
+        if (room.state.eliminated[t]) continue;
+        const stats = getTeamStats(room.state, t);
+        if (stats.pop > 0) aliveTeams.push(t);
       }
+
+      // For non-AI rooms, if only 1 team remains (or 0 humans left), game over
+      if (!room.ai) {
+        let humansAlive = 0;
+        for (let t = 0; t < room.maxPlayers; t++) {
+          if (room.players[t] !== null && !room.state.eliminated[t]) humansAlive++;
+        }
+        if (humansAlive <= 1 && aliveTeams.length <= 1) {
+          room.state.gameOver = true;
+          room.state.winner = aliveTeams.length === 1 ? aliveTeams[0] : -1;
+          const goMsg = JSON.stringify({ type: 'gameover', winner: room.state.winner });
+          for (let i = 0; i < room.maxPlayers; i++) {
+            const ws2 = room.players[i];
+            if (ws2 && ws2.readyState === 1) ws2.send(goMsg);
+          }
+          cleanupRoom(room.code);
+          return;
+        }
+      }
+    } else if (!room.started) {
+      // Remove from waiting room
+      room.players[playerTeam] = null;
+      // Broadcast update
+      let connected = 0;
+      for (let i = 0; i < room.maxPlayers; i++) {
+        if (room.players[i] !== null) connected++;
+      }
+      if (connected === 0) {
+        cleanupRoom(room.code);
+      } else {
+        for (let i = 0; i < room.maxPlayers; i++) {
+          if (room.players[i] && room.players[i].readyState === 1) {
+            room.players[i].send(JSON.stringify({
+              type: 'waiting_update',
+              connectedPlayers: connected,
+              maxPlayers: room.maxPlayers,
+            }));
+          }
+        }
+      }
+      return;
     }
 
-    cleanupRoom(room.code);
-    console.log(`Room ${room.code} cleaned up`);
+    // Check if all humans disconnected from a started game
+    let anyHuman = false;
+    for (let i = 0; i < room.maxPlayers; i++) {
+      if (room.players[i] !== null) { anyHuman = true; break; }
+    }
+    if (!anyHuman) cleanupRoom(room.code);
+
+    console.log(`Player ${playerTeam} left room ${room.code}`);
   });
 });

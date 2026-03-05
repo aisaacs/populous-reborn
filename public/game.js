@@ -13,6 +13,31 @@ const SLOPE_DARKEN = 20;
 const GRID_MODES = [null, 'rgba(0,0,0,0.15)', 'rgba(255,255,255,0.25)'];
 let gridMode = 2;
 
+// ── Dynamic Map Dimensions ──────────────────────────────────────────
+let localMapW = MAP_W;
+let localMapH = MAP_H;
+let numTeams = 2;
+
+// ── Crop Overlay Colors (per team) ──────────────────────────────────
+const CROP_OVERLAY_COLORS = [
+  'rgba(100,180,60,0.35)',   // Blue
+  'rgba(160,160,40,0.35)',   // Red
+  'rgba(60,180,100,0.35)',   // Green
+  'rgba(180,180,60,0.35)',   // Yellow
+  'rgba(140,100,180,0.35)',  // Purple
+  'rgba(180,140,60,0.35)',   // Orange
+];
+
+// ── Minimap Crop Colors (per team) ──────────────────────────────────
+const MINIMAP_CROP_COLORS = [
+  '#5a8a3a',  // Blue
+  '#8a8a2a',  // Red
+  '#3a8a5a',  // Green
+  '#8a8a3a',  // Yellow
+  '#6a4a8a',  // Purple
+  '#8a6a2a',  // Orange
+];
+
 // ── Terrain Textures ────────────────────────────────────────────────
 const TEX_NAMES = ['grass', 'rock', 'water', 'sand', 'snow', 'swamp'];
 const terrainTextures = {};
@@ -51,6 +76,14 @@ const SETT_LEVEL_NAMES = ['tent', 'hut', 'cottage', 'house', 'largehouse', 'mano
 const settlementSprites = {};
 let settlementSpritesLoaded = false;
 
+// Team tint colors for generating sprites for teams 2-5
+const TEAM_TINT_COLORS = {
+  green:  [60, 200, 60],
+  yellow: [220, 220, 40],
+  purple: [170, 70, 255],
+  orange: [255, 140, 30],
+};
+
 (function loadSettlementSprites() {
   let count = 0;
   const total = SETT_LEVEL_NAMES.length * 2;
@@ -59,11 +92,37 @@ let settlementSpritesLoaded = false;
       const key = name + '-' + team;
       const img = new Image();
       img.src = 'gfx/' + key + '.png';
-      img.onload = () => { if (++count === total) settlementSpritesLoaded = true; };
+      img.onload = () => {
+        if (++count === total) {
+          settlementSpritesLoaded = true;
+          // Generate tinted sprites for teams 2-5 based on blue sprites
+          generateTintedSettlementSprites();
+        }
+      };
       settlementSprites[key] = img;
     }
   }
 })();
+
+function generateTintedSettlementSprites() {
+  for (const name of SETT_LEVEL_NAMES) {
+    const baseImg = settlementSprites[name + '-blue'];
+    if (!baseImg || !baseImg.complete || baseImg.naturalWidth === 0) continue;
+    for (const teamName of ['green', 'yellow', 'purple', 'orange']) {
+      const key = name + '-' + teamName;
+      const canvas = document.createElement('canvas');
+      canvas.width = baseImg.width;
+      canvas.height = baseImg.height;
+      const tctx = canvas.getContext('2d');
+      tctx.drawImage(baseImg, 0, 0);
+      tctx.globalCompositeOperation = 'source-atop';
+      const [cr, cg, cb] = TEAM_TINT_COLORS[teamName];
+      tctx.fillStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',0.6)';
+      tctx.fillRect(0, 0, canvas.width, canvas.height);
+      settlementSprites[key] = canvas;
+    }
+  }
+}
 
 // ── Walker Sprites ────────────────────────────────────────────────────
 // Directions: se, nw (sprites), sw = mirror of se, ne = mirror of nw
@@ -75,7 +134,7 @@ let walkerSpritesLoaded = false;
   let count = 0;
   const dirs = ['se', 'nw'];
   const teams = ['blue', 'red'];
-  const total = dirs.length * teams.length * 2; // 2 dirs × 2 teams × 2 frames
+  const total = dirs.length * teams.length * 2; // 2 dirs x 2 teams x 2 frames
   for (const dir of dirs) {
     for (const team of teams) {
       for (let frame = 0; frame < 2; frame++) {
@@ -85,7 +144,12 @@ let walkerSpritesLoaded = false;
         const key = dir + '-' + team + '-' + frame;
         const img = new Image();
         img.src = 'gfx/' + file;
-        const done = () => { if (++count >= total) walkerSpritesLoaded = true; };
+        const done = () => {
+          if (++count >= total) {
+            walkerSpritesLoaded = true;
+            generateTintedWalkerSprites();
+          }
+        };
         img.onload = done;
         img.onerror = done;
         walkerSprites[key] = img;
@@ -93,6 +157,30 @@ let walkerSpritesLoaded = false;
     }
   }
 })();
+
+function generateTintedWalkerSprites() {
+  const dirs = ['se', 'nw'];
+  for (const dir of dirs) {
+    for (let frame = 0; frame < 2; frame++) {
+      const baseKey = dir + '-blue-' + frame;
+      const baseImg = walkerSprites[baseKey];
+      if (!baseImg || !baseImg.complete || baseImg.naturalWidth === 0) continue;
+      for (const teamName of ['green', 'yellow', 'purple', 'orange']) {
+        const key = dir + '-' + teamName + '-' + frame;
+        const canvas = document.createElement('canvas');
+        canvas.width = baseImg.width;
+        canvas.height = baseImg.height;
+        const tctx = canvas.getContext('2d');
+        tctx.drawImage(baseImg, 0, 0);
+        tctx.globalCompositeOperation = 'source-atop';
+        const [cr, cg, cb] = TEAM_TINT_COLORS[teamName];
+        tctx.fillStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',0.6)';
+        tctx.fillRect(0, 0, canvas.width, canvas.height);
+        walkerSprites[key] = canvas;
+      }
+    }
+  }
+}
 
 // ── Boulder Sprite ──────────────────────────────────────────────────
 const boulderImg = new Image();
@@ -381,7 +469,8 @@ let magnetPos = [{ x: 10, y: 10 }, { x: 50, y: 50 }];
 let teamMode = [MODE_SETTLE, MODE_SETTLE];
 let myMana = 0;
 let myTeam = -1;
-let walkerGrid = new Array(MAP_W * MAP_H);
+let walkerGrid = new Array(localMapW * localMapH);
+let homePos = null;
 
 // Power system state
 let swamps = [];
@@ -391,19 +480,33 @@ let trees = new Set();
 let pebbles = new Set();
 let ruins = []; // {x, y, team}
 let ruinSet = new Set();
-let cropSetBlue = new Set();
-let cropSetRed = new Set();
+let cropSets = []; // array of Sets, one per team
 let seaLevel = SEA_LEVEL;
-let leaders = [-1, -1];
+let leaders = [];
 let armageddon = false;
-let magnetLocked = [false, false];
-let teamPop = [0, 0];
+let magnetLocked = [];
+let teamPop = [];
 let fires = []; // {x, y, a (age in seconds)}
 let fireParticles = []; // client-side particles for rendering
 let targetingPower = null;
 let inspectMode = false;
 let inspectData = null; // {type:'settlement'|'walker', screenX, screenY, ...data}
 let magnetMode = false;
+
+// Initialize dynamic arrays
+function initTeamArrays(n) {
+  leaders = [];
+  magnetLocked = [];
+  teamPop = [];
+  cropSets = [];
+  for (let i = 0; i < n; i++) {
+    leaders.push(-1);
+    magnetLocked.push(false);
+    teamPop.push(0);
+    cropSets.push(new Set());
+  }
+}
+initTeamArrays(2);
 
 // ── Space Background ────────────────────────────────────────────────
 const STAR_COUNT = 300;
@@ -509,12 +612,6 @@ function getOrigin() {
 }
 
 // Clamp camera so viewport edges never scroll past the map edges.
-// The map diamond's bounding box in world space (relative to origin) is:
-//   left:   -MAP_H * TILE_HALF_W   (vertex 0,MAP_H)
-//   right:   MAP_W * TILE_HALF_W   (vertex MAP_W,0)
-//   top:    -MAX_HEIGHT * HEIGHT_STEP (vertex 0,0 at max height)
-//   bottom: (MAP_W+MAP_H) * TILE_HALF_H (vertex MAP_W,MAP_H)
-// We require viewport edges to stay inside this box.
 function clampCamera() {
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
@@ -522,14 +619,11 @@ function clampCamera() {
   const hvh = cy / zoom; // half viewport height in world space
 
   const pad = 48; // pixels of slack around the map
-  const mapL = -MAP_H * TILE_HALF_W - pad;
-  const mapR =  MAP_W * TILE_HALF_W + pad;
+  const mapL = -localMapH * TILE_HALF_W - pad;
+  const mapR =  localMapW * TILE_HALF_W + pad;
   const mapT = -MAX_HEIGHT * HEIGHT_STEP - pad;
-  const mapB = (MAP_W + MAP_H) * TILE_HALF_H + pad;
+  const mapB = (localMapW + localMapH) * TILE_HALF_H + pad;
 
-  // Viewport in world: [cx - hvw, cx + hvw] x [cy - hvh, cy + hvh]
-  // Map in world: [cx + camX + mapL, cx + camX + mapR] x [80 + camY + mapT, 80 + camY + mapB]
-  // Constraints: viewport left >= map left, viewport right <= map right, etc.
   const minCamX = hvw - mapR;
   const maxCamX = -mapL - hvw;
   const minCamY = cy + hvh - 80 - mapB;
@@ -538,7 +632,7 @@ function clampCamera() {
   if (minCamX <= maxCamX) {
     camX = Math.max(minCamX, Math.min(maxCamX, camX));
   } else {
-    camX = (minCamX + maxCamX) / 2; // map fits in viewport — center it
+    camX = (minCamX + maxCamX) / 2;
   }
 
   if (minCamY <= maxCamY) {
@@ -592,10 +686,10 @@ function getSettlementDiamondColor(team, level) {
 // ── Height Interpolation (for rendering) ────────────────────────────
 function heightAt(fx, fy) {
   const ix = Math.floor(fx), iy = Math.floor(fy);
-  const cx = Math.max(0, Math.min(MAP_W, ix));
-  const cy = Math.max(0, Math.min(MAP_H, iy));
-  const cx1 = Math.min(MAP_W, cx + 1);
-  const cy1 = Math.min(MAP_H, cy + 1);
+  const cx = Math.max(0, Math.min(localMapW, ix));
+  const cy = Math.max(0, Math.min(localMapH, iy));
+  const cx1 = Math.min(localMapW, cx + 1);
+  const cy1 = Math.min(localMapH, cy + 1);
   const fx2 = fx - ix, fy2 = fy - iy;
   const h00 = heights[cx][cy], h10 = heights[cx1][cy];
   const h01 = heights[cx][cy1], h11 = heights[cx1][cy1];
@@ -632,8 +726,7 @@ function drawTile(tx, ty) {
     const hcy = canvas.height / 2;
     const zox = hcx * (1 - zoom), zoy = hcy * (1 - zoom);
 
-    // Triangle 1: Top → Right → Bottom
-    // Maps image (0,0)→pTop, (iw,0)→pRight, (iw,ih)→pBottom
+    // Triangle 1: Top -> Right -> Bottom
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(pTop.x, pTop.y);
@@ -653,8 +746,7 @@ function drawTile(tx, ty) {
     ctx.drawImage(tex, 0, 0);
     ctx.restore();
 
-    // Triangle 2: Top → Bottom → Left
-    // Maps image (0,0)→pTop, (iw,ih)→pBottom, (0,ih)→pLeft
+    // Triangle 2: Top -> Bottom -> Left
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(pTop.x, pTop.y);
@@ -690,14 +782,14 @@ function drawTile(tx, ty) {
     drawWaterSparkles(pTop, pRight, pBottom, pLeft, time, tx, ty);
   }
 
-  // Crop overlay
+  // Crop overlay — loop through all team crop sets
   const tileKey = tx + ',' + ty;
-  if (cropSetBlue.has(tileKey)) {
-    ctx.fillStyle = 'rgba(100, 180, 60, 0.35)';
-    ctx.fill();
-  } else if (cropSetRed.has(tileKey)) {
-    ctx.fillStyle = 'rgba(160, 160, 40, 0.35)';
-    ctx.fill();
+  for (let ci = 0; ci < cropSets.length; ci++) {
+    if (cropSets[ci].has(tileKey)) {
+      ctx.fillStyle = CROP_OVERLAY_COLORS[ci] || CROP_OVERLAY_COLORS[0];
+      ctx.fill();
+      break;
+    }
   }
 
   // Swamp overlay
@@ -789,12 +881,12 @@ function drawTile(tx, ty) {
 }
 
 function rebuildWalkerGrid() {
-  for (let i = 0; i < MAP_W * MAP_H; i++) walkerGrid[i] = null;
+  for (let i = 0; i < localMapW * localMapH; i++) walkerGrid[i] = null;
   for (let i = 0; i < walkers.length; i++) {
     const w = walkers[i];
     const tx = Math.floor(w.x), ty = Math.floor(w.y);
-    if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) continue;
-    const key = ty * MAP_W + tx;
+    if (tx < 0 || tx >= localMapW || ty < 0 || ty >= localMapH) continue;
+    const key = ty * localMapW + tx;
     if (!walkerGrid[key]) walkerGrid[key] = [];
     walkerGrid[key].push(w);
   }
@@ -806,7 +898,6 @@ function getWalkerDirection(w) {
   const dx = w.tx - w.x;
   const dy = w.ty - w.y;
   if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return 'se'; // stationary
-  // In isometric: +gx = screen SE, -gx = screen NW, +gy = screen SW, -gy = screen NE
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0 ? 'se' : 'nw';
   } else {
@@ -819,14 +910,13 @@ function drawWalker(w) {
   const p = project(w.x, w.y, h);
   const isKnight = w.isKnight;
   const isLeader = w.isLeader;
-  const team = w.team === TEAM_BLUE ? 'blue' : 'red';
+  const team = TEAM_SPRITE_NAMES[w.team] || 'blue';
 
   // Determine direction and animation frame
   const dir = getWalkerDirection(w);
-  const animFrame = Math.floor(performance.now() / 250) % 2; // alternate every 250ms
+  const animFrame = Math.floor(performance.now() / 250) % 2;
 
   // Map direction to sprite key + mirror flag
-  // se/nw have direct sprites; sw mirrors se, ne mirrors nw
   let spriteDir, mirror;
   if (dir === 'se') { spriteDir = 'se'; mirror = false; }
   else if (dir === 'nw') { spriteDir = 'nw'; mirror = false; }
@@ -835,18 +925,17 @@ function drawWalker(w) {
 
   const key = spriteDir + '-' + team + '-' + animFrame;
   const img = walkerSprites[key];
-  const spriteH = isKnight ? 18 : 14; // screen pixels tall
-  const spriteReady = walkerSpritesLoaded && img && img.complete && img.naturalWidth > 0;
+  const spriteH = isKnight ? 18 : 14;
+  const spriteReady = walkerSpritesLoaded && img && (img instanceof HTMLCanvasElement || (img.complete && img.naturalWidth > 0));
 
   if (spriteReady) {
-    const scale = spriteH / img.height;
-    const spriteW = img.width * scale;
+    const scale = spriteH / (img.height || img.naturalHeight || 14);
+    const spriteW = (img.width || img.naturalWidth || 14) * scale;
     const drawX = p.x - spriteW / 2;
-    const drawY = p.y - spriteH + 2; // feet at walker position
+    const drawY = p.y - spriteH + 2;
 
     ctx.save();
     if (mirror) {
-      // Flip horizontally around the walker's center x
       ctx.translate(p.x, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(img, -spriteW / 2, drawY, spriteW, spriteH);
@@ -899,7 +988,7 @@ function drawWalker(w) {
 function drawSettlement(s) {
   const h = heights[s.tx][s.ty];
 
-  // Diamond footprint: 1 tile for levels 1-8, 3×3 for castle (level 9)
+  // Diamond footprint: 1 tile for levels 1-8, 3x3 for castle (level 9)
   const cx = s.ox + s.sz * 0.5;
   const cy = s.oy + s.sz * 0.5;
   const he = s.sz * 0.5;
@@ -928,18 +1017,18 @@ function drawSettlement(s) {
 
   // Sprite: center at top corner of diamond, bottom-center at bottom corner
   if (settlementSpritesLoaded && s.l >= 1 && s.l <= SETT_LEVEL_NAMES.length) {
-    const team = s.t === TEAM_BLUE ? 'blue' : 'red';
+    const team = TEAM_SPRITE_NAMES[s.t] || 'blue';
     const key = SETT_LEVEL_NAMES[s.l - 1] + '-' + team;
     const img = settlementSprites[key];
-    if (img && img.complete) {
+    if (img && (img instanceof HTMLCanvasElement || (img.complete && img.naturalWidth > 0))) {
+      const imgW = img.width || img.naturalWidth;
+      const imgH = img.height || img.naturalHeight;
       const tileH = pBottom.y - pTop.y;
-      // Fill %: 55% tent, 75% hut, 85% cottage-manor, 95% towerhouse/fortress, 55% castle (3×3)
       const fillPct = s.sz >= 5 ? 0.55 : s.l === 1 ? 0.55 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
-      // Anchor sprite: tent/small sit lower, castle sits centered
       const centerY = s.sz >= 5 ? pTop.y + tileH * 0.45 : s.l === 1 ? pTop.y + tileH * 0.35 : pTop.y + tileH * 0.25;
       const dh = tileH * fillPct / 0.75;
-      const scale = dh / img.height;
-      const dw = img.width * scale;
+      const scale = dh / imgH;
+      const dw = imgW * scale;
       ctx.drawImage(img, pTop.x - dw / 2, centerY - dh / 2, dw, dh);
     }
   }
@@ -967,18 +1056,24 @@ function drawSettlement(s) {
 const BEACON_COLORS = [
   { core: '130,180,255', glow: '60,120,255', base: '100,160,255' },   // TEAM_BLUE
   { core: '255,160,130', glow: '255,60,40',  base: '255,100,80' },    // TEAM_RED
+  { core: '130,255,130', glow: '40,200,40',  base: '80,220,80' },     // TEAM_GREEN
+  { core: '255,255,130', glow: '200,200,40', base: '220,220,80' },    // TEAM_YELLOW
+  { core: '200,130,255', glow: '140,40,255', base: '170,80,255' },    // TEAM_PURPLE
+  { core: '255,180,100', glow: '255,120,30', base: '255,150,60' },    // TEAM_ORANGE
 ];
 
 function drawMagnetFlag(team) {
+  if (team >= magnetPos.length) return;
   const mp = magnetPos[team];
+  if (!mp) return;
   const h = heightAt(mp.x, mp.y);
   const p = project(mp.x, mp.y, h);
   const sx = p.x, sy = p.y;
   const time = performance.now() / 1000;
-  const isLocked = magnetLocked[team];
-  const colors = BEACON_COLORS[team];
+  const isLocked = magnetLocked[team] || false;
+  const colors = BEACON_COLORS[team] || BEACON_COLORS[0];
 
-  // Pulse (gentle 0.85–1.0) or locked flicker (stuttery)
+  // Pulse (gentle 0.85-1.0) or locked flicker (stuttery)
   const pulse = 0.85 + 0.15 * Math.sin(time * 2.5);
   const flicker = isLocked
     ? (Math.sin(time * 17) > 0.3 ? 0.4 : 0.15)
@@ -1071,15 +1166,14 @@ function drawMagnetFlag(team) {
 function updateFireParticles(dt) {
   // Spawn particles for active fires
   for (const f of fires) {
-    // Spawn rate decreases as fire ages (5s total life)
     const intensity = Math.max(0, 1 - f.a / 5);
-    const spawnCount = Math.floor(intensity * 3 * dt * 60); // ~3 per frame at full intensity
+    const spawnCount = Math.floor(intensity * 3 * dt * 60);
     for (let i = 0; i < spawnCount; i++) {
       fireParticles.push({
         x: f.x + 0.3 + Math.random() * 0.4,
         y: f.y + 0.3 + Math.random() * 0.4,
         vx: (Math.random() - 0.5) * 0.3,
-        vy: -0.5 - Math.random() * 0.8, // rise upward in screen space
+        vy: -0.5 - Math.random() * 0.8,
         life: 0.4 + Math.random() * 0.6,
         maxLife: 0.4 + Math.random() * 0.6,
         size: 1.5 + Math.random() * 2.5,
@@ -1095,8 +1189,8 @@ function updateFireParticles(dt) {
       continue;
     }
     p.x += p.vx * dt;
-    p.vy -= 0.5 * dt; // slight acceleration upward
-    p.size *= (1 - 0.5 * dt); // shrink
+    p.vy -= 0.5 * dt;
+    p.size *= (1 - 0.5 * dt);
   }
 }
 
@@ -1157,8 +1251,8 @@ function onArmageddonStart() {
   fallingTileTimer = 0;
   fallingFrontier = [];
   // Seed frontier with all map edge tiles
-  for (let x = 0; x < MAP_W; x++) { fallingFrontier.push([x, 0]); fallingFrontier.push([x, MAP_H - 1]); }
-  for (let y = 1; y < MAP_H - 1; y++) { fallingFrontier.push([0, y]); fallingFrontier.push([MAP_W - 1, y]); }
+  for (let x = 0; x < localMapW; x++) { fallingFrontier.push([x, 0]); fallingFrontier.push([x, localMapH - 1]); }
+  for (let y = 1; y < localMapH - 1; y++) { fallingFrontier.push([0, y]); fallingFrontier.push([localMapW - 1, y]); }
 
   // Pick ~15 bright stars to go supernova at staggered times
   supernovaStars = [];
@@ -1168,7 +1262,7 @@ function onArmageddonStart() {
     const s = candidates.splice(idx, 1)[0];
     supernovaStars.push({
       star: s,
-      delay: Math.random() * 4,       // staggered over 4 seconds
+      delay: Math.random() * 4,
       ringRadius: 0,
       ringAlpha: 1,
       exploded: false,
@@ -1180,14 +1274,14 @@ function updateArmageddonEffects(dt) {
   if (!armageddon) return;
   const elapsed = performance.now() / 1000 - armageddonStartTime;
 
-  // Screen shake — intense at start, fades out over ~8 seconds
+  // Screen shake
   const shakeIntensity = elapsed < 2 ? 8 * (1 - elapsed / 2)
     : elapsed < 8 ? (1.5 + Math.sin(elapsed * 7) * 0.5) * (1 - (elapsed - 2) / 6)
     : 0;
   armageddonShake.x = (Math.random() - 0.5) * shakeIntensity * 2;
   armageddonShake.y = (Math.random() - 0.5) * shakeIntensity * 2;
 
-  // Spawn embers (burning particles falling from sky)
+  // Spawn embers
   if (armageddonEmbers.length < EMBER_MAX && Math.random() < 0.4) {
     armageddonEmbers.push({
       x: Math.random() * canvas.width,
@@ -1206,7 +1300,7 @@ function updateArmageddonEffects(dt) {
     const e = armageddonEmbers[i];
     e.x += e.vx * dt;
     e.y += e.vy * dt;
-    e.vy += 15 * dt; // gentle gravity
+    e.vy += 15 * dt;
     e.life -= dt;
     if (e.life <= 0 || e.y > canvas.height + 20) {
       armageddonEmbers.splice(i, 1);
@@ -1222,15 +1316,14 @@ function updateArmageddonEffects(dt) {
       sn.ringAlpha = 1;
     }
     const snElapsed = elapsed - sn.delay;
-    sn.ringRadius = snElapsed * 120; // expand at 120px/sec
-    sn.ringAlpha = Math.max(0, 1 - snElapsed / 3); // fade over 3s
+    sn.ringRadius = snElapsed * 120;
+    sn.ringAlpha = Math.max(0, 1 - snElapsed / 3);
   }
 
   // Falling tiles — erode edges progressively from map edges inward
   if (elapsed > 3 && heights.length > 0) {
-    // Spawn falling tiles from the frontier (edge-adjacent tiles)
     fallingTileTimer += dt;
-    const spawnInterval = Math.max(0.05, 0.3 - elapsed * 0.003); // speeds up over time
+    const spawnInterval = Math.max(0.05, 0.3 - elapsed * 0.003);
     while (fallingTileTimer >= spawnInterval && fallingTiles.length < FALLING_TILE_MAX) {
       fallingTileTimer -= spawnInterval;
 
@@ -1245,7 +1338,6 @@ function updateArmageddonEffects(dt) {
       // Pick a random frontier tile
       const idx = Math.floor(Math.random() * fallingFrontier.length);
       const [tx, ty] = fallingFrontier[idx];
-      // Swap-remove
       fallingFrontier[idx] = fallingFrontier[fallingFrontier.length - 1];
       fallingFrontier.pop();
 
@@ -1255,7 +1347,7 @@ function updateArmageddonEffects(dt) {
       // Add neighbors to frontier
       for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
         const nx = tx + dx, ny = ty + dy;
-        if (nx >= 0 && nx < MAP_W && ny >= 0 && ny < MAP_H && !fallenTileSet.has(nx + ',' + ny)) {
+        if (nx >= 0 && nx < localMapW && ny >= 0 && ny < localMapH && !fallenTileSet.has(nx + ',' + ny)) {
           fallingFrontier.push([nx, ny]);
         }
       }
@@ -1267,11 +1359,11 @@ function updateArmageddonEffects(dt) {
 
       fallingTiles.push({
         tx, ty, t, r, b, l, color,
-        offsetY: 0,       // how far it's fallen (in pixels)
-        vy: 5 + Math.random() * 20,  // initial fall speed
+        offsetY: 0,
+        vy: 5 + Math.random() * 20,
         rotAngle: 0,
-        rotSpeed: (Math.random() - 0.5) * 3,  // tumble
-        driftX: (Math.random() - 0.5) * 30,   // slight horizontal drift
+        rotSpeed: (Math.random() - 0.5) * 3,
+        driftX: (Math.random() - 0.5) * 30,
         alpha: 1,
         fallen: true,
       });
@@ -1281,7 +1373,7 @@ function updateArmageddonEffects(dt) {
   // Update falling tiles
   for (let i = fallingTiles.length - 1; i >= 0; i--) {
     const ft = fallingTiles[i];
-    ft.vy += 180 * dt; // gravity
+    ft.vy += 180 * dt;
     ft.offsetY += ft.vy * dt;
     ft.rotAngle += ft.rotSpeed * dt;
     ft.alpha = Math.max(0, 1 - ft.offsetY / 600);
@@ -1297,7 +1389,7 @@ function drawSpaceBackground(time) {
 
   // Sky color shifts red during armageddon
   if (armageddon) {
-    const redShift = Math.min(1, elapsed / 8); // full shift over 8 seconds
+    const redShift = Math.min(1, elapsed / 8);
     const r = Math.floor(5 + redShift * 25);
     const g = Math.floor(8 - redShift * 4);
     const b = Math.floor(15 - redShift * 10);
@@ -1307,14 +1399,13 @@ function drawSpaceBackground(time) {
   }
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Nebula (cached) — tint red during armageddon
+  // Nebula (cached)
   if (!nebulaCanvas || nebulaCanvas.width !== canvas.width || nebulaCanvas.height !== canvas.height) {
     buildNebulaCanvas(canvas.width, canvas.height);
   }
   ctx.drawImage(nebulaCanvas, 0, 0);
 
   if (armageddon) {
-    // Red nebula overlay that intensifies
     const redIntensity = Math.min(0.15, elapsed * 0.02);
     const rGrad = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.4, 0,
       canvas.width * 0.5, canvas.height * 0.4, canvas.width * 0.6);
@@ -1331,12 +1422,10 @@ function drawSpaceBackground(time) {
     let size = star.size;
     let r = 255, g = 255, b = 255;
 
-    // During armageddon, stars brighten and shift warm
     if (armageddon) {
       const boost = Math.min(1, elapsed / 5);
       alpha = Math.min(1, alpha * (1 + boost * 1.5));
       size = star.size * (1 + boost * 0.8);
-      // Shift to warm orange-red
       g = Math.floor(255 - boost * 80);
       b = Math.floor(255 - boost * 160);
     }
@@ -1383,7 +1472,6 @@ function drawSpaceBackground(time) {
       const sx = Math.floor(sn.star.x * canvas.width);
       const sy = Math.floor(sn.star.y * canvas.height);
 
-      // Bright flash at center (fades faster)
       const flashAlpha = Math.min(1, sn.ringAlpha * 2);
       if (flashAlpha > 0.05) {
         const flashR = 4 + (1 - sn.ringAlpha) * 12;
@@ -1395,7 +1483,6 @@ function drawSpaceBackground(time) {
         ctx.fillRect(sx - flashR, sy - flashR, flashR * 2, flashR * 2);
       }
 
-      // Expanding ring
       if (sn.ringRadius > 5) {
         ctx.beginPath();
         ctx.arc(sx, sy, sn.ringRadius, 0, Math.PI * 2);
@@ -1403,7 +1490,6 @@ function drawSpaceBackground(time) {
         ctx.lineWidth = 2 + sn.ringAlpha * 3;
         ctx.stroke();
 
-        // Inner glow ring
         ctx.beginPath();
         ctx.arc(sx, sy, sn.ringRadius * 0.85, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(255, 200, 120, ${(sn.ringAlpha * 0.15).toFixed(2)})`;
@@ -1411,10 +1497,9 @@ function drawSpaceBackground(time) {
         ctx.stroke();
       }
 
-      // Cross spike during flash
       if (sn.ringAlpha > 0.5) {
         const spikeLen = 20 + (1 - sn.ringAlpha) * 60;
-        const spikeA = (sn.ringAlpha - 0.5) * 2; // 0..1 during first half
+        const spikeA = (sn.ringAlpha - 0.5) * 2;
         ctx.beginPath();
         ctx.moveTo(sx - spikeLen, sy); ctx.lineTo(sx + spikeLen, sy);
         ctx.moveTo(sx, sy - spikeLen); ctx.lineTo(sx, sy + spikeLen);
@@ -1449,7 +1534,7 @@ function drawArmageddonEmbers() {
   }
 }
 
-// Draw falling tiles in world space (they tumble off the map edges)
+// Draw falling tiles in world space
 function drawFallingTiles() {
   if (!armageddon || fallingTiles.length === 0) return;
   for (const ft of fallingTiles) {
@@ -1458,17 +1543,14 @@ function drawFallingTiles() {
     const pBottom = project(ft.tx + 1, ft.ty + 1, ft.b);
     const pLeft   = project(ft.tx,     ft.ty + 1, ft.l);
 
-    // Center of tile
     const cx = (pTop.x + pRight.x + pBottom.x + pLeft.x) / 4;
     const cy = (pTop.y + pRight.y + pBottom.y + pLeft.y) / 4;
 
     ctx.save();
     ctx.globalAlpha = ft.alpha;
-    // Translate to tile center, apply fall offset + drift, rotate, translate back
     ctx.translate(cx + ft.driftX * (ft.offsetY / 200), cy + ft.offsetY);
     ctx.rotate(ft.rotAngle);
 
-    // Draw the tile diamond relative to center
     ctx.beginPath();
     ctx.moveTo(pTop.x - cx, pTop.y - cy);
     ctx.lineTo(pRight.x - cx, pRight.y - cy);
@@ -1478,7 +1560,6 @@ function drawFallingTiles() {
     ctx.fillStyle = ft.color;
     ctx.fill();
 
-    // Thin dark edge to give depth
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
@@ -1489,7 +1570,7 @@ function drawFallingTiles() {
 
 // ── Waterfall System ────────────────────────────────────────────────
 function clientIsTileWater(tx, ty) {
-  if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
+  if (tx < 0 || tx >= localMapW || ty < 0 || ty >= localMapH) return true;
   return heights[tx][ty] <= seaLevel &&
          heights[tx + 1][ty] <= seaLevel &&
          heights[tx + 1][ty + 1] <= seaLevel &&
@@ -1498,21 +1579,19 @@ function clientIsTileWater(tx, ty) {
 
 function spawnWaterfallParticles(dt) {
   if (heights.length === 0) return;
-  const rate = 3; // particles per edge tile per second
-  // Only front edges (bottom-right in isometric): x=MAP_W-1 and y=MAP_H-1
-  for (let x = 0; x < MAP_W; x++) {
-    if (clientIsTileWater(x, MAP_H - 1)) spawnAtEdge(x, MAP_H - 1, dt, rate);
+  const rate = 3;
+  for (let x = 0; x < localMapW; x++) {
+    if (clientIsTileWater(x, localMapH - 1)) spawnAtEdge(x, localMapH - 1, dt, rate);
   }
-  for (let y = 0; y < MAP_H - 1; y++) {
-    if (clientIsTileWater(MAP_W - 1, y)) spawnAtEdge(MAP_W - 1, y, dt, rate);
+  for (let y = 0; y < localMapH - 1; y++) {
+    if (clientIsTileWater(localMapW - 1, y)) spawnAtEdge(localMapW - 1, y, dt, rate);
   }
 }
 
-let wfNextIdx = 0; // round-robin index for particle pool
+let wfNextIdx = 0;
 function spawnAtEdge(tx, ty, dt, rate) {
   if (Math.random() > rate * dt) return;
 
-  // Find an inactive particle via round-robin
   let wp = null;
   for (let i = 0; i < 20; i++) {
     const candidate = waterfallParticles[wfNextIdx];
@@ -1521,14 +1600,10 @@ function spawnAtEdge(tx, ty, dt, rate) {
   }
   if (!wp) return;
 
-  // Spawn along the outer edge of the tile
-  // Right map edge (x=MAP_W-1): outer edge runs from (tx+1,ty) to (tx+1,ty+1)
-  // Bottom map edge (y=MAP_H-1): outer edge runs from (tx,ty+1) to (tx+1,ty+1)
-  const t = Math.random(); // interpolation along the edge
+  const t = Math.random();
   let gx, gy, dvx = 0, dvy = 0;
 
-  if (tx === MAP_W - 1 && ty === MAP_H - 1) {
-    // Corner tile — randomly pick one of the two edges
+  if (tx === localMapW - 1 && ty === localMapH - 1) {
     if (Math.random() < 0.5) {
       gx = tx + 1; gy = ty + t;
       dvx = 6; dvy = 3;
@@ -1536,12 +1611,10 @@ function spawnAtEdge(tx, ty, dt, rate) {
       gx = tx + t; gy = ty + 1;
       dvx = -3; dvy = 6;
     }
-  } else if (tx === MAP_W - 1) {
-    // Right edge: line from (tx+1, ty) to (tx+1, ty+1)
+  } else if (tx === localMapW - 1) {
     gx = tx + 1; gy = ty + t;
     dvx = 6; dvy = 3;
   } else {
-    // Bottom edge: line from (tx, ty+1) to (tx+1, ty+1)
     gx = tx + t; gy = ty + 1;
     dvx = -3; dvy = 6;
   }
@@ -1563,7 +1636,7 @@ function updateWaterfallParticles(dt) {
     if (!p.active) continue;
     p.ox += p.vx * dt;
     p.oy += p.vy * dt;
-    p.vy += 25 * dt; // gravity into the void
+    p.vy += 25 * dt;
     p.life -= dt;
     if (p.life <= 0) p.active = false;
   }
@@ -1582,17 +1655,15 @@ function drawWaterfallParticles() {
 }
 
 function drawEdgeMist() {
-  // Only front edges (bottom-right in isometric)
-  for (let x = 0; x < MAP_W; x++) {
-    if (clientIsTileWater(x, MAP_H - 1)) drawMistAt(project(x + 0.5, MAP_H - 0.5, 0));
+  for (let x = 0; x < localMapW; x++) {
+    if (clientIsTileWater(x, localMapH - 1)) drawMistAt(project(x + 0.5, localMapH - 0.5, 0));
   }
-  for (let y = 0; y < MAP_H - 1; y++) {
-    if (clientIsTileWater(MAP_W - 1, y)) drawMistAt(project(MAP_W - 0.5, y + 0.5, 0));
+  for (let y = 0; y < localMapH - 1; y++) {
+    if (clientIsTileWater(localMapW - 1, y)) drawMistAt(project(localMapW - 0.5, y + 0.5, 0));
   }
 }
 
 function drawMistAt(p) {
-  // Cull off-screen
   const cx2 = canvas.width / 2, cy2 = canvas.height / 2;
   const sx = p.x * zoom + cx2 * (1 - zoom);
   const sy = p.y * zoom + cy2 * (1 - zoom);
@@ -1622,19 +1693,35 @@ function getTeamStats(team) {
   return { pop, set, walk };
 }
 
+// ── Dynamic Population Bars ─────────────────────────────────────────
+function buildPopBars(n) {
+  const container = document.getElementById('pop-bars');
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const color = TEAM_COLORS[i] || '#888';
+    const label = TEAM_NAMES[i] ? TEAM_NAMES[i].charAt(0) : '?';
+    const row = document.createElement('div');
+    row.className = 'pop-row';
+    row.innerHTML =
+      '<span class="pop-label" style="color:' + color + '">' + label + '</span>' +
+      '<div class="pop-bar-bg"><div class="pop-bar-fill" id="pop-bar-' + i + '" style="width:0;background:' + color + '"></div></div>' +
+      '<span class="pop-val" id="pop-val-' + i + '">0</span>';
+    container.appendChild(row);
+  }
+}
+
 function updateSidebar() {
   const maxPop = 800;
-  const bluePct = Math.min(100, (teamPop[TEAM_BLUE] / maxPop) * 100);
-  const redPct = Math.min(100, (teamPop[TEAM_RED] / maxPop) * 100);
 
-  const popBarBlue = document.getElementById('pop-bar-blue');
-  const popBarRed = document.getElementById('pop-bar-red');
-  const popValBlue = document.getElementById('pop-val-blue');
-  const popValRed = document.getElementById('pop-val-red');
-  if (popBarBlue) popBarBlue.style.width = bluePct + '%';
-  if (popBarRed) popBarRed.style.width = redPct + '%';
-  if (popValBlue) popValBlue.textContent = teamPop[TEAM_BLUE];
-  if (popValRed) popValRed.textContent = teamPop[TEAM_RED];
+  // Update pop bars for all teams
+  for (let i = 0; i < numTeams; i++) {
+    const pct = Math.min(100, ((teamPop[i] || 0) / maxPop) * 100);
+    const popBar = document.getElementById('pop-bar-' + i);
+    const popVal = document.getElementById('pop-val-' + i);
+    if (popBar) popBar.style.width = pct + '%';
+    if (popVal) popVal.textContent = teamPop[i] || 0;
+  }
 
   // Mana
   const manaPct = Math.min(100, (myMana / MANA_MAX) * 100);
@@ -1657,15 +1744,25 @@ function updateSidebar() {
   if (magBtn) magBtn.classList.toggle('active', magnetMode);
 
   // Stats
-  const otherTeam = myTeam === 0 ? 1 : 0;
   const myStats = getTeamStats(myTeam);
-  const oppStats = getTeamStats(otherTeam);
   const el = id => document.getElementById(id);
   const s = (id, v) => { const e = el(id); if (e) e.textContent = v; };
   s('stat-my-set', myStats.set);
   s('stat-my-walk', myStats.walk);
-  s('stat-opp-set', oppStats.set);
-  s('stat-opp-walk', oppStats.walk);
+
+  // Opponent stats — show all non-own teams
+  const oppDiv = document.getElementById('opp-stats');
+  if (oppDiv) {
+    let html = '';
+    for (let t = 0; t < numTeams; t++) {
+      if (t === myTeam) continue;
+      const oppStats = getTeamStats(t);
+      const color = TEAM_COLORS[t] || '#888';
+      const name = TEAM_NAMES[t] || 'Team ' + t;
+      html += '<div class="stat-line" style="color:' + color + '">' + name + ': <span class="stat-val">' + oppStats.set + 's / ' + oppStats.walk + 'w</span></div>';
+    }
+    oppDiv.innerHTML = html;
+  }
 }
 
 function showSidebar() {
@@ -1674,11 +1771,13 @@ function showSidebar() {
 }
 
 function centerOnHome() {
-  const home = myTeam === 0 ? { x: 10, y: 10 } : { x: 50, y: 50 };
-  // Set camera so home tile projects to screen center (before zoom, since zoom is around center)
-  // project(hx,hy,h) = (origin.x + (hx-hy)*THW, origin.y + (hx+hy)*THH - h*HS)
-  // origin = (canvas.width/2 + camX, 80 + camY)
-  // We want projected point = screen center = (canvas.width/2, canvas.height/2)
+  let home;
+  if (homePos) {
+    home = homePos;
+  } else {
+    // Fallback: center of map
+    home = { x: localMapW / 2, y: localMapH / 2 };
+  }
   const h = 3; // approximate land height
   camX = -(home.x - home.y) * TILE_HALF_W;
   camY = canvas.height / 2 - 80 - (home.x + home.y) * TILE_HALF_H + h * HEIGHT_STEP;
@@ -1708,8 +1807,8 @@ function render() {
   drawFallingTiles();
 
   // Pass 1: terrain (skip tiles that have fallen off during armageddon)
-  for (let row = 0; row < MAP_H; row++) {
-    for (let col = 0; col < MAP_W; col++) {
+  for (let row = 0; row < localMapH; row++) {
+    for (let col = 0; col < localMapW; col++) {
       if (fallenTileSet.has(col + ',' + row)) continue;
       drawTile(col, row);
     }
@@ -1743,16 +1842,14 @@ function render() {
   if (targetingPower) {
     const powerDef = POWERS.find(p => p.id === targetingPower);
     if (powerDef) {
-      // Get grid position under cursor
       const { px, py } = screenToGrid(mouseX, mouseY);
       let radius = 0;
       if (targetingPower === 'earthquake') radius = EARTHQUAKE_RADIUS;
       else if (targetingPower === 'volcano') radius = VOLCANO_RADIUS;
 
       if (radius > 0) {
-        // Draw radius overlay
-        for (let tx = Math.max(0, px - radius); tx < Math.min(MAP_W, px + radius); tx++) {
-          for (let ty = Math.max(0, py - radius); ty < Math.min(MAP_H, py + radius); ty++) {
+        for (let tx = Math.max(0, px - radius); tx < Math.min(localMapW, px + radius); tx++) {
+          for (let ty = Math.max(0, py - radius); ty < Math.min(localMapH, py + radius); ty++) {
             const dx = tx + 0.5 - px, dy = ty + 0.5 - py;
             if (dx * dx + dy * dy < radius * radius) {
               const t = heights[tx][ty], r = heights[tx + 1][ty];
@@ -1773,9 +1870,8 @@ function render() {
           }
         }
       } else if (targetingPower === 'swamp') {
-        // Single tile highlight
         const tx = Math.floor(px), ty = Math.floor(py);
-        if (tx >= 0 && tx < MAP_W && ty >= 0 && ty < MAP_H) {
+        if (tx >= 0 && tx < localMapW && ty >= 0 && ty < localMapH) {
           const t = heights[tx][ty], r = heights[tx + 1][ty];
           const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
           const pTop    = project(tx,     ty,     t);
@@ -1795,9 +1891,10 @@ function render() {
     }
   }
 
-  // Magnet flags
-  drawMagnetFlag(TEAM_BLUE);
-  drawMagnetFlag(TEAM_RED);
+  // Magnet flags — draw for all teams
+  for (let t = 0; t < numTeams; t++) {
+    drawMagnetFlag(t);
+  }
 
   // Waterfall particles (front edges, falling into the void)
   drawWaterfallParticles();
@@ -1842,14 +1939,12 @@ function render() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Glow layers
     ctx.shadowColor = `rgba(255, 40, 0, ${(pulse * 0.8).toFixed(2)})`;
     ctx.shadowBlur = 30 + pulse * 20;
     ctx.font = "bold 52px 'Cinzel Decorative', 'Cinzel', serif";
     ctx.fillStyle = `rgba(255, ${Math.floor(60 + pulse * 40)}, 0, 0.95)`;
     ctx.fillText('ARMAGEDDON', cx, 55);
 
-    // Sharper inner text
     ctx.shadowBlur = 0;
     ctx.fillStyle = `rgba(255, ${Math.floor(180 + pulse * 75)}, ${Math.floor(80 + pulse * 60)}, 1)`;
     ctx.fillText('ARMAGEDDON', cx, 55);
@@ -1864,11 +1959,9 @@ function render() {
     const cy = canvas.height / 2;
     const won = gameWinner === myTeam;
 
-    // Darken background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Radial highlight in winner's color
     const hlColor = won ? 'rgba(40, 80, 200, 0.12)' : 'rgba(200, 40, 40, 0.08)';
     const hlGrad = ctx.createRadialGradient(cx, cy - 40, 0, cx, cy - 40, 300);
     hlGrad.addColorStop(0, hlColor);
@@ -1880,7 +1973,6 @@ function render() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Main result text
     const resultText = won ? 'VICTORY' : 'DEFEAT';
     const resultColor = won ? '#6aafff' : '#ff5544';
     const glowColor = won ? 'rgba(80, 140, 255, 0.6)' : 'rgba(255, 60, 40, 0.5)';
@@ -1892,11 +1984,9 @@ function render() {
     ctx.fillStyle = resultColor;
     ctx.fillText(resultText, cx, cy - 50);
 
-    // Sharper pass
     ctx.shadowBlur = 0;
     ctx.fillText(resultText, cx, cy - 50);
 
-    // Subtitle
     ctx.font = "300 18px 'Raleway', sans-serif";
     ctx.letterSpacing = '4px';
     ctx.fillStyle = 'rgba(200, 210, 230, 0.7)';
@@ -1905,7 +1995,6 @@ function render() {
       : `The ${TEAM_NAMES[gameWinner]} god has prevailed`;
     ctx.fillText(subText, cx, cy + 10);
 
-    // Separator line
     const lineW = 160;
     const lineGrad = ctx.createLinearGradient(cx - lineW, 0, cx + lineW, 0);
     lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
@@ -1920,7 +2009,6 @@ function render() {
     const btn1X = cx - 90, btn2X = cx + 90;
     const btnW = 140, btnH = 40;
 
-    // Play Again button
     const b1hover = gameOverHover === 'again';
     ctx.fillStyle = b1hover ? 'rgba(40, 65, 130, 0.9)' : 'rgba(25, 40, 80, 0.8)';
     ctx.strokeStyle = b1hover ? 'rgba(100, 160, 255, 0.6)' : 'rgba(80, 120, 200, 0.3)';
@@ -1931,7 +2019,6 @@ function render() {
     ctx.fillStyle = b1hover ? '#fff' : 'rgba(180, 210, 255, 0.9)';
     ctx.fillText('PLAY AGAIN', btn1X, btnY);
 
-    // Return to Lobby button
     const b2hover = gameOverHover === 'lobby';
     ctx.fillStyle = b2hover ? 'rgba(50, 50, 60, 0.9)' : 'rgba(30, 30, 40, 0.8)';
     ctx.strokeStyle = b2hover ? 'rgba(160, 160, 180, 0.5)' : 'rgba(100, 100, 120, 0.3)';
@@ -1941,7 +2028,6 @@ function render() {
     ctx.fillStyle = b2hover ? '#fff' : 'rgba(180, 180, 200, 0.8)';
     ctx.fillText('LOBBY', btn2X, btnY);
 
-    // Store button rects for hit testing
     gameOverBtns.again = { x: btn1X - btnW/2, y: btnY - btnH/2, w: btnW, h: btnH };
     gameOverBtns.lobby = { x: btn2X - btnW/2, y: btnY - btnH/2, w: btnW, h: btnH };
 
@@ -2009,6 +2095,15 @@ function returnToLobby() {
   inspectMode = false;
   inspectData = null;
   magnetMode = false;
+  homePos = null;
+
+  // Reset dynamic dimensions
+  localMapW = MAP_W;
+  localMapH = MAP_H;
+  numTeams = 2;
+  cropSets = [];
+  initTeamArrays(2);
+  walkerGrid = new Array(localMapW * localMapH);
 
   // Show lobby, hide game
   document.getElementById('game').style.display = 'none';
@@ -2048,7 +2143,7 @@ function screenToGrid(sx, sy) {
 
   for (let ix = bx - R; ix <= bx + R; ix++) {
     for (let iy = by - R; iy <= by + R; iy++) {
-      if (ix < 0 || ix > MAP_W || iy < 0 || iy > MAP_H) continue;
+      if (ix < 0 || ix > localMapW || iy < 0 || iy > localMapH) continue;
       const sp = project(ix, iy, heights[ix][iy]);
       const d = (sp.x - sx) ** 2 + (sp.y - sy) ** 2;
       if (d < bestDist) { bestDist = d; bestPx = ix; bestPy = iy; }
@@ -2063,6 +2158,8 @@ let gameStarted = false;
 let gameOver = false;
 let gameWinner = -1;
 let room_wasAI = false;
+let room_lastMaxPlayers = 2;
+let room_lastMapSize = 'small';
 
 function connectToServer() {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -2090,6 +2187,9 @@ function handleServerMessage(msg) {
       document.getElementById('create-section').style.display = 'none';
       document.getElementById('join-section').style.display = 'none';
       document.getElementById('waiting-section').style.display = 'block';
+      if (msg.maxPlayers && msg.maxPlayers > 2) {
+        document.getElementById('waiting-text').textContent = 'Waiting for players... (1 of ' + msg.maxPlayers + ')';
+      }
       break;
 
     case 'joined':
@@ -2100,8 +2200,41 @@ function handleServerMessage(msg) {
       document.getElementById('waiting-text').textContent = 'Joining game...';
       break;
 
-    case 'start':
+    case 'waiting_update':
+      document.getElementById('waiting-text').textContent =
+        'Waiting for players... (' + msg.connectedPlayers + ' of ' + msg.maxPlayers + ')';
+      break;
+
+    case 'start': {
       if (myTeam < 0) myTeam = 0; // AI game — default to blue
+
+      // Extract map dimensions and team count from start message
+      const startNumTeams = msg.numTeams || 2;
+      const startMapW = msg.mapW || MAP_W;
+      const startMapH = msg.mapH || MAP_H;
+      const startSpawnZones = msg.spawnZones || [];
+
+      // Set dynamic dimensions
+      localMapW = startMapW;
+      localMapH = startMapH;
+      numTeams = startNumTeams;
+
+      // Reinitialize walker grid for new dimensions
+      walkerGrid = new Array(localMapW * localMapH);
+
+      // Initialize team arrays
+      initTeamArrays(numTeams);
+
+      // Set home position from spawn zones
+      if (startSpawnZones.length > myTeam) {
+        homePos = { x: startSpawnZones[myTeam].cx, y: startSpawnZones[myTeam].cy };
+      } else {
+        homePos = { x: localMapW / 2, y: localMapH / 2 };
+      }
+
+      // Build population bars for N teams
+      buildPopBars(numTeams);
+
       gameStarted = true;
       lobbyActive = false;
       document.getElementById('lobby').style.display = 'none';
@@ -2117,6 +2250,7 @@ function handleServerMessage(msg) {
       lastFrame = performance.now();
       requestAnimationFrame(gameLoop);
       break;
+    }
 
     case 'state':
       applyStateSnapshot(msg);
@@ -2134,20 +2268,38 @@ function handleServerMessage(msg) {
 }
 
 function applyStateSnapshot(msg) {
-  // Reconstruct heights from flat array
-  const flat = msg.heights;
-  if (heights.length === 0) {
-    for (let x = 0; x <= MAP_W; x++) {
-      heights[x] = [];
-      for (let y = 0; y <= MAP_H; y++) {
-        heights[x][y] = 0;
+  // Update dynamic dimensions from state if provided
+  if (msg.mapW) localMapW = msg.mapW;
+  if (msg.mapH) localMapH = msg.mapH;
+  if (msg.numTeams) numTeams = msg.numTeams;
+
+  // Handle height data — supports both full and delta formats
+  const heightsPayload = msg.heights;
+  if (heightsPayload) {
+    if (heightsPayload.full) {
+      // Full height data — reconstruct from flat array
+      const flat = heightsPayload.full;
+      if (heights.length === 0) {
+        for (let x = 0; x <= localMapW; x++) {
+          heights[x] = [];
+          for (let y = 0; y <= localMapH; y++) {
+            heights[x][y] = 0;
+          }
+        }
       }
-    }
-  }
-  let idx = 0;
-  for (let y = 0; y <= MAP_H; y++) {
-    for (let x = 0; x <= MAP_W; x++) {
-      heights[x][y] = flat[idx++];
+      let idx = 0;
+      for (let y = 0; y <= localMapH; y++) {
+        for (let x = 0; x <= localMapW; x++) {
+          heights[x][y] = flat[idx++];
+        }
+      }
+    } else if (heightsPayload.delta) {
+      // Delta update — triplets of [x, y, h]
+      const delta = heightsPayload.delta;
+      for (let i = 0; i < delta.length; i += 3) {
+        const x = delta[i], y = delta[i + 1], h = delta[i + 2];
+        if (heights[x]) heights[x][y] = h;
+      }
     }
   }
 
@@ -2199,23 +2351,28 @@ function applyStateSnapshot(msg) {
     }
   }
 
-  cropSetBlue = new Set();
-  cropSetRed = new Set();
+  // Crops — build per-team crop sets
+  cropSets = [];
+  for (let i = 0; i < numTeams; i++) {
+    cropSets.push(new Set());
+  }
   if (msg.crops) {
     for (let i = 0; i < msg.crops.length; i += 3) {
       const key = msg.crops[i] + ',' + msg.crops[i + 1];
-      if (msg.crops[i + 2] === TEAM_BLUE) cropSetBlue.add(key);
-      else cropSetRed.add(key);
+      const team = msg.crops[i + 2];
+      if (team >= 0 && team < cropSets.length) {
+        cropSets[team].add(key);
+      }
     }
   }
 
   seaLevel = msg.seaLevel !== undefined ? msg.seaLevel : SEA_LEVEL;
-  leaders = msg.leaders || [-1, -1];
+  leaders = msg.leaders || [];
   const wasArmageddon = armageddon;
   armageddon = msg.armageddon || false;
   if (armageddon && !wasArmageddon) onArmageddonStart();
-  magnetLocked = msg.magnetLocked || [false, false];
-  teamPop = msg.teamPop || [0, 0];
+  magnetLocked = msg.magnetLocked || [];
+  teamPop = msg.teamPop || [];
   fires = msg.fires || [];
 }
 
@@ -2233,7 +2390,6 @@ canvas.addEventListener('mousedown', (e) => {
     if (gameOverBtns.again && mx >= gameOverBtns.again.x && mx <= gameOverBtns.again.x + gameOverBtns.again.w &&
         my >= gameOverBtns.again.y && my <= gameOverBtns.again.y + gameOverBtns.again.h) {
       returnToLobby();
-      // Auto-start same game type
       setTimeout(() => {
         if (room_wasAI) document.getElementById('btn-ai').click();
         else document.getElementById('btn-create').click();
@@ -2383,20 +2539,16 @@ canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
   // Min zoom fits entire map diamond in viewport (with padding)
-  const mapScreenW = MAP_W * 2 * TILE_HALF_W;
-  const mapScreenH = MAP_H * 2 * TILE_HALF_H + MAX_HEIGHT * HEIGHT_STEP;
+  const mapScreenW = localMapW * 2 * TILE_HALF_W;
+  const mapScreenH = localMapH * 2 * TILE_HALF_H + MAX_HEIGHT * HEIGHT_STEP;
   const minZoom = Math.min(canvas.width / mapScreenW, canvas.height / mapScreenH) * 0.9;
   const newZoom = Math.max(minZoom, Math.min(5, zoom * factor));
-  // Adjust camera so the world point under the cursor stays fixed
   const mx = e.clientX, my = e.clientY;
   const cx = canvas.width / 2, cy = canvas.height / 2;
-  // World-space coords under mouse before zoom change
   const wx = (mx - cx * (1 - zoom)) / zoom;
   const wy = (my - cy * (1 - zoom)) / zoom;
-  // Where that world point would end up with new zoom
   const sx = wx * newZoom + cx * (1 - newZoom);
   const sy = wy * newZoom + cy * (1 - newZoom);
-  // Shift camera to compensate
   camX += (mx - sx) / newZoom;
   camY += (my - sy) / newZoom;
   zoom = newZoom;
@@ -2404,8 +2556,8 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 // Edge pan — move camera when cursor is near screen edges
-const EDGE_SIZE = 30;       // pixels from edge to trigger
-const EDGE_PAN_SPEED = 500; // pixels/sec at full intensity
+const EDGE_SIZE = 30;
+const EDGE_PAN_SPEED = 500;
 let mouseX = 0, mouseY = 0;
 window.addEventListener('mousemove', (e) => {
   mouseX = e.clientX;
@@ -2415,17 +2567,29 @@ window.addEventListener('mousemove', (e) => {
 // ── Lobby Handlers ──────────────────────────────────────────────────
 document.getElementById('btn-create').addEventListener('click', () => {
   room_wasAI = false;
+  const selPlayers = document.getElementById('sel-players');
+  const selMapsize = document.getElementById('sel-mapsize');
+  const maxPlayers = selPlayers ? parseInt(selPlayers.value) || 2 : 2;
+  const mapSize = selMapsize ? selMapsize.value : 'small';
+  room_lastMaxPlayers = maxPlayers;
+  room_lastMapSize = mapSize;
   connectToServer();
   ws.onopen = () => {
-    sendMessage({ type: 'create' });
+    sendMessage({ type: 'create', maxPlayers, mapSize });
   };
 });
 
 document.getElementById('btn-ai').addEventListener('click', () => {
   room_wasAI = true;
+  const selPlayers = document.getElementById('sel-players');
+  const selMapsize = document.getElementById('sel-mapsize');
+  const maxPlayers = selPlayers ? parseInt(selPlayers.value) || 2 : 2;
+  const mapSize = selMapsize ? selMapsize.value : 'small';
+  room_lastMaxPlayers = maxPlayers;
+  room_lastMapSize = mapSize;
   connectToServer();
   ws.onopen = () => {
-    sendMessage({ type: 'create_ai' });
+    sendMessage({ type: 'create_ai', maxPlayers, mapSize });
   };
 });
 
@@ -2480,7 +2644,10 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
 // ── Minimap ─────────────────────────────────────────────────────────
 const MM_SIZE = 200;
 const MM_MARGIN = 10;
-const MM_SCALE = MM_SIZE / MAP_W; // ~3.125 px per tile
+
+function getMMScale() {
+  return MM_SIZE / Math.max(localMapW, localMapH);
+}
 
 function getMinimapRect() {
   return {
@@ -2496,15 +2663,16 @@ function isInMinimap(sx, sy) {
 
 function minimapClickToGrid(sx, sy) {
   const mm = getMinimapRect();
+  const mmScale = getMMScale();
   return {
-    gx: (sx - mm.x) / MM_SCALE,
-    gy: (sy - mm.y) / MM_SCALE,
+    gx: (sx - mm.x) / mmScale,
+    gy: (sy - mm.y) / mmScale,
   };
 }
 
 function centerCameraOnGrid(gx, gy) {
-  const hx = Math.max(0, Math.min(MAP_W, gx));
-  const hy = Math.max(0, Math.min(MAP_H, gy));
+  const hx = Math.max(0, Math.min(localMapW, gx));
+  const hy = Math.max(0, Math.min(localMapH, gy));
   const h = heightAt(hx, hy);
   camX = -(gx - gy) * TILE_HALF_W;
   camY = canvas.height / 2 - 80 - (gx + gy) * TILE_HALF_H + h * HEIGHT_STEP;
@@ -2526,7 +2694,8 @@ function screenToGridFlat(sx, sy) {
 
 function drawMinimap() {
   const mm = getMinimapRect();
-  const cs = Math.ceil(MM_SCALE);
+  const mmScale = getMMScale();
+  const cs = Math.ceil(mmScale);
 
   ctx.save();
   ctx.beginPath();
@@ -2537,25 +2706,25 @@ function drawMinimap() {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(mm.x, mm.y, MM_SIZE, MM_SIZE);
 
-  // Pass 1: terrain (skip fallen tiles — they show as void)
-  for (let ty = 0; ty < MAP_H; ty++) {
-    for (let tx = 0; tx < MAP_W; tx++) {
+  // Pass 1: terrain (skip fallen tiles)
+  for (let ty = 0; ty < localMapH; ty++) {
+    for (let tx = 0; tx < localMapW; tx++) {
       if (fallenTileSet.has(tx + ',' + ty)) continue;
       ctx.fillStyle = getTileColor(tx, ty);
-      ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
+      ctx.fillRect(mm.x + tx * mmScale, mm.y + ty * mmScale, cs, cs);
     }
   }
 
-  // Pass 2a: crops
-  for (let ty = 0; ty < MAP_H; ty++) {
-    for (let tx = 0; tx < MAP_W; tx++) {
+  // Pass 2a: crops — loop through all team crop sets
+  for (let ty = 0; ty < localMapH; ty++) {
+    for (let tx = 0; tx < localMapW; tx++) {
       const key = tx + ',' + ty;
-      if (cropSetBlue.has(key)) {
-        ctx.fillStyle = '#5a8a3a';
-        ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
-      } else if (cropSetRed.has(key)) {
-        ctx.fillStyle = '#8a8a2a';
-        ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
+      for (let ci = 0; ci < cropSets.length; ci++) {
+        if (cropSets[ci].has(key)) {
+          ctx.fillStyle = MINIMAP_CROP_COLORS[ci] || MINIMAP_CROP_COLORS[0];
+          ctx.fillRect(mm.x + tx * mmScale, mm.y + ty * mmScale, cs, cs);
+          break;
+        }
       }
     }
   }
@@ -2564,49 +2733,51 @@ function drawMinimap() {
   ctx.fillStyle = '#2a6a2a';
   for (const key of trees) {
     const [tx, ty] = key.split(',');
-    ctx.fillRect(mm.x + tx * MM_SCALE, mm.y + ty * MM_SCALE, cs, cs);
+    ctx.fillRect(mm.x + tx * mmScale, mm.y + ty * mmScale, cs, cs);
   }
 
   // Pass 2c: swamps
   ctx.fillStyle = '#3a5a1a';
   for (const s of swamps) {
-    ctx.fillRect(mm.x + s.x * MM_SCALE, mm.y + s.y * MM_SCALE, cs, cs);
+    ctx.fillRect(mm.x + s.x * mmScale, mm.y + s.y * mmScale, cs, cs);
   }
 
   // Pass 2d: pebbles
   ctx.fillStyle = '#8a7a6a';
   for (const key of pebbles) {
     const [px, py] = key.split(',');
-    ctx.fillRect(mm.x + px * MM_SCALE, mm.y + py * MM_SCALE, cs, cs);
+    ctx.fillRect(mm.x + px * mmScale, mm.y + py * mmScale, cs, cs);
   }
 
   // Pass 2e: ruins
   ctx.fillStyle = '#4a3a2a';
   for (const r of ruins) {
-    ctx.fillRect(mm.x + r.x * MM_SCALE, mm.y + r.y * MM_SCALE, cs, cs);
+    ctx.fillRect(mm.x + r.x * mmScale, mm.y + r.y * mmScale, cs, cs);
   }
 
   // Pass 3: settlements (team-colored squares sized to footprint)
   for (const s of settlements) {
     ctx.fillStyle = TEAM_COLORS[s.t];
-    const sz = Math.ceil(s.sz * MM_SCALE);
-    ctx.fillRect(mm.x + s.ox * MM_SCALE, mm.y + s.oy * MM_SCALE, sz, sz);
+    const sz = Math.ceil(s.sz * mmScale);
+    ctx.fillRect(mm.x + s.ox * mmScale, mm.y + s.oy * mmScale, sz, sz);
   }
 
   // Pass 4: walkers (single bright pixels)
   for (const w of walkers) {
     ctx.fillStyle = TEAM_COLORS[w.team];
-    ctx.fillRect(mm.x + Math.floor(w.x * MM_SCALE), mm.y + Math.floor(w.y * MM_SCALE), 1, 1);
+    ctx.fillRect(mm.x + Math.floor(w.x * mmScale), mm.y + Math.floor(w.y * mmScale), 1, 1);
   }
 
-  // Pass 5: magnet flags (bright white dots)
+  // Pass 5: magnet flags (bright white dots) — loop all teams
   ctx.fillStyle = '#fff';
-  for (let t = 0; t < 2; t++) {
+  for (let t = 0; t < numTeams; t++) {
+    if (t >= magnetPos.length) continue;
     const mp = magnetPos[t];
-    ctx.fillRect(mm.x + Math.floor(mp.x * MM_SCALE) - 1, mm.y + Math.floor(mp.y * MM_SCALE) - 1, 3, 3);
+    if (!mp) continue;
+    ctx.fillRect(mm.x + Math.floor(mp.x * mmScale) - 1, mm.y + Math.floor(mp.y * mmScale) - 1, 3, 3);
   }
 
-  // Pass 6: viewport bounds (diamond in grid space)
+  // Pass 6: viewport bounds
   const corners = [
     screenToGridFlat(0, 0),
     screenToGridFlat(canvas.width, 0),
@@ -2617,8 +2788,8 @@ function drawMinimap() {
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let i = 0; i < 4; i++) {
-    const px = mm.x + corners[i].gx * MM_SCALE;
-    const py = mm.y + corners[i].gy * MM_SCALE;
+    const px = mm.x + corners[i].gx * mmScale;
+    const py = mm.y + corners[i].gy * mmScale;
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
   }
   ctx.closePath();
@@ -2626,7 +2797,7 @@ function drawMinimap() {
 
   ctx.restore();
 
-  // Border (drawn outside clip so it's crisp on all edges)
+  // Border
   ctx.strokeStyle = '#555';
   ctx.lineWidth = 1;
   ctx.strokeRect(mm.x, mm.y, MM_SIZE, MM_SIZE);
@@ -2667,7 +2838,7 @@ function performInspect(sx, sy) {
   }
 
   // Check walkers
-  let closest = null, closestDist = 4; // max 2 tile distance squared
+  let closest = null, closestDist = 4;
   for (const w of walkers) {
     const dx = w.x - px, dy = w.y - py;
     const d = dx * dx + dy * dy;
@@ -2689,20 +2860,16 @@ function drawInspectTooltip() {
   const d = inspectData;
   if (!d) return;
 
-  // For walkers, track the walker each frame to follow it
   let anchorX, anchorY;
   if (d.type === 'walker') {
     const w = walkers.find(w => w.id === d.walkerId);
-    if (!w) { inspectData = null; return; } // walker died
-    // Update live data
+    if (!w) { inspectData = null; return; }
     d.strength = w.strength;
     d.isLeader = w.isLeader;
     d.isKnight = w.isKnight;
     d.team = w.team;
-    // Project walker position to screen
     const h = heightAt(w.x, w.y);
     const p = project(w.x, w.y, h);
-    // Convert from world-space (zoomed) to screen-space
     const cx = canvas.width / 2, cy = canvas.height / 2;
     anchorX = p.x * zoom + cx * (1 - zoom);
     anchorY = p.y * zoom + cy * (1 - zoom);
@@ -2788,7 +2955,6 @@ function updateEdgePan(dt) {
   const w = canvas.width, h = canvas.height;
   let dx = 0, dy = 0;
 
-  // Don't edge-pan when mouse is over the sidebar
   if (mouseX < SIDEBAR_W) { /* skip left edge pan */ }
   else if (mouseX < SIDEBAR_W + EDGE_SIZE) dx = 1 - (mouseX - SIDEBAR_W) / EDGE_SIZE;
   else if (mouseX > w - EDGE_SIZE) dx = -((mouseX - (w - EDGE_SIZE)) / EDGE_SIZE);
