@@ -319,6 +319,25 @@ let landTileCache = null;       // Array of offscreen canvases (or null entries 
 let landTileCacheTexOpacity = -1; // which textureOpacity was baked in
 let landTileCacheHiRes = null;   // which settingHiRes setting was baked in
 
+// ── Terrain Buffer Cache ────────────────────────────────────────────
+// Full-map offscreen buffer: replaces N per-tile drawImage calls with 1 large blit
+let terrainBuffer = null;
+let terrainBufferCtx = null;
+let terrainBufferW = 0;
+let terrainBufferH = 0;
+let terrainBufferDirty = null;      // Uint8Array(mapW*mapH), 1=needs redraw
+let terrainBufferNeedsFull = true;  // triggers complete re-render
+let terrainBufferInited = false;
+// Previous frame overlay state for diffing
+let prevCropTeamTiles = null;
+let prevSwampTiles = null;
+let prevRockTiles = null;
+let prevTreeTiles = null;
+let prevPebbleTiles = null;
+let prevRuinTiles = null;
+let prevSeaLevel = -1;
+const TERRAIN_BUFFER_MAX_BYTES = 40 * 1024 * 1024; // 40 MB memory guard
+
 // Precompute valid shape keys (adjacency constraint: |diff|≤1 between neighbors)
 const VALID_SHAPE_KEYS = [];
 (function() {
@@ -751,6 +770,54 @@ function reinitTypedArrays() {
   treeCoords = [];
   pebbleCoords = [];
   landTileCache = null; // invalidate on map dimension change
+  resetTerrainBuffer();
+}
+
+function resetTerrainBuffer() {
+  terrainBuffer = null;
+  terrainBufferCtx = null;
+  terrainBufferW = 0;
+  terrainBufferH = 0;
+  terrainBufferDirty = null;
+  terrainBufferNeedsFull = true;
+  terrainBufferInited = false;
+  prevCropTeamTiles = null;
+  prevSwampTiles = null;
+  prevRockTiles = null;
+  prevTreeTiles = null;
+  prevPebbleTiles = null;
+  prevRuinTiles = null;
+  prevSeaLevel = -1;
+}
+
+function initTerrainBuffer() {
+  const w = (localMapW + localMapH) * TILE_HALF_W;   // (mapW+mapH)*16
+  const h = (localMapW + localMapH) * TILE_HALF_H + MAX_HEIGHT * HEIGHT_STEP + 64; // extra for height + margin
+  const bytes = w * h * 4;
+  if (bytes > TERRAIN_BUFFER_MAX_BYTES) {
+    console.warn('Terrain buffer too large (' + (bytes / 1024 / 1024).toFixed(1) + ' MB), disabled');
+    terrainBufferInited = false;
+    return;
+  }
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  terrainBuffer = c;
+  terrainBufferCtx = c.getContext('2d');
+  terrainBufferW = w;
+  terrainBufferH = h;
+  const sz = localMapW * localMapH;
+  terrainBufferDirty = new Uint8Array(sz);
+  terrainBufferNeedsFull = true;
+  terrainBufferInited = true;
+  // Init prev overlay arrays for diffing
+  prevCropTeamTiles = new Uint8Array(sz);
+  prevSwampTiles = new Uint8Array(sz);
+  prevRockTiles = new Uint8Array(sz);
+  prevTreeTiles = new Uint8Array(sz);
+  prevPebbleTiles = new Uint8Array(sz);
+  prevRuinTiles = new Uint8Array(sz);
+  prevSeaLevel = seaLevel;
 }
 
 // Initialize dynamic arrays
@@ -1280,6 +1347,195 @@ function drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBot
       }
     }
   }
+}
+
+// ── Draw single tile to terrain buffer (buffer-local coords) ────────
+function drawTileToBuffer(tx, ty) {
+  const bCtx = terrainBufferCtx;
+  const t = heights[tx][ty], r = heights[tx + 1][ty];
+  const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
+  const tileIdx = ty * localMapW + tx;
+
+  // Buffer-local origin: top-left corner maps to buffer pixel coords
+  const bOriginX = localMapH * TILE_HALF_W;
+  const bOriginY = MAX_HEIGHT * HEIGHT_STEP + 32; // margin for tallest tiles
+
+  const isWater = (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel);
+
+  if (isWater && waterFrames) {
+    // Static water frame (spatial variation only, no temporal animation)
+    const pTopX = bOriginX + (tx - ty) * TILE_HALF_W;
+    const pTopY = bOriginY + (tx + ty) * TILE_HALF_H;
+    const fi = (tx + ty) % WATER_FRAME_COUNT; // static spatial variation
+    const wf = waterFrames[fi];
+    bCtx.drawImage(wf, 0, 0, wf.width, wf.height,
+      pTopX - TILE_HALF_W, pTopY, TILE_HALF_W * 2, TILE_HALF_H * 2);
+    return;
+  }
+
+  // Land tile via pre-rendered cache
+  if (landTileCache) {
+    const minH = Math.min(t, r, b, l);
+    const dt = t - minH, dr = r - minH, db = b - minH, dl = l - minH;
+    const shapeKey = dt * 27 + dr * 9 + db * 3 + dl;
+    const avg = (t + r + b + l) / 4;
+    const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+    const swampFlag = swampTiles[tileIdx] ? 1 : 0;
+    const cacheIdx = shapeKey * 18 + (colorIdx - 1) * 2 + swampFlag;
+    const frame = landTileCache[cacheIdx];
+
+    if (frame) {
+      const pTopX = bOriginX + (tx - ty) * TILE_HALF_W;
+      const pTopY = bOriginY + (tx + ty) * TILE_HALF_H - t * HEIGHT_STEP;
+      const maxRel = Math.max(dt, dr, db, dl);
+      const blitX = pTopX - TILE_HALF_W;
+      const blitY = pTopY - (maxRel - dt) * HEIGHT_STEP;
+      const dstW = TILE_HALF_W * 2;
+      const dstH = TILE_HALF_H * 2 + maxRel * HEIGHT_STEP;
+      bCtx.drawImage(frame, 0, 0, frame.width, frame.height, blitX, blitY, dstW, dstH);
+
+      // Crop overlay
+      const cropTeam = cropTeamTiles[tileIdx];
+      if (cropTeam) {
+        const pRightX = bOriginX + (tx + 1 - ty) * TILE_HALF_W;
+        const pRightY = bOriginY + (tx + 1 + ty) * TILE_HALF_H - r * HEIGHT_STEP;
+        const pBottomX = bOriginX + (tx + 1 - ty - 1) * TILE_HALF_W;
+        const pBottomY = bOriginY + (tx + 1 + ty + 1) * TILE_HALF_H - b * HEIGHT_STEP;
+        const pLeftX = bOriginX + (tx - ty - 1) * TILE_HALF_W;
+        const pLeftY = bOriginY + (tx + ty + 1) * TILE_HALF_H - l * HEIGHT_STEP;
+        bCtx.beginPath();
+        bCtx.moveTo(pTopX, pTopY);
+        bCtx.lineTo(pRightX, pRightY);
+        bCtx.lineTo(pBottomX, pBottomY);
+        bCtx.lineTo(pLeftX, pLeftY);
+        bCtx.closePath();
+        bCtx.fillStyle = CROP_OVERLAY_COLORS[cropTeam - 1] || CROP_OVERLAY_COLORS[0];
+        bCtx.fill();
+      }
+
+      // Sprite overlays (rocks, trees, pebbles, ruins) — use buffer context
+      const needSprites = rockTiles[tileIdx] || treeTiles[tileIdx] ||
+                          pebbleTiles[tileIdx] || ruinTiles[tileIdx];
+      if (needSprites) {
+        const pRightX = bOriginX + (tx + 1 - ty) * TILE_HALF_W;
+        const pRightY = bOriginY + (tx + 1 + ty) * TILE_HALF_H - r * HEIGHT_STEP;
+        const pBottomX = bOriginX + (tx + 1 - ty - 1) * TILE_HALF_W;
+        const pBottomY = bOriginY + (tx + 1 + ty + 1) * TILE_HALF_H - b * HEIGHT_STEP;
+        const pLeftX = bOriginX + (tx - ty - 1) * TILE_HALF_W;
+        const pLeftY = bOriginY + (tx + ty + 1) * TILE_HALF_H - l * HEIGHT_STEP;
+        drawTileSpritesToCtx(bCtx, tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY);
+      }
+      return;
+    }
+  }
+
+  // Fallback: color-fill path for buffer (before textures load)
+  const pTopX = bOriginX + (tx - ty) * TILE_HALF_W;
+  const pTopY = bOriginY + (tx + ty) * TILE_HALF_H - t * HEIGHT_STEP;
+  const pRightX = bOriginX + (tx + 1 - ty) * TILE_HALF_W;
+  const pRightY = bOriginY + (tx + 1 + ty) * TILE_HALF_H - r * HEIGHT_STEP;
+  const pBottomX = bOriginX + (tx + 1 - ty - 1) * TILE_HALF_W;
+  const pBottomY = bOriginY + (tx + 1 + ty + 1) * TILE_HALF_H - b * HEIGHT_STEP;
+  const pLeftX = bOriginX + (tx - ty - 1) * TILE_HALF_W;
+  const pLeftY = bOriginY + (tx + ty + 1) * TILE_HALF_H - l * HEIGHT_STEP;
+
+  bCtx.beginPath();
+  bCtx.moveTo(pTopX, pTopY);
+  bCtx.lineTo(pRightX, pRightY);
+  bCtx.lineTo(pBottomX, pBottomY);
+  bCtx.lineTo(pLeftX, pLeftY);
+  bCtx.closePath();
+  const avg = (t + r + b + l) / 4;
+  const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+  const isFlat = (t === r && r === b && b === l);
+  const colors = LAND_FILL_COLORS[colorIdx];
+  bCtx.fillStyle = isFlat ? colors.flat : colors.slope;
+  bCtx.fill();
+}
+
+// Sprite overlays that can render to any context (buffer or screen)
+function drawTileSpritesToCtx(targetCtx, tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY) {
+  if (rockTiles[tileIdx] && boulderLoaded) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
+    const scale = tileW * 0.7 / boulderImg.width;
+    const sw = boulderImg.width * scale;
+    const sh = boulderImg.height * scale;
+    targetCtx.drawImage(boulderImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
+  }
+  if (treeTiles[tileIdx] && treeLoaded) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
+    const scale = tileW * 0.7 / treeImg.width;
+    const sw = treeImg.width * scale;
+    const sh = treeImg.height * scale;
+    targetCtx.drawImage(treeImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
+  }
+  if (pebbleTiles[tileIdx]) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
+    if (pebblesLoaded) {
+      const scale = tileW * 0.5 / pebblesImg.width;
+      const sw = pebblesImg.width * scale;
+      const sh = pebblesImg.height * scale;
+      targetCtx.drawImage(pebblesImg, midX - sw / 2, midY - sh * 0.5, sw, sh);
+    }
+  }
+  const ruinTeam = ruinTiles[tileIdx];
+  if (ruinTeam && ruinsLoaded) {
+    const midX = (pTopX + pBottomX) / 2;
+    const midY = (pTopY + pBottomY) / 2;
+    const tileW = (pRightX - pLeftX);
+    const ruinTeamIdx = ruinTeam - 1;
+    const scale = tileW * 0.6 / ruinsImg.width;
+    const sw = ruinsImg.width * scale;
+    const sh = ruinsImg.height * scale;
+    targetCtx.drawImage(ruinsImg, midX - sw / 2, midY - sh * 0.6, sw, sh);
+    targetCtx.save();
+    targetCtx.globalAlpha = 0.2;
+    targetCtx.fillStyle = TEAM_COLORS[ruinTeamIdx];
+    targetCtx.fillRect(midX - sw / 2, midY - sh * 0.6, sw, sh);
+    targetCtx.restore();
+  }
+}
+
+// ── Terrain Buffer Update ────────────────────────────────────────────
+// Always does a full redraw when anything is dirty. A full pass over a
+// 64×64 map is ~4096 canvas-to-canvas blits on the offscreen buffer —
+// well under 1 ms — and avoids all partial-clear artifacts from
+// isometric tile overlap.
+function updateTerrainBuffer() {
+  if (!terrainBufferInited || !terrainBuffer) return;
+
+  if (terrainBufferNeedsFull) {
+    terrainBufferCtx.clearRect(0, 0, terrainBufferW, terrainBufferH);
+    for (let ty = 0; ty < localMapH; ty++) {
+      for (let tx = 0; tx < localMapW; tx++) {
+        drawTileToBuffer(tx, ty);
+      }
+    }
+    terrainBufferDirty.fill(0);
+    terrainBufferNeedsFull = false;
+    return;
+  }
+
+  // Any dirty tiles at all → full redraw
+  let hasDirty = false;
+  for (let i = 0; i < localMapW * localMapH; i++) {
+    if (terrainBufferDirty[i]) { hasDirty = true; break; }
+  }
+  if (!hasDirty) return;
+
+  terrainBufferCtx.clearRect(0, 0, terrainBufferW, terrainBufferH);
+  for (let ty = 0; ty < localMapH; ty++) {
+    for (let tx = 0; tx < localMapW; tx++) {
+      drawTileToBuffer(tx, ty);
+    }
+  }
+  terrainBufferDirty.fill(0);
 }
 
 function rebuildWalkerGrid() {
@@ -2254,6 +2510,8 @@ function render() {
         landTileCacheTexOpacity !== textureOpacity ||
         landTileCacheHiRes !== settingHiRes) {
       buildLandTileFrames();
+      // Terrain buffer depends on land tile cache, needs full redraw
+      terrainBufferNeedsFull = true;
     }
   }
 
@@ -2295,18 +2553,106 @@ function render() {
   _startCol_dbg = _startCol; _endCol_dbg = _endCol; _startRow_dbg = _startRow; _endRow_dbg = _endRow;
   if (_p) { const _t = performance.now(); _sample.culling = _t - _t0; _t0 = _t; }
 
-  // Pass 1: terrain (only visible tiles, skip fallen during armageddon)
+  // Pass 1: terrain
   let _waterCount = 0, _landCount = 0;
-  for (let row = _startRow; row < _endRow; row++) {
-    for (let col = _startCol; col < _endCol; col++) {
-      if (fallenTiles[row * localMapW + col]) continue;
-      if (_p) {
+
+  // Init terrain buffer on first frame with state data
+  if (!terrainBufferInited && heights.length > 0 && landTileCache) {
+    initTerrainBuffer();
+  }
+
+  // Use terrain buffer when zoomed out (at high zoom, per-tile rendering is sharper).
+  // Buffer is at 1:1 world-space resolution; zoom > 1.5 would visibly blur.
+  const useTerrainBuffer = terrainBufferInited && terrainBuffer && !armageddon && zoom <= 1.5;
+
+  if (useTerrainBuffer) {
+    // ── Buffer path: single blit + water animation overlay + grid lines ──
+    updateTerrainBuffer();
+
+    // Buffer-local origin matches drawTileToBuffer
+    const bOriginX = localMapH * TILE_HALF_W;
+    const bOriginY = MAX_HEIGHT * HEIGHT_STEP + 32;
+
+    // Buffer pixel (bx, by) corresponds to world pixel (bx - bOriginX + _originX, by - bOriginY + _originY).
+    // Buffer's top-left corner sits at world position:
+    const bufWorldX = _originX - bOriginX;
+    const bufWorldY = _originY - bOriginY;
+
+    // Compute visible world-space bounds and clip to buffer for efficient blit
+    const invZ = 1 / zoom;
+    const zOffX = _vpCX * (1 - zoom);
+    const zOffY = _vpCY * (1 - zoom);
+    const wLeft  = (0            - zOffX) * invZ;
+    const wTop   = (0            - zOffY) * invZ;
+    const wRight = (canvas.width - zOffX) * invZ;
+    const wBot   = (canvas.height- zOffY) * invZ;
+
+    // Map visible world bounds to buffer coords
+    let srcX = Math.max(0, Math.floor(wLeft - bufWorldX));
+    let srcY = Math.max(0, Math.floor(wTop  - bufWorldY));
+    let srcR = Math.min(terrainBufferW, Math.ceil(wRight  - bufWorldX));
+    let srcB = Math.min(terrainBufferH, Math.ceil(wBot    - bufWorldY));
+    let srcW = srcR - srcX;
+    let srcH = srcB - srcY;
+
+    if (srcW > 0 && srcH > 0) {
+      ctx.drawImage(terrainBuffer, srcX, srcY, srcW, srcH,
+        bufWorldX + srcX, bufWorldY + srcY, srcW, srcH);
+    }
+
+    // Water animation overlay: iterate visible tiles, draw only water with animated frame
+    for (let row = _startRow; row < _endRow; row++) {
+      for (let col = _startCol; col < _endCol; col++) {
         const t = heights[col][row], r = heights[col + 1][row];
         const b = heights[col + 1][row + 1], l = heights[col][row + 1];
-        if (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel) _waterCount++;
-        else _landCount++;
+        const isWater = (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel);
+        if (!isWater || !waterFrames) continue;
+        if (_p) _waterCount++;
+        const pTopX = _originX + (col - row) * TILE_HALF_W;
+        const pTopY = _originY + (col + row) * TILE_HALF_H;
+        const fi = (waterFrameCounter + col + row) % WATER_FRAME_COUNT;
+        const wf = waterFrames[fi];
+        ctx.drawImage(wf, 0, 0, wf.width, wf.height,
+          pTopX - TILE_HALF_W, pTopY, TILE_HALF_W * 2, TILE_HALF_H * 2);
       }
-      drawTile(col, row);
+    }
+
+    // Grid lines overlay: iterate visible tiles, stroke at screen resolution
+    if (GRID_MODES[gridMode]) {
+      ctx.strokeStyle = GRID_MODES[gridMode];
+      ctx.lineWidth = 1;
+      for (let row = _startRow; row < _endRow; row++) {
+        for (let col = _startCol; col < _endCol; col++) {
+          if (fallenTiles[row * localMapW + col]) continue;
+          const t = heights[col][row], r = heights[col + 1][row];
+          const b = heights[col + 1][row + 1], l = heights[col][row + 1];
+          const pTopX = _originX + (col - row) * TILE_HALF_W;
+          const pTopY = _originY + (col + row) * TILE_HALF_H - t * HEIGHT_STEP;
+          ctx.beginPath();
+          ctx.moveTo(pTopX, pTopY);
+          ctx.lineTo(pTopX + TILE_HALF_W, pTopY + TILE_HALF_H - (r - t) * HEIGHT_STEP);
+          ctx.lineTo(pTopX, pTopY + 2 * TILE_HALF_H - (b - t) * HEIGHT_STEP);
+          ctx.lineTo(pTopX - TILE_HALF_W, pTopY + TILE_HALF_H - (l - t) * HEIGHT_STEP);
+          ctx.closePath();
+          ctx.stroke();
+        }
+      }
+    }
+
+    if (_p) _landCount = localMapW * localMapH - _waterCount;
+  } else {
+    // ── Fallback path: per-tile rendering (armageddon or buffer disabled) ──
+    for (let row = _startRow; row < _endRow; row++) {
+      for (let col = _startCol; col < _endCol; col++) {
+        if (fallenTiles[row * localMapW + col]) continue;
+        if (_p) {
+          const t = heights[col][row], r = heights[col + 1][row];
+          const b = heights[col + 1][row + 1], l = heights[col][row + 1];
+          if (t <= seaLevel && r <= seaLevel && b <= seaLevel && l <= seaLevel) _waterCount++;
+          else _landCount++;
+        }
+        drawTile(col, row);
+      }
     }
   }
 
@@ -3028,6 +3374,146 @@ function applyStateSnapshot(msg) {
   teamPop = msg.teamPop || [];
   fires = msg.fires || [];
   minimapDirty = true;
+
+  // Terrain buffer dirty detection
+  detectTerrainDirty(msg);
+}
+
+// ── Terrain Buffer Dirty Detection ──────────────────────────────────
+function markTileDirty(tx, ty) {
+  if (!terrainBufferDirty) return;
+  // Mark tile and all 8 neighbors (tiles overlap due to height and isometric projection)
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const nx = tx + dx, ny = ty + dy;
+      if (nx >= 0 && nx < localMapW && ny >= 0 && ny < localMapH) {
+        terrainBufferDirty[ny * localMapW + nx] = 1;
+      }
+    }
+  }
+}
+
+function detectTerrainDirty(msg) {
+  if (!terrainBufferInited) return;
+
+  const sz = localMapW * localMapH;
+  let dirtyCount = 0;
+
+  // 1. Height deltas — each [x,y,h] triplet marks surrounding tiles dirty
+  const hp = msg.heights;
+  if (hp) {
+    if (hp.full) {
+      // Full height update — need full redraw
+      terrainBufferNeedsFull = true;
+      // Copy overlay state for next diff
+      if (prevCropTeamTiles) prevCropTeamTiles.set(cropTeamTiles);
+      if (prevSwampTiles) prevSwampTiles.set(swampTiles);
+      if (prevRockTiles) prevRockTiles.set(rockTiles);
+      if (prevTreeTiles) prevTreeTiles.set(treeTiles);
+      if (prevPebbleTiles) prevPebbleTiles.set(pebbleTiles);
+      if (prevRuinTiles) prevRuinTiles.set(ruinTiles);
+      prevSeaLevel = seaLevel;
+      return;
+    }
+    if (hp.delta) {
+      const delta = hp.delta;
+      for (let i = 0; i < delta.length; i += 3) {
+        const px = delta[i], py = delta[i + 1];
+        // Height point (px,py) affects tiles (px-1,py-1), (px,py-1), (px-1,py), (px,py)
+        for (let dx = -1; dx <= 0; dx++) {
+          for (let dy = -1; dy <= 0; dy++) {
+            const tx = px + dx, ty = py + dy;
+            if (tx >= 0 && tx < localMapW && ty >= 0 && ty < localMapH) {
+              markTileDirty(tx, ty);
+              dirtyCount++;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Sea level change
+  if (seaLevel !== prevSeaLevel) {
+    terrainBufferNeedsFull = true;
+    if (prevCropTeamTiles) prevCropTeamTiles.set(cropTeamTiles);
+    if (prevSwampTiles) prevSwampTiles.set(swampTiles);
+    if (prevRockTiles) prevRockTiles.set(rockTiles);
+    if (prevTreeTiles) prevTreeTiles.set(treeTiles);
+    if (prevPebbleTiles) prevPebbleTiles.set(pebbleTiles);
+    if (prevRuinTiles) prevRuinTiles.set(ruinTiles);
+    prevSeaLevel = seaLevel;
+    return;
+  }
+
+  // 3. Overlay diffs — compare typed arrays against prev copies
+  if (prevCropTeamTiles) {
+    for (let i = 0; i < sz; i++) {
+      if (cropTeamTiles[i] !== prevCropTeamTiles[i]) {
+        const tx = i % localMapW, ty = (i / localMapW) | 0;
+        markTileDirty(tx, ty);
+        dirtyCount++;
+      }
+    }
+    prevCropTeamTiles.set(cropTeamTiles);
+  }
+  if (prevSwampTiles) {
+    for (let i = 0; i < sz; i++) {
+      if (swampTiles[i] !== prevSwampTiles[i]) {
+        const tx = i % localMapW, ty = (i / localMapW) | 0;
+        markTileDirty(tx, ty);
+        dirtyCount++;
+      }
+    }
+    prevSwampTiles.set(swampTiles);
+  }
+  if (prevRockTiles) {
+    for (let i = 0; i < sz; i++) {
+      if (rockTiles[i] !== prevRockTiles[i]) {
+        const tx = i % localMapW, ty = (i / localMapW) | 0;
+        markTileDirty(tx, ty);
+        dirtyCount++;
+      }
+    }
+    prevRockTiles.set(rockTiles);
+  }
+  if (prevTreeTiles) {
+    for (let i = 0; i < sz; i++) {
+      if (treeTiles[i] !== prevTreeTiles[i]) {
+        const tx = i % localMapW, ty = (i / localMapW) | 0;
+        markTileDirty(tx, ty);
+        dirtyCount++;
+      }
+    }
+    prevTreeTiles.set(treeTiles);
+  }
+  if (prevPebbleTiles) {
+    for (let i = 0; i < sz; i++) {
+      if (pebbleTiles[i] !== prevPebbleTiles[i]) {
+        const tx = i % localMapW, ty = (i / localMapW) | 0;
+        markTileDirty(tx, ty);
+        dirtyCount++;
+      }
+    }
+    prevPebbleTiles.set(pebbleTiles);
+  }
+  if (prevRuinTiles) {
+    for (let i = 0; i < sz; i++) {
+      if (ruinTiles[i] !== prevRuinTiles[i]) {
+        const tx = i % localMapW, ty = (i / localMapW) | 0;
+        markTileDirty(tx, ty);
+        dirtyCount++;
+      }
+    }
+    prevRuinTiles.set(ruinTiles);
+  }
+
+  prevSeaLevel = seaLevel;
+
+  // If >25% tiles dirty, just do a full redraw
+  if (dirtyCount > sz * 0.25) {
+    terrainBufferNeedsFull = true;
+  }
 }
 
 let pendingMessages = [];
