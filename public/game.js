@@ -3131,11 +3131,40 @@ function connectToServer() {
 
   ws.onopen = () => {
     console.log('Connected to server');
-    // Send player name
-    ws.send(JSON.stringify({ type: 'set_name', name: getPlayerName() }));
-    // Flush any pending messages
-    const queued = pendingMessages.splice(0);
-    for (const m of queued) ws.send(JSON.stringify(m));
+    let name = getPlayerName();
+    if (name === 'Player') {
+      // Show name prompt modal
+      const overlay = document.getElementById('name-prompt-overlay');
+      const input = document.getElementById('name-prompt-input');
+      const btn = document.getElementById('name-prompt-btn');
+      overlay.classList.add('visible');
+      input.value = '';
+      input.focus();
+      const submitName = () => {
+        const val = (input.value || '').replace(/[<>&"']/g, '').trim().slice(0, 16);
+        if (val) {
+          name = val;
+          const nameField = document.getElementById('player-name');
+          if (nameField) nameField.value = name;
+          localStorage.setItem('playerName', name);
+        }
+        overlay.classList.remove('visible');
+        ws.send(JSON.stringify({ type: 'set_name', name }));
+        const queued = pendingMessages.splice(0);
+        for (const m of queued) ws.send(JSON.stringify(m));
+        btn.removeEventListener('click', submitName);
+        input.removeEventListener('keydown', onKey);
+      };
+      const onKey = (e) => { if (e.key === 'Enter') submitName(); };
+      btn.addEventListener('click', submitName);
+      input.addEventListener('keydown', onKey);
+    } else {
+      // Send player name immediately
+      ws.send(JSON.stringify({ type: 'set_name', name }));
+      // Flush any pending messages
+      const queued = pendingMessages.splice(0);
+      for (const m of queued) ws.send(JSON.stringify(m));
+    }
   };
 
   ws.onmessage = (event) => {
@@ -3168,6 +3197,24 @@ function handleServerMessage(msg) {
     case 'lobby_chat':
       appendChatMessage('lobby-chat-messages', msg.name, msg.text);
       break;
+
+    case 'lobby_system': {
+      const container = document.getElementById('lobby-chat-messages');
+      if (!container) break;
+      const div = document.createElement('div');
+      div.className = 'chat-msg chat-msg-system';
+      div.textContent = msg.text;
+      container.appendChild(div);
+      while (container.children.length > 100) container.removeChild(container.firstChild);
+      container.scrollTop = container.scrollHeight;
+      break;
+    }
+
+    case 'lobby_count': {
+      const el = document.getElementById('lobby-count');
+      if (el) el.textContent = msg.count + ' online';
+      break;
+    }
 
     case 'room_chat':
       appendChatMessage('room-chat-messages', msg.name, msg.text);

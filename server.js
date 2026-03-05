@@ -123,6 +123,20 @@ function broadcastLobbyChat(name, text) {
   }
 }
 
+function broadcastLobbyCount() {
+  const msg = JSON.stringify({ type: 'lobby_count', count: lobbyClients.size });
+  for (const c of lobbyClients) {
+    if (c.readyState === 1) c.send(msg);
+  }
+}
+
+function broadcastLobbySystem(text) {
+  const msg = JSON.stringify({ type: 'lobby_system', text, time: Date.now() });
+  for (const c of lobbyClients) {
+    if (c.readyState === 1) c.send(msg);
+  }
+}
+
 function broadcastWaitingUpdate(room) {
   let humanCount = 0;
   const names = [];
@@ -2475,7 +2489,9 @@ wss.on('connection', (ws) => {
 
   // Add to lobby clients and send current game list
   lobbyClients.add(ws);
+  ws._lobbyAnnounced = false;
   ws.send(JSON.stringify({ type: 'game_list', games: buildGameList() }));
+  broadcastLobbyCount();
 
   ws.on('message', (raw) => {
     serverBytesInAcc += (typeof raw === 'string' ? raw.length : raw.byteLength || 0);
@@ -2489,7 +2505,16 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
       case 'set_name': {
         const name = sanitizeName(msg.name);
+        const oldName = playerNames.get(ws);
         playerNames.set(ws, name);
+        if (lobbyClients.has(ws)) {
+          if (!ws._lobbyAnnounced) {
+            ws._lobbyAnnounced = true;
+            broadcastLobbySystem(name + ' has joined');
+          } else if (oldName && oldName !== name) {
+            broadcastLobbySystem(oldName + ' is now known as ' + name);
+          }
+        }
         break;
       }
 
@@ -2597,6 +2622,8 @@ wss.on('connection', (ws) => {
         playerRoom = room;
         playerTeam = 0;
         lobbyClients.delete(ws);
+        broadcastLobbySystem(pName + ' has left');
+        broadcastLobbyCount();
         ws.send(JSON.stringify({
           type: 'created',
           code: room.code,
@@ -2624,6 +2651,8 @@ wss.on('connection', (ws) => {
         playerRoom = room;
         playerTeam = 0;
         lobbyClients.delete(ws);
+        broadcastLobbySystem(pName + ' has left');
+        broadcastLobbyCount();
         const spawnZones = computeSpawnZones(room.mapW, room.mapH, maxPlayers);
         ws.send(JSON.stringify({
           type: 'start',
@@ -2674,7 +2703,10 @@ wss.on('connection', (ws) => {
         room.players[slot] = ws;
         playerRoom = room;
         playerTeam = slot;
+        const joinLeaveName = playerNames.get(ws) || 'Player';
         lobbyClients.delete(ws);
+        broadcastLobbySystem(joinLeaveName + ' has left');
+        broadcastLobbyCount();
         ws.send(JSON.stringify({
           type: 'joined',
           code: room.code,
@@ -2823,7 +2855,14 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    lobbyClients.delete(ws);
+    if (lobbyClients.has(ws)) {
+      const leaveName = playerNames.get(ws) || 'Player';
+      lobbyClients.delete(ws);
+      broadcastLobbySystem(leaveName + ' has left');
+      broadcastLobbyCount();
+    } else {
+      lobbyClients.delete(ws);
+    }
     adminClients.delete(ws);
 
     if (!playerRoom) return;

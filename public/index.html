@@ -371,6 +371,11 @@
     .chat-msg-text {
       color: rgba(200, 210, 230, 0.8);
     }
+    .chat-msg-system {
+      color: #aaa;
+      font-style: italic;
+      font-size: 11px;
+    }
     .chat-input-row {
       display: flex;
       gap: 0;
@@ -856,6 +861,80 @@
       margin-bottom: 4px;
     }
 
+    /* Name prompt modal */
+    #name-prompt-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+    }
+    #name-prompt-overlay.visible { display: flex; }
+    #name-prompt-modal {
+      background: radial-gradient(ellipse at center, rgba(15, 15, 40, 0.97) 0%, rgba(8, 8, 22, 0.99) 100%);
+      border: 1px solid rgba(100, 140, 255, 0.25);
+      border-radius: 12px;
+      padding: 32px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 0 60px rgba(40, 60, 120, 0.25), 0 0 120px rgba(30, 50, 100, 0.1);
+      animation: namePromptIn 0.3s ease-out;
+    }
+    @keyframes namePromptIn {
+      from { opacity: 0; transform: scale(0.9) translateY(-10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    #name-prompt-header {
+      font: 600 13px 'Raleway', sans-serif;
+      color: #8ab;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    #name-prompt-input {
+      background: rgba(5, 5, 20, 0.8);
+      color: #b8d8ff;
+      border: 1px solid rgba(100, 140, 255, 0.25);
+      border-radius: 6px;
+      padding: 10px 16px;
+      font: 15px 'Raleway', sans-serif;
+      letter-spacing: 1px;
+      text-align: center;
+      width: 240px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #name-prompt-input:focus {
+      outline: none;
+      border-color: rgba(100, 140, 255, 0.5);
+      box-shadow: 0 0 15px rgba(68, 136, 255, 0.15);
+    }
+    #name-prompt-input::placeholder {
+      color: rgba(100, 130, 180, 0.35);
+      letter-spacing: 2px;
+    }
+    #name-prompt-btn {
+      background: linear-gradient(180deg, rgba(30, 50, 100, 0.9) 0%, rgba(18, 32, 70, 0.95) 100%);
+      color: rgba(180, 210, 255, 0.9);
+      border: 1px solid rgba(80, 130, 255, 0.25);
+      border-radius: 6px;
+      padding: 10px 32px;
+      font: 600 12px 'Raleway', sans-serif;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+    #name-prompt-btn:hover {
+      background: linear-gradient(180deg, rgba(40, 65, 130, 0.95) 0%, rgba(25, 45, 95, 0.95) 100%);
+      border-color: rgba(100, 160, 255, 0.5);
+      box-shadow: 0 0 25px rgba(68, 136, 255, 0.2);
+      color: #fff;
+    }
+    #name-prompt-btn:active { transform: scale(0.97); }
+
     /* Guide modal */
     #guide-overlay {
       display: none;
@@ -1047,7 +1126,7 @@
 
           <!-- Right column: Lobby Chat -->
           <div class="lobby-col lobby-col-right">
-            <div class="lobby-col-title">Lobby Chat</div>
+            <div class="lobby-col-title">Lobby Chat <span id="lobby-count" style="font-size:10px;opacity:0.6;margin-left:6px"></span></div>
             <div class="chat-box">
               <div class="chat-messages" id="lobby-chat-messages"></div>
               <div class="chat-input-row">
@@ -1177,6 +1256,15 @@
       <input id="music-vol" class="sb-slider" type="range" min="0" max="100" value="30">
     </div>
     <button class="setting-btn" data-setting="lowZoomSimplify">Simplify at Low Zoom</button>
+  </div>
+
+  <!-- Name prompt modal -->
+  <div id="name-prompt-overlay">
+    <div id="name-prompt-modal">
+      <div id="name-prompt-header">Enter Your Name</div>
+      <input id="name-prompt-input" type="text" maxlength="16" placeholder="Your name..." autofocus>
+      <button id="name-prompt-btn">Enter the Realm</button>
+    </div>
   </div>
 
   <!-- Guide modal -->
