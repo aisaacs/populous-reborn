@@ -4018,6 +4018,127 @@ window.addEventListener('mousedown', (e) => {
 
 syncSettingsUI();
 
+// ── Guide Modal ─────────────────────────────────────────────────────
+const guideOverlay = document.getElementById('guide-overlay');
+const guideBody = document.getElementById('guide-body');
+let guideLoaded = false;
+let guideHtml = '';
+
+function parseMarkdown(md) {
+  // Simple markdown to HTML converter for the guide
+  let html = '';
+  const lines = md.split('\n');
+  let inTable = false;
+  let inList = false;
+  let listType = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Close list if we're no longer in one
+    if (inList && !/^\s*[-*\d]/.test(line) && line.trim() !== '') {
+      html += listType === 'ul' ? '</ul>' : '</ol>';
+      inList = false;
+    }
+
+    // Table
+    if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      const cells = line.split('|').slice(1, -1).map(c => c.trim());
+      // Check if separator row
+      if (cells.every(c => /^[-:]+$/.test(c))) continue;
+      if (!inTable) {
+        html += '<table>';
+        inTable = true;
+        // First row is header
+        html += '<tr>' + cells.map(c => '<th>' + inlineFormat(c) + '</th>').join('') + '</tr>';
+        continue;
+      }
+      html += '<tr>' + cells.map(c => '<td>' + inlineFormat(c) + '</td>').join('') + '</tr>';
+      continue;
+    }
+    if (inTable) { html += '</table>'; inTable = false; }
+
+    // Headers
+    if (line.startsWith('### ')) { html += '<h3>' + inlineFormat(line.slice(4)) + '</h3>'; continue; }
+    if (line.startsWith('## ')) { html += '<h2>' + inlineFormat(line.slice(3)) + '</h2>'; continue; }
+    if (line.startsWith('# ')) { html += '<h1>' + inlineFormat(line.slice(2)) + '</h1>'; continue; }
+
+    // Unordered list
+    if (/^[-*] /.test(line.trim())) {
+      if (!inList || listType !== 'ul') {
+        if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+        html += '<ul>';
+        inList = true;
+        listType = 'ul';
+      }
+      html += '<li>' + inlineFormat(line.trim().slice(2)) + '</li>';
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\.\s/.test(line.trim())) {
+      if (!inList || listType !== 'ol') {
+        if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+        html += '<ol>';
+        inList = true;
+        listType = 'ol';
+      }
+      html += '<li>' + inlineFormat(line.trim().replace(/^\d+\.\s/, '')) + '</li>';
+      continue;
+    }
+
+    // Empty line
+    if (line.trim() === '') continue;
+
+    // Paragraph
+    html += '<p>' + inlineFormat(line) + '</p>';
+  }
+
+  if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+  if (inTable) html += '</table>';
+  return html;
+}
+
+function inlineFormat(text) {
+  // Bold
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Code
+  text = text.replace(/`(.+?)`/g, '<code>$1</code>');
+  // Italic
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  return text;
+}
+
+function openGuide() {
+  if (!guideLoaded) {
+    fetch('guide.md')
+      .then(r => r.text())
+      .then(md => {
+        guideHtml = parseMarkdown(md);
+        guideBody.innerHTML = guideHtml;
+        guideLoaded = true;
+      })
+      .catch(() => {
+        guideBody.innerHTML = '<p>Failed to load guide.</p>';
+      });
+  } else {
+    guideBody.innerHTML = guideHtml;
+  }
+  guideOverlay.classList.add('visible');
+}
+
+function closeGuide() {
+  guideOverlay.classList.remove('visible');
+}
+
+document.getElementById('guide-close').addEventListener('click', closeGuide);
+guideOverlay.addEventListener('click', (e) => {
+  if (e.target === guideOverlay) closeGuide();
+});
+document.getElementById('lobby-guide-btn').addEventListener('click', openGuide);
+const sidebarGuideBtn = document.getElementById('sidebar-guide-btn');
+if (sidebarGuideBtn) sidebarGuideBtn.addEventListener('click', openGuide);
+
 // ── Minimap ─────────────────────────────────────────────────────────
 const MM_SIZE = 200;
 const MM_MARGIN = 10;

@@ -16,6 +16,7 @@ const MIME = {
   '.png':  'image/png',
   '.jpg':  'image/jpeg',
   '.json': 'application/json',
+  '.md':   'text/markdown; charset=utf-8',
 };
 
 const server = http.createServer((req, res) => {

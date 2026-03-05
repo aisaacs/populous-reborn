@@ -855,6 +855,112 @@
       letter-spacing: 1px;
       margin-bottom: 4px;
     }
+
+    /* Guide modal */
+    #guide-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    #guide-overlay.visible { display: flex; }
+    #guide-modal {
+      background: rgba(12, 14, 28, 0.97);
+      border: 1px solid #444;
+      border-radius: 8px;
+      width: 680px;
+      max-width: 90vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #guide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+    }
+    #guide-header span {
+      font: bold 13px 'Raleway', monospace;
+      color: #8ab;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    #guide-close {
+      background: none;
+      border: 1px solid #444;
+      border-radius: 3px;
+      color: #888;
+      font: 14px monospace;
+      cursor: pointer;
+      padding: 2px 8px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #guide-close:hover { color: #ddd; border-color: #888; }
+    #guide-body {
+      padding: 16px 24px;
+      overflow-y: auto;
+      font: 13px/1.7 'Raleway', sans-serif;
+      color: #c0c8d8;
+    }
+    #guide-body h1 { font: bold 18px 'Raleway', sans-serif; color: #8af; margin: 0 0 12px 0; }
+    #guide-body h2 { font: bold 15px 'Raleway', sans-serif; color: #8ab; margin: 20px 0 8px 0; border-bottom: 1px solid #282828; padding-bottom: 4px; }
+    #guide-body h3 { font: bold 13px 'Raleway', sans-serif; color: #9ac; margin: 14px 0 6px 0; }
+    #guide-body p { margin: 0 0 8px 0; }
+    #guide-body ul, #guide-body ol { margin: 0 0 8px 0; padding-left: 20px; }
+    #guide-body li { margin-bottom: 3px; }
+    #guide-body strong { color: #d0d8e8; }
+    #guide-body code { background: rgba(255,255,255,0.07); padding: 1px 4px; border-radius: 2px; font: 12px monospace; color: #aab; }
+    #guide-body table { border-collapse: collapse; margin: 8px 0; width: 100%; font-size: 12px; }
+    #guide-body th { text-align: left; padding: 4px 8px; border-bottom: 1px solid #444; color: #8ab; font-weight: bold; }
+    #guide-body td { padding: 3px 8px; border-bottom: 1px solid #1e1e2e; }
+    #guide-body tr:hover td { background: rgba(255,255,255,0.03); }
+    #guide-body::-webkit-scrollbar { width: 6px; }
+    #guide-body::-webkit-scrollbar-track { background: transparent; }
+    #guide-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    #guide-body::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    /* Sidebar bottom links */
+    .sb-bottom-links {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      padding-top: 2px;
+    }
+    .sb-bottom-link {
+      background: none;
+      border: none;
+      color: #555;
+      font: 8px monospace;
+      cursor: pointer;
+      padding: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: color 0.15s;
+    }
+    .sb-bottom-link:hover { color: #aaa; }
+    .sb-bottom-sep { color: #333; font: 8px monospace; }
+
+    /* Lobby how-to-play link */
+    .lobby-guide-link {
+      background: none;
+      border: none;
+      color: rgba(130, 170, 255, 0.4);
+      font: 300 11px 'Raleway', sans-serif;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-bottom: 12px;
+      padding: 0;
+      transition: color 0.2s;
+    }
+    .lobby-guide-link:hover { color: rgba(130, 170, 255, 0.8); }
   </style>
 </head>
 <body>
@@ -864,6 +970,7 @@
       <h1>POPULOUS</h1>
       <div class="title-sub">Reborn</div>
       <div class="subtitle">Multiplayer God Game</div>
+      <button class="lobby-guide-link" id="lobby-guide-btn">How to Play</button>
 
       <div class="lobby-name-row">
         <label for="player-name">Your Name</label>
@@ -1044,16 +1151,16 @@
       <div id="opp-stats"></div>
     </div>
 
-    <!-- Settings gear -->
-    <div class="sb-section" style="text-align:center">
-      <button id="btn-settings-gear" class="gear-btn" title="Settings">&#9881;</button>
-    </div>
-
-    <!-- Performance -->
-    <div class="sb-section">
-      <div class="sb-label">Perf</div>
-      <div class="stat-line">FPS: <span id="perf-fps" class="stat-val">--</span></div>
-      <div class="stat-line">Frame: <span id="perf-frame" class="stat-val">--</span> ms</div>
+    <!-- Bottom: Settings / Guide / FPS -->
+    <div class="sb-section" style="border-bottom:none">
+      <div class="sb-bottom-links">
+        <button id="btn-settings-gear" class="sb-bottom-link" title="Settings">Settings</button>
+        <span class="sb-bottom-sep">|</span>
+        <button id="sidebar-guide-btn" class="sb-bottom-link" title="How to Play">How to Play</button>
+      </div>
+      <div class="stat-line" style="text-align:center;margin-top:4px">
+        <span style="color:#444;font-size:8px">FPS: <span id="perf-fps" class="stat-val" style="font-size:8px">--</span> &middot; <span id="perf-frame" class="stat-val" style="font-size:8px">--</span>ms</span>
+      </div>
     </div>
   </div>
 
@@ -1068,6 +1175,17 @@
       <input id="music-vol" class="sb-slider" type="range" min="0" max="100" value="30">
     </div>
     <button class="setting-btn" data-setting="lowZoomSimplify">Simplify at Low Zoom</button>
+  </div>
+
+  <!-- Guide modal -->
+  <div id="guide-overlay">
+    <div id="guide-modal">
+      <div id="guide-header">
+        <span>How to Play</span>
+        <button id="guide-close">&times;</button>
+      </div>
+      <div id="guide-body">Loading...</div>
+    </div>
   </div>
 
   <script src="/shared/constants.js"></script>
