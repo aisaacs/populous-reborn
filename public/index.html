@@ -951,16 +951,18 @@
     .lobby-guide-link {
       background: none;
       border: none;
-      color: rgba(130, 170, 255, 0.4);
+      color: rgba(140, 175, 240, 0.5);
       font: 300 11px 'Raleway', sans-serif;
-      letter-spacing: 3px;
-      text-transform: uppercase;
+      letter-spacing: 1px;
       cursor: pointer;
-      margin-bottom: 12px;
+      margin-top: 14px;
       padding: 0;
       transition: color 0.2s;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-color: rgba(140, 175, 240, 0.2);
     }
-    .lobby-guide-link:hover { color: rgba(130, 170, 255, 0.8); }
+    .lobby-guide-link:hover { color: rgba(150, 190, 255, 0.85); text-decoration-color: rgba(150, 190, 255, 0.4); }
   </style>
 </head>
 <body>
@@ -970,7 +972,6 @@
       <h1>POPULOUS</h1>
       <div class="title-sub">Reborn</div>
       <div class="subtitle">Multiplayer God Game</div>
-      <button class="lobby-guide-link" id="lobby-guide-btn">How to Play</button>
 
       <div class="lobby-name-row">
         <label for="player-name">Your Name</label>
@@ -1083,6 +1084,7 @@
       </div>
 
       <div id="error-text"></div>
+      <a class="lobby-guide-link" id="lobby-guide-btn" href="javascript:void(0)">How to Play</a>
     </div>
   </div>
 
