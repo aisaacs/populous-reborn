@@ -876,6 +876,10 @@ for (let i = 0; i < WATERFALL_MAX; i++) {
   waterfallParticles.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, size: 2, active: false });
 }
 
+// ── Delta State Maps ────────────────────────────────────────────────
+let walkerMap = new Map();      // id → walker data object
+let settlementMap = new Map();  // "tx,ty" → settlement data object
+
 // ── Walker Interpolation ────────────────────────────────────────────
 let prevWalkers = [];
 let currWalkers = [];
@@ -3273,97 +3277,129 @@ function handleServerMessage(msg) {
 }
 
 function applyStateSnapshot(msg) {
-  // Update dynamic dimensions from state if provided
+  if (msg.full) {
+    applyFullSnapshot(msg);
+  } else {
+    applyDeltaSnapshot(msg);
+  }
+}
+
+// ── Tile Overlay Helpers ───────────────────────────────────────────
+function applySwamps(data) {
+  swamps = data || [];
+  swampTiles.fill(0);
+  for (const s of swamps) swampTiles[s.y * localMapW + s.x] = 1;
+}
+
+function applyRocks(data) {
+  rockTiles.fill(0);
+  if (data) {
+    for (let i = 0; i < data.length; i += 2)
+      rockTiles[data[i + 1] * localMapW + data[i]] = 1;
+  }
+}
+
+function applyTrees(data) {
+  treeTiles.fill(0);
+  treeCoords = data || [];
+  if (data) {
+    for (let i = 0; i < data.length; i += 2)
+      treeTiles[data[i + 1] * localMapW + data[i]] = 1;
+  }
+}
+
+function applyPebbles(data) {
+  pebbleTiles.fill(0);
+  pebbleCoords = data || [];
+  if (data) {
+    for (let i = 0; i < data.length; i += 2)
+      pebbleTiles[data[i + 1] * localMapW + data[i]] = 1;
+  }
+}
+
+function applyRuins(data) {
+  ruins = [];
+  ruinTiles.fill(0);
+  if (data) {
+    for (let i = 0; i < data.length; i += 3) {
+      ruins.push({ x: data[i], y: data[i + 1], team: data[i + 2] });
+      ruinTiles[data[i + 1] * localMapW + data[i]] = data[i + 2] + 1;
+    }
+  }
+}
+
+function applyCrops(data) {
+  cropTeamTiles.fill(0);
+  if (data) {
+    for (let i = 0; i < data.length; i += 3) {
+      const team = data[i + 2];
+      if (team >= 0 && team < numTeams)
+        cropTeamTiles[data[i + 1] * localMapW + data[i]] = team + 1;
+    }
+  }
+}
+
+function applyHeights(heightsPayload) {
+  if (!heightsPayload) return;
+  if (heightsPayload.full) {
+    const flat = heightsPayload.full;
+    if (heights.length === 0) {
+      for (let x = 0; x <= localMapW; x++) {
+        heights[x] = [];
+        for (let y = 0; y <= localMapH; y++) {
+          heights[x][y] = 0;
+        }
+      }
+    }
+    let idx = 0;
+    for (let y = 0; y <= localMapH; y++) {
+      for (let x = 0; x <= localMapW; x++) {
+        heights[x][y] = flat[idx++];
+      }
+    }
+  } else if (heightsPayload.delta) {
+    const delta = heightsPayload.delta;
+    for (let i = 0; i < delta.length; i += 3) {
+      const x = delta[i], y = delta[i + 1], h = delta[i + 2];
+      if (heights[x]) heights[x][y] = h;
+    }
+  }
+}
+
+function applyFullSnapshot(msg) {
   if (msg.mapW) localMapW = msg.mapW;
   if (msg.mapH) localMapH = msg.mapH;
   if (msg.numTeams) numTeams = msg.numTeams;
 
-  // Handle height data — supports both full and delta formats
-  const heightsPayload = msg.heights;
-  if (heightsPayload) {
-    if (heightsPayload.full) {
-      // Full height data — reconstruct from flat array
-      const flat = heightsPayload.full;
-      if (heights.length === 0) {
-        for (let x = 0; x <= localMapW; x++) {
-          heights[x] = [];
-          for (let y = 0; y <= localMapH; y++) {
-            heights[x][y] = 0;
-          }
-        }
-      }
-      let idx = 0;
-      for (let y = 0; y <= localMapH; y++) {
-        for (let x = 0; x <= localMapW; x++) {
-          heights[x][y] = flat[idx++];
-        }
-      }
-    } else if (heightsPayload.delta) {
-      // Delta update — triplets of [x, y, h]
-      const delta = heightsPayload.delta;
-      for (let i = 0; i < delta.length; i += 3) {
-        const x = delta[i], y = delta[i + 1], h = delta[i + 2];
-        if (heights[x]) heights[x][y] = h;
-      }
-    }
-  }
+  applyHeights(msg.heights);
 
   // Shift walker snapshots for interpolation
   prevWalkers = currWalkers;
   currWalkers = msg.walkers;
   lastTickTime = performance.now();
 
+  // Rebuild walkerMap from full walker list
+  walkerMap = new Map();
+  for (const w of currWalkers) walkerMap.set(w.id, w);
+
   // Unpack settlements
   settlements = msg.settlements;
+
+  // Rebuild settlementMap
+  settlementMap = new Map();
+  for (const s of settlements) settlementMap.set(s.tx + ',' + s.ty, s);
 
   // Other state
   magnetPos = msg.magnetPos;
   teamMode = msg.teamMode;
   myMana = msg.mana;
 
-  // Power system state — typed arrays for O(1) lookups
-  swamps = msg.swamps || [];
-  swampTiles.fill(0);
-  for (const s of swamps) swampTiles[s.y * localMapW + s.x] = 1;
-
-  rockTiles.fill(0);
-  if (msg.rocks) {
-    for (let i = 0; i < msg.rocks.length; i += 2)
-      rockTiles[msg.rocks[i + 1] * localMapW + msg.rocks[i]] = 1;
-  }
-
-  treeTiles.fill(0);
-  treeCoords = msg.trees || [];
-  if (msg.trees) {
-    for (let i = 0; i < msg.trees.length; i += 2)
-      treeTiles[msg.trees[i + 1] * localMapW + msg.trees[i]] = 1;
-  }
-
-  pebbleTiles.fill(0);
-  pebbleCoords = msg.pebbles || [];
-  if (msg.pebbles) {
-    for (let i = 0; i < msg.pebbles.length; i += 2)
-      pebbleTiles[msg.pebbles[i + 1] * localMapW + msg.pebbles[i]] = 1;
-  }
-
-  ruins = [];
-  ruinTiles.fill(0);
-  if (msg.ruins) {
-    for (let i = 0; i < msg.ruins.length; i += 3) {
-      ruins.push({ x: msg.ruins[i], y: msg.ruins[i + 1], team: msg.ruins[i + 2] });
-      ruinTiles[msg.ruins[i + 1] * localMapW + msg.ruins[i]] = msg.ruins[i + 2] + 1;
-    }
-  }
-
-  // Crops — single typed array (team + 1)
-  cropTeamTiles.fill(0);
-  if (msg.crops) {
-    for (let i = 0; i < msg.crops.length; i += 3) {
-      const team = msg.crops[i + 2];
-      if (team >= 0 && team < numTeams)
-        cropTeamTiles[msg.crops[i + 1] * localMapW + msg.crops[i]] = team + 1;
-    }
-  }
+  applySwamps(msg.swamps);
+  applyRocks(msg.rocks);
+  applyTrees(msg.trees);
+  applyPebbles(msg.pebbles);
+  applyRuins(msg.ruins);
+  applyCrops(msg.crops);
 
   seaLevel = msg.seaLevel !== undefined ? msg.seaLevel : SEA_LEVEL;
   leaders = msg.leaders || [];
@@ -3375,7 +3411,86 @@ function applyStateSnapshot(msg) {
   fires = msg.fires || [];
   minimapDirty = true;
 
-  // Terrain buffer dirty detection
+  detectTerrainDirty(msg);
+}
+
+function applyDeltaSnapshot(msg) {
+  if (msg.mapW) localMapW = msg.mapW;
+  if (msg.mapH) localMapH = msg.mapH;
+  if (msg.numTeams) numTeams = msg.numTeams;
+
+  // Heights (already supports delta)
+  if (msg.heights) applyHeights(msg.heights);
+
+  // Walker delta
+  prevWalkers = currWalkers;
+
+  // Apply position-only moves
+  if (msg.wMov) {
+    for (let i = 0; i < msg.wMov.length; i += 3) {
+      const id = msg.wMov[i], x = msg.wMov[i + 1], y = msg.wMov[i + 2];
+      const w = walkerMap.get(id);
+      if (w) { w.x = x; w.y = y; }
+    }
+  }
+
+  // Apply full updates (new or changed walkers)
+  if (msg.wUpd) {
+    for (const w of msg.wUpd) {
+      walkerMap.set(w.id, w);
+    }
+  }
+
+  // Remove dead walkers
+  if (msg.wRem) {
+    for (const id of msg.wRem) walkerMap.delete(id);
+  }
+
+  // Rebuild currWalkers array from map
+  currWalkers = Array.from(walkerMap.values());
+  lastTickTime = performance.now();
+
+  // Settlement delta
+  if (msg.sUpd) {
+    for (const s of msg.sUpd) {
+      settlementMap.set(s.tx + ',' + s.ty, s);
+    }
+  }
+  if (msg.sRem) {
+    for (let i = 0; i < msg.sRem.length; i += 2) {
+      settlementMap.delete(msg.sRem[i] + ',' + msg.sRem[i + 1]);
+    }
+  }
+  if (msg.sUpd || msg.sRem) {
+    settlements = Array.from(settlementMap.values());
+  }
+
+  // Always-present fields
+  if (msg.mana !== undefined) myMana = msg.mana;
+  if (msg.teamPop) teamPop = msg.teamPop;
+  if (msg.fires) fires = msg.fires;
+
+  // Conditional fields — only update if present
+  if (msg.swamps !== undefined) applySwamps(msg.swamps);
+  if (msg.rocks !== undefined) applyRocks(msg.rocks);
+  if (msg.trees !== undefined) applyTrees(msg.trees);
+  if (msg.pebbles !== undefined) applyPebbles(msg.pebbles);
+  if (msg.ruins !== undefined) applyRuins(msg.ruins);
+  if (msg.crops !== undefined) applyCrops(msg.crops);
+
+  if (msg.magnetPos !== undefined) magnetPos = msg.magnetPos;
+  if (msg.teamMode !== undefined) teamMode = msg.teamMode;
+  if (msg.seaLevel !== undefined) seaLevel = msg.seaLevel;
+  if (msg.leaders !== undefined) leaders = msg.leaders;
+  if (msg.magnetLocked !== undefined) magnetLocked = msg.magnetLocked;
+
+  if (msg.armageddon !== undefined) {
+    const wasArmageddon = armageddon;
+    armageddon = msg.armageddon;
+    if (armageddon && !wasArmageddon) onArmageddonStart();
+  }
+
+  minimapDirty = true;
   detectTerrainDirty(msg);
 }
 

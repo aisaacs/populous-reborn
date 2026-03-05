@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Populous Server Admin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0e14;
+    color: #c0c8d8;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 16px;
+    min-height: 100vh;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #1e2a3a;
+    border-bottom: none;
+    background: #0d1218;
+    padding: 10px 16px;
+    border-radius: 6px 6px 0 0;
+  }
+  .header h1 {
+    font-size: 14px;
+    color: #5fa8d3;
+    font-weight: normal;
+    letter-spacing: 2px;
+  }
+  .header .uptime {
+    color: #6a7a8a;
+    font-size: 12px;
+  }
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .status-dot.connected { background: #4ae04a; box-shadow: 0 0 4px #4ae04a; }
+  .status-dot.disconnected { background: #e04a4a; box-shadow: 0 0 4px #e04a4a; }
+
+  .section {
+    border: 1px solid #1e2a3a;
+    background: #0d1218;
+    margin-bottom: 0;
+  }
+  .section:last-child {
+    border-radius: 0 0 6px 6px;
+  }
+  .section-title {
+    padding: 8px 16px;
+    background: #111820;
+    color: #5fa8d3;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid #1e2a3a;
+  }
+  .section-body {
+    padding: 12px 16px;
+  }
+
+  .metrics-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .metric {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .metric-label {
+    color: #6a7a8a;
+    font-size: 11px;
+    min-width: 70px;
+  }
+  .metric-bar {
+    width: 120px;
+    height: 14px;
+    background: #1a2230;
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .metric-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease, background 0.5s ease;
+  }
+  .metric-value {
+    color: #e0e8f0;
+    font-size: 12px;
+    min-width: 60px;
+  }
+
+  .bar-green { background: #2d8a4e; }
+  .bar-yellow { background: #b8960c; }
+  .bar-red { background: #c0392b; }
+  .bar-blue { background: #2a6496; }
+
+  /* Games table */
+  .games-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .games-table th {
+    text-align: left;
+    color: #5a6a7a;
+    font-weight: normal;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #1e2a3a;
+  }
+  .games-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #141c24;
+  }
+  .games-table tr:hover td {
+    background: #111820;
+  }
+  .game-status {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .game-status.playing { background: #4ae04a; }
+  .game-status.waiting { background: #f0c040; }
+  .game-status.ended { background: #6a7a8a; }
+
+  .no-games {
+    color: #3a4a5a;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+  }
+
+  .tick-warn { color: #f0c040; }
+  .tick-crit { color: #e04a4a; }
+
+  /* Temperature gauge */
+  .temp-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .temp-gauge {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+  }
+  .temp-gauge svg {
+    width: 80px;
+    height: 80px;
+    transform: rotate(-90deg);
+  }
+  .temp-gauge-bg {
+    fill: none;
+    stroke: #1a2230;
+    stroke-width: 6;
+  }
+  .temp-gauge-fill {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s ease, stroke 0.8s ease;
+  }
+  .temp-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    line-height: 1.2;
+  }
+  .temp-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: #e0e8f0;
+  }
+  .temp-unit {
+    font-size: 9px;
+    color: #6a7a8a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .temp-details {
+    flex: 1;
+  }
+
+  /* Net bandwidth */
+  .net-row {
+    display: flex;
+    gap: 24px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #1a2230;
+  }
+  .net-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .net-arrow {
+    font-size: 14px;
+  }
+  .net-arrow.in { color: #4ae04a; }
+  .net-arrow.out { color: #e08a4a; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span class="status-dot disconnected" id="connDot"></span>POPULOUS SERVER ADMIN</h1>
+  <span class="uptime" id="uptime">uptime: --</span>
+</div>
+
+<div class="section">
+  <div class="section-title">Server Overview</div>
+  <div class="section-body">
+    <div class="temp-section">
+      <div class="temp-gauge">
+        <svg viewBox="0 0 36 36">
+          <circle class="temp-gauge-bg" cx="18" cy="18" r="15.9"></circle>
+          <circle class="temp-gauge-fill" id="tempArc" cx="18" cy="18" r="15.9"
+            stroke-dasharray="100" stroke-dashoffset="100" stroke="#2d8a4e"></circle>
+        </svg>
+        <div class="temp-label">
+          <div class="temp-value" id="tempVal">0</div>
+          <div class="temp-unit">temp</div>
+        </div>
+      </div>
+      <div class="temp-details">
+        <div class="metrics-row">
+          <div class="metric">
+            <span class="metric-label">Tick Load</span>
+            <div class="metric-bar"><div class="metric-bar-fill bar-green" id="tickBar" style="width:0%"></div></div>
+            <span class="metric-value" id="tickVal">0%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Heap</span>
+            <div class="metric-bar"><div class="metric-bar-fill bar-blue" id="heapBar" style="width:0%"></div></div>
+            <span class="metric-value" id="heapVal">0 MB</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">RSS</span>
+            <div class="metric-bar"><div class="metric-bar-fill bar-blue" id="rssBar" style="width:0%"></div></div>
+            <span class="metric-value" id="rssVal">0 MB</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Connections</span>
+            <span class="metric-value" id="connVal">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Active Games</span>
+            <span class="metric-value" id="activeVal">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Lobby</span>
+            <span class="metric-value" id="lobbyVal">0</span>
+          </div>
+        </div>
+        <div class="net-row">
+          <div class="net-item">
+            <span class="net-arrow in">&#9660;</span>
+            <span class="metric-label">Net In</span>
+            <span class="metric-value" id="netInVal">0 B/s</span>
+          </div>
+          <div class="net-item">
+            <span class="net-arrow out">&#9650;</span>
+            <span class="metric-label">Net Out</span>
+            <span class="metric-value" id="netOutVal">0 B/s</span>
+          </div>
+          <div class="net-item">
+            <span class="metric-label">Total</span>
+            <span class="metric-value" id="netTotalVal">0 B/s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Games</div>
+  <div class="section-body" style="padding:0">
+    <table class="games-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Players</th>
+          <th>Map</th>
+          <th>Duration</th>
+          <th>Walkers</th>
+          <th>Settle.</th>
+          <th>Pop</th>
+          <th>Tick</th>
+          <th>Net Out</th>
+        </tr>
+      </thead>
+      <tbody id="gamesBody">
+        <tr><td colspan="11" class="no-games">No active games</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function() {
+  let ws = null;
+  let connected = false;
+
+  function formatUptime(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
+  }
+
+  function formatDuration(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B/s';
+    return (bytes / 1024).toFixed(1) + ' KB/s';
+  }
+
+  function barColor(pct) {
+    if (pct < 50) return 'bar-green';
+    if (pct < 80) return 'bar-yellow';
+    return 'bar-red';
+  }
+
+  function tempColor(pct) {
+    if (pct < 40) return '#2d8a4e';
+    if (pct < 65) return '#b8960c';
+    if (pct < 85) return '#e08a4a';
+    return '#c0392b';
+  }
+
+  function update(data) {
+    // Uptime
+    document.getElementById('uptime').textContent = 'uptime: ' + formatUptime(data.uptime);
+
+    // Temperature gauge
+    const temp = Math.min(data.temperature || 0, 100);
+    const arc = document.getElementById('tempArc');
+    arc.setAttribute('stroke-dashoffset', 100 - temp);
+    arc.setAttribute('stroke', tempColor(temp));
+    const tempValEl = document.getElementById('tempVal');
+    tempValEl.textContent = temp;
+    tempValEl.style.color = tempColor(temp);
+
+    // Tick load
+    const tickPct = Math.min(data.tickLoad, 100);
+    const tickBar = document.getElementById('tickBar');
+    tickBar.style.width = tickPct + '%';
+    tickBar.className = 'metric-bar-fill ' + barColor(tickPct);
+    document.getElementById('tickVal').textContent = data.tickLoad + '%';
+
+    // Memory
+    const heapPct = Math.min(data.memory.heapUsed / Math.max(data.memory.heapTotal, 1) * 100, 100);
+    document.getElementById('heapBar').style.width = heapPct + '%';
+    document.getElementById('heapVal').textContent = data.memory.heapUsed + ' MB';
+
+    const rssPct = Math.min(data.memory.rss / 200 * 100, 100); // 200MB as reference max
+    document.getElementById('rssBar').style.width = rssPct + '%';
+    document.getElementById('rssVal').textContent = data.memory.rss + ' MB';
+
+    // Counts
+    document.getElementById('connVal').textContent = data.connections;
+    document.getElementById('activeVal').textContent = data.activeGames;
+    document.getElementById('lobbyVal').textContent = data.lobbyCount;
+
+    // Network
+    document.getElementById('netInVal').textContent = formatBytes(data.netInRate || 0);
+    document.getElementById('netOutVal').textContent = formatBytes(data.netOutRate || 0);
+    document.getElementById('netTotalVal').textContent = formatBytes((data.netInRate || 0) + (data.netOutRate || 0));
+
+    // Games table
+    const tbody = document.getElementById('gamesBody');
+    if (data.games.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="11" class="no-games">No active games</td></tr>';
+      return;
+    }
+
+    let html = '';
+    for (const g of data.games) {
+      const tickClass = g.tickTimeMs > 40 ? 'tick-crit' : (g.tickTimeMs > 20 ? 'tick-warn' : '');
+      html += '<tr>'
+        + '<td><span class="game-status ' + g.status + '"></span>' + g.status + '</td>'
+        + '<td>' + g.code + '</td>'
+        + '<td>' + (g.name || '-') + '</td>'
+        + '<td>' + g.humans + '/' + g.maxPlayers + (g.aiCount > 0 ? '+' + g.aiCount + 'AI' : '') + '</td>'
+        + '<td>' + g.mapSize + '</td>'
+        + '<td>' + formatDuration(g.duration) + '</td>'
+        + '<td>' + (g.walkers != null ? g.walkers : '-') + '</td>'
+        + '<td>' + (g.settlements != null ? g.settlements : '-') + '</td>'
+        + '<td>' + (g.totalPop != null ? g.totalPop : '-') + '</td>'
+        + '<td class="' + tickClass + '">' + g.tickTimeMs + 'ms</td>'
+        + '<td>' + formatBytes(g.bytesSentRate) + '</td>'
+        + '</tr>';
+    }
+    tbody.innerHTML = html;
+  }
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(proto + '//' + location.host);
+
+    ws.onopen = function() {
+      connected = true;
+      document.getElementById('connDot').className = 'status-dot connected';
+      ws.send(JSON.stringify({ type: 'admin_subscribe' }));
+    };
+
+    ws.onmessage = function(e) {
+      let data;
+      try { data = JSON.parse(e.data); } catch { return; }
+      if (data.type === 'admin_snapshot') update(data);
+    };
+
+    ws.onclose = function() {
+      connected = false;
+      document.getElementById('connDot').className = 'status-dot disconnected';
+      setTimeout(connect, 2000);
+    };
+
+    ws.onerror = function() {
+      ws.close();
+    };
+  }
+
+  connect();
+})();
+</script>
+
+</body>
+</html>

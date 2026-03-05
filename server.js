@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const { performance } = require('perf_hooks');
 const C = require('./shared/constants');
 
 // ── HTTP Static File Server ─────────────────────────────────────────
@@ -21,7 +22,9 @@ const server = http.createServer((req, res) => {
   let filePath;
   const url = req.url.split('?')[0];
 
-  if (url.startsWith('/shared/')) {
+  if (url === '/admin') {
+    filePath = path.join(__dirname, 'public', 'admin.html');
+  } else if (url.startsWith('/shared/')) {
     filePath = path.join(__dirname, url);
   } else {
     filePath = path.join(__dirname, 'public', url === '/' ? 'index.html' : url);
@@ -50,6 +53,23 @@ server.listen(PORT, () => {
 const rooms = new Map();
 const lobbyClients = new Set();       // ws connections in lobby (not in a game)
 const playerNames = new WeakMap();    // ws → name string
+
+// ── Admin Metrics ───────────────────────────────────────────────────
+const serverStartTime = Date.now();
+const adminClients = new Set();
+const roomMetrics = new Map();        // room code → metrics object
+
+let serverBytesInAcc = 0, serverBytesOutAcc = 0;
+let serverBytesInRate = 0, serverBytesOutRate = 0;
+
+function getOrCreateRoomMetrics(code) {
+  let m = roomMetrics.get(code);
+  if (!m) {
+    m = { tickTimeMs: 0, tickTimeAvg: 0, bytesSentAcc: 0, msgsSentAcc: 0, bytesSentRate: 0, msgsSentRate: 0 };
+    roomMetrics.set(code, m);
+  }
+  return m;
+}
 
 function sanitizeName(name) {
   if (!name || typeof name !== 'string') return 'Player';
@@ -160,6 +180,7 @@ function createRoom(maxPlayers, mapSize, opts) {
     isPublic: !!opts.isPublic,
     creatorName: opts.creatorName || 'Player',
     chatLog: [],
+    createdAt: Date.now(),
   };
   rooms.set(code, room);
   return room;
@@ -170,6 +191,7 @@ function cleanupRoom(code) {
   if (!room) return;
   if (room.tickInterval) clearInterval(room.tickInterval);
   rooms.delete(code);
+  roomMetrics.delete(code);
 }
 
 // ── Spawn Zone Computation ──────────────────────────────────────────
@@ -254,6 +276,28 @@ function createGameState(mapW, mapH, numTeams) {
     winner: -1,
     _tickCount: 0,
     prevHeights: null, // for delta compression
+    // Delta serialization tracking
+    _prevWalkerMap: new Map(),      // id → {t,s,x,y,tx,ty,l,k}
+    _prevSettlements: [],           // prev serialized settlement array
+    _prevCropStr: '',               // joined crop triplets for fast compare
+    _prevRocksSize: 0,
+    _prevTreesSize: 0,
+    _prevPebblesSize: 0,
+    _prevRuinsLen: 0,
+    _prevSwampsLen: 0,
+    _prevSwampsStr: '',
+    _prevMagnetPosStr: '',
+    _prevMagnetLockedStr: '',
+    _prevTeamModeStr: '',
+    _prevSeaLevel: 0,
+    _prevLeadersStr: '',
+    _prevArmageddon: false,
+    _prevFiresStr: '',
+    _fullSnapshotCounter: 0,
+    _prevRocksStr: '',
+    _prevTreesStr: '',
+    _prevPebblesStr: '',
+    _prevRuinsStr: '',
   };
 }
 
@@ -1623,6 +1667,294 @@ function serializeState(state, team, heightsPayload) {
   };
 }
 
+// ── Delta Serialization ─────────────────────────────────────────────
+
+function computeWalkerDelta(state) {
+  const prevMap = state._prevWalkerMap;
+  const wMov = [];   // flat triplets: id, x, y (position-only changes)
+  const wUpd = [];   // full objects for new/changed walkers
+  const wRem = [];   // removed walker IDs
+  const newMap = new Map();
+
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    const x = Math.round(w.x * 100) / 100;
+    const y = Math.round(w.y * 100) / 100;
+    const tx = Math.round(w.tx * 100) / 100;
+    const ty = Math.round(w.ty * 100) / 100;
+    const l = w.isLeader ? 1 : 0;
+    const k = w.isKnight ? 1 : 0;
+
+    const prev = prevMap.get(w.id);
+    if (!prev) {
+      // New walker
+      const wd = { id: w.id, t: w.team, s: w.strength, x, y, tx, ty };
+      if (l) wd.l = 1;
+      if (k) wd.k = 1;
+      wUpd.push(wd);
+    } else if (prev.s !== w.strength || prev.tx !== tx || prev.ty !== ty ||
+               prev.l !== l || prev.k !== k || prev.t !== w.team) {
+      // Changed strength, target, flags, or team
+      const wd = { id: w.id, t: w.team, s: w.strength, x, y, tx, ty };
+      if (l) wd.l = 1;
+      if (k) wd.k = 1;
+      wUpd.push(wd);
+    } else if (prev.x !== x || prev.y !== y) {
+      // Position-only change
+      wMov.push(w.id, x, y);
+    }
+    // else: unchanged, skip
+
+    newMap.set(w.id, { t: w.team, s: w.strength, x, y, tx, ty, l, k });
+  }
+
+  // Find removed walkers
+  for (const id of prevMap.keys()) {
+    if (!newMap.has(id)) wRem.push(id);
+  }
+
+  state._prevWalkerMap = newMap;
+  return { wMov, wUpd, wRem };
+}
+
+function computeSettlementDelta(state) {
+  const prev = state._prevSettlements;
+  const sUpd = [];
+  const sRem = [];
+  const currMap = new Map();
+
+  for (const s of state.settlements) {
+    if (s.dead) continue;
+    const key = s.tx + ',' + s.ty;
+    const sd = {
+      t: s.team, l: s.level, p: s.population,
+      tx: s.tx, ty: s.ty,
+      ox: s.sqOx, oy: s.sqOy, sz: s.sqSize,
+    };
+    if (s.hasLeader) sd.hl = 1;
+    currMap.set(key, sd);
+  }
+
+  // Build prev map
+  const prevMap = new Map();
+  for (const sd of prev) {
+    prevMap.set(sd.tx + ',' + sd.ty, sd);
+  }
+
+  // Find new/changed
+  for (const [key, sd] of currMap) {
+    const p = prevMap.get(key);
+    if (!p || p.t !== sd.t || p.l !== sd.l || p.p !== sd.p ||
+        p.ox !== sd.ox || p.oy !== sd.oy || p.sz !== sd.sz ||
+        (p.hl || 0) !== (sd.hl || 0)) {
+      sUpd.push(sd);
+    }
+  }
+
+  // Find removed
+  for (const key of prevMap.keys()) {
+    if (!currMap.has(key)) {
+      const [tx, ty] = key.split(',').map(Number);
+      sRem.push(tx, ty);
+    }
+  }
+
+  state._prevSettlements = Array.from(currMap.values());
+  return { sUpd, sRem };
+}
+
+function serializeSetData(set) {
+  const arr = [];
+  for (const key of set) {
+    const parts = key.split(',');
+    arr.push(+parts[0], +parts[1]);
+  }
+  return arr;
+}
+
+function computeDelta(state, heightsPayload) {
+  const delta = {
+    type: 'state',
+  };
+
+  // Heights (already delta-encoded by computeHeightsPayload)
+  if (heightsPayload) {
+    if (heightsPayload.full || (heightsPayload.delta && heightsPayload.delta.length > 0)) {
+      delta.heights = heightsPayload;
+    }
+  }
+
+  // Walker delta
+  const wd = computeWalkerDelta(state);
+  if (wd.wMov.length > 0) delta.wMov = wd.wMov;
+  if (wd.wUpd.length > 0) delta.wUpd = wd.wUpd;
+  if (wd.wRem.length > 0) delta.wRem = wd.wRem;
+
+  // Settlement delta
+  const sd = computeSettlementDelta(state);
+  if (sd.sUpd.length > 0) delta.sUpd = sd.sUpd;
+  if (sd.sRem.length > 0) delta.sRem = sd.sRem;
+
+  // Fires — always sent (small, changes every tick due to age)
+  delta.fires = state.fires.map(f => ({ x: f.x, y: f.y, a: Math.round(f.age * 10) / 10 }));
+
+  // teamPop — always sent (small)
+  const teamPop = [];
+  for (let t = 0; t < state.numTeams; t++) {
+    teamPop.push(getTeamStats(state, t).pop);
+  }
+  delta.teamPop = teamPop;
+
+  // Crops — string compare
+  let cropStr = '';
+  if (state.crops) {
+    for (const c of state.crops) {
+      cropStr += c.x + ',' + c.y + ',' + c.t + ';';
+    }
+  }
+  if (cropStr !== state._prevCropStr) {
+    const cropData = [];
+    if (state.crops) {
+      for (const c of state.crops) cropData.push(c.x, c.y, c.t);
+    }
+    delta.crops = cropData;
+    state._prevCropStr = cropStr;
+  }
+
+  // Rocks
+  const rocksStr = Array.from(state.rocks).join(';');
+  if (rocksStr !== state._prevRocksStr) {
+    delta.rocks = serializeSetData(state.rocks);
+    state._prevRocksStr = rocksStr;
+  }
+
+  // Trees
+  const treesStr = Array.from(state.trees).join(';');
+  if (treesStr !== state._prevTreesStr) {
+    delta.trees = serializeSetData(state.trees);
+    state._prevTreesStr = treesStr;
+  }
+
+  // Pebbles
+  const pebblesStr = Array.from(state.pebbles).join(';');
+  if (pebblesStr !== state._prevPebblesStr) {
+    delta.pebbles = serializeSetData(state.pebbles);
+    state._prevPebblesStr = pebblesStr;
+  }
+
+  // Ruins
+  const ruinsStr = state.ruins.map(r => r.x + ',' + r.y + ',' + r.team).join(';');
+  if (ruinsStr !== state._prevRuinsStr) {
+    const ruinData = [];
+    for (const r of state.ruins) ruinData.push(r.x, r.y, r.team);
+    delta.ruins = ruinData;
+    state._prevRuinsStr = ruinsStr;
+  }
+
+  // Swamps
+  const swampsStr = state.swamps.map(s => s.x + ',' + s.y + ',' + s.team).join(';');
+  if (swampsStr !== state._prevSwampsStr) {
+    delta.swamps = state.swamps.map(s => ({ x: s.x, y: s.y, t: s.team }));
+    state._prevSwampsStr = swampsStr;
+  }
+
+  // Scalar fields — only if changed
+  const magnetPosStr = JSON.stringify(state.magnetPos);
+  if (magnetPosStr !== state._prevMagnetPosStr) {
+    delta.magnetPos = state.magnetPos;
+    state._prevMagnetPosStr = magnetPosStr;
+  }
+
+  const magnetLockedStr = JSON.stringify(state.magnetLocked);
+  if (magnetLockedStr !== state._prevMagnetLockedStr) {
+    delta.magnetLocked = state.magnetLocked.slice();
+    state._prevMagnetLockedStr = magnetLockedStr;
+  }
+
+  const teamModeStr = JSON.stringify(state.teamMode);
+  if (teamModeStr !== state._prevTeamModeStr) {
+    delta.teamMode = state.teamMode;
+    state._prevTeamModeStr = teamModeStr;
+  }
+
+  if (state.seaLevel !== state._prevSeaLevel) {
+    delta.seaLevel = state.seaLevel;
+    state._prevSeaLevel = state.seaLevel;
+  }
+
+  const leadersStr = JSON.stringify(state.leaders);
+  if (leadersStr !== state._prevLeadersStr) {
+    delta.leaders = state.leaders;
+    state._prevLeadersStr = leadersStr;
+  }
+
+  if (state.armageddon !== state._prevArmageddon) {
+    delta.armageddon = state.armageddon;
+    state._prevArmageddon = state.armageddon;
+  }
+
+  return delta;
+}
+
+function serializeFullState(state, team, heightsPayload) {
+  const msg = serializeState(state, team, heightsPayload);
+  msg.full = true;
+
+  // Update all prev tracking to match current state
+  // Walkers
+  state._prevWalkerMap = new Map();
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    state._prevWalkerMap.set(w.id, {
+      t: w.team,
+      s: w.strength,
+      x: Math.round(w.x * 100) / 100,
+      y: Math.round(w.y * 100) / 100,
+      tx: Math.round(w.tx * 100) / 100,
+      ty: Math.round(w.ty * 100) / 100,
+      l: w.isLeader ? 1 : 0,
+      k: w.isKnight ? 1 : 0,
+    });
+  }
+
+  // Settlements
+  state._prevSettlements = [];
+  for (const s of state.settlements) {
+    if (s.dead) continue;
+    const sd = {
+      t: s.team, l: s.level, p: s.population,
+      tx: s.tx, ty: s.ty,
+      ox: s.sqOx, oy: s.sqOy, sz: s.sqSize,
+    };
+    if (s.hasLeader) sd.hl = 1;
+    state._prevSettlements.push(sd);
+  }
+
+  // Crops
+  let cropStr = '';
+  if (state.crops) {
+    for (const c of state.crops) cropStr += c.x + ',' + c.y + ',' + c.t + ';';
+  }
+  state._prevCropStr = cropStr;
+
+  // Collections
+  state._prevRocksStr = Array.from(state.rocks).join(';');
+  state._prevTreesStr = Array.from(state.trees).join(';');
+  state._prevPebblesStr = Array.from(state.pebbles).join(';');
+  state._prevRuinsStr = state.ruins.map(r => r.x + ',' + r.y + ',' + r.team).join(';');
+  state._prevSwampsStr = state.swamps.map(s => s.x + ',' + s.y + ',' + s.team).join(';');
+
+  // Scalars
+  state._prevMagnetPosStr = JSON.stringify(state.magnetPos);
+  state._prevMagnetLockedStr = JSON.stringify(state.magnetLocked);
+  state._prevTeamModeStr = JSON.stringify(state.teamMode);
+  state._prevSeaLevel = state.seaLevel;
+  state._prevLeadersStr = JSON.stringify(state.leaders);
+  state._prevArmageddon = state.armageddon;
+
+  return msg;
+}
+
 // ── Divine Powers ───────────────────────────────────────────────────
 function executePowerEarthquake(state, team, px, py) {
   const r = C.EARTHQUAKE_RADIUS;
@@ -2003,10 +2335,16 @@ function startGame(room) {
   room.state = state;
   room.started = true;
 
+  // Mark all players to receive a full snapshot on first tick
+  for (let i = 0; i < room.maxPlayers; i++) {
+    if (room.players[i]) room.players[i]._needsFullSnapshot = true;
+  }
+
   const dt = 1 / C.TICK_RATE;
 
   room.tickInterval = setInterval(() => {
     if (state.gameOver) return;
+    const _tickStart = performance.now();
 
     updateWalkers(state, dt);
     handleWalkerCollisions(state);
@@ -2056,15 +2394,63 @@ function startGame(room) {
       }
     }
 
-    // Send state to each player (compute heights once, share across all)
+    // Send state to each player using delta serialization
     const heightsPayload = computeHeightsPayload(state);
-    for (let i = 0; i < room.maxPlayers; i++) {
-      const ws = room.players[i];
-      if (ws && ws.readyState === 1) {
-        const msg = serializeState(state, i, heightsPayload);
-        ws.send(JSON.stringify(msg));
+    const _rm = getOrCreateRoomMetrics(room.code);
+
+    const periodicFull = state._fullSnapshotCounter >= 100;
+
+    // Check if ALL connected players need full (then skip delta computation)
+    let allNeedFull = periodicFull;
+    if (!allNeedFull) {
+      allNeedFull = true;
+      for (let i = 0; i < room.maxPlayers; i++) {
+        const ws = room.players[i];
+        if (ws && ws.readyState === 1 && !ws._needsFullSnapshot) {
+          allNeedFull = false;
+          break;
+        }
       }
     }
+
+    // Compute delta once if any player will use it
+    let sharedDelta = null;
+    if (!allNeedFull) {
+      sharedDelta = computeDelta(state, heightsPayload);
+    }
+
+    for (let i = 0; i < room.maxPlayers; i++) {
+      const ws = room.players[i];
+      if (!ws || ws.readyState !== 1) continue;
+
+      let json;
+      if (ws._needsFullSnapshot || periodicFull) {
+        const msg = serializeFullState(state, i, heightsPayload);
+        json = JSON.stringify(msg);
+        ws._needsFullSnapshot = false;
+      } else {
+        // Build per-player delta (add mana which is per-team)
+        const msg = Object.assign({}, sharedDelta);
+        msg.mana = Math.floor(state.mana[i]);
+        msg.team = i;
+        msg.numTeams = state.numTeams;
+        msg.mapW = state.mapW;
+        msg.mapH = state.mapH;
+        json = JSON.stringify(msg);
+      }
+      _rm.bytesSentAcc += json.length;
+      _rm.msgsSentAcc++;
+      serverBytesOutAcc += json.length;
+      ws.send(json);
+    }
+
+    if (periodicFull) state._fullSnapshotCounter = 0;
+    else state._fullSnapshotCounter++;
+
+    // Record tick timing
+    const _tickEnd = performance.now();
+    _rm.tickTimeMs = _tickEnd - _tickStart;
+    _rm.tickTimeAvg = _rm.tickTimeAvg * 0.9 + _rm.tickTimeMs * 0.1;
 
     // Send game over
     if (state.gameOver) {
@@ -2091,6 +2477,7 @@ wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'game_list', games: buildGameList() }));
 
   ws.on('message', (raw) => {
+    serverBytesInAcc += (typeof raw === 'string' ? raw.length : raw.byteLength || 0);
     let msg;
     try {
       msg = JSON.parse(raw);
@@ -2420,11 +2807,23 @@ wss.on('connection', (ws) => {
         }
         break;
       }
+
+      case 'resync': {
+        if (playerRoom && playerRoom.started) ws._needsFullSnapshot = true;
+        break;
+      }
+
+      case 'admin_subscribe': {
+        adminClients.add(ws);
+        ws.send(JSON.stringify(buildAdminSnapshot()));
+        break;
+      }
     }
   });
 
   ws.on('close', () => {
     lobbyClients.delete(ws);
+    adminClients.delete(ws);
 
     if (!playerRoom) return;
     const room = playerRoom;
@@ -2487,3 +2886,97 @@ wss.on('connection', (ws) => {
     console.log(`Player ${playerTeam} left room ${room.code}`);
   });
 });
+
+// ── Admin Snapshot & Broadcast ──────────────────────────────────────
+function buildAdminSnapshot() {
+  const mem = process.memoryUsage();
+  const gamesList = [];
+  let totalTickLoad = 0;
+  let activeGames = 0;
+
+  for (const [code, room] of rooms) {
+    const m = roomMetrics.get(code) || { tickTimeAvg: 0, bytesSentRate: 0, msgsSentRate: 0 };
+    let humanCount = 0;
+    for (let i = 0; i < room.maxPlayers; i++) {
+      if (room.players[i] !== null) humanCount++;
+    }
+
+    const g = {
+      code,
+      name: room.name || '',
+      status: room.started ? (room.state && room.state.gameOver ? 'ended' : 'playing') : 'waiting',
+      humans: humanCount,
+      maxPlayers: room.maxPlayers,
+      aiCount: room.aiCount,
+      mapSize: room.mapSize,
+      duration: room.createdAt ? Math.floor((Date.now() - room.createdAt) / 1000) : 0,
+      tickTimeMs: Math.round(m.tickTimeAvg * 100) / 100,
+      bytesSentRate: m.bytesSentRate,
+      msgsSentRate: m.msgsSentRate,
+    };
+
+    if (room.started && room.state) {
+      const s = room.state;
+      g.walkers = s.walkers.filter(w => !w.dead).length;
+      g.settlements = s.settlements.filter(st => !st.dead).length;
+      let totalPop = 0;
+      for (const st of s.settlements) {
+        if (!st.dead) totalPop += st.population;
+      }
+      for (const w of s.walkers) {
+        if (!w.dead) totalPop += w.strength;
+      }
+      g.totalPop = totalPop;
+      totalTickLoad += m.tickTimeAvg;
+      activeGames++;
+    }
+
+    gamesList.push(g);
+  }
+
+  const tickLoad = activeGames > 0 ? Math.round(totalTickLoad / C.TICK_INTERVAL * 100 * 10) / 10 : 0;
+  const memPressure = mem.heapTotal > 0 ? mem.heapUsed / mem.heapTotal * 100 : 0;
+  const connLoad = Math.min(wss.clients.size / 50 * 100, 100);
+  const temperature = Math.round(tickLoad * 0.5 + memPressure * 0.3 + connLoad * 0.2);
+
+  return {
+    type: 'admin_snapshot',
+    uptime: Math.floor((Date.now() - serverStartTime) / 1000),
+    memory: {
+      rss: Math.round(mem.rss / 1024 / 1024 * 10) / 10,
+      heapUsed: Math.round(mem.heapUsed / 1024 / 1024 * 10) / 10,
+      heapTotal: Math.round(mem.heapTotal / 1024 / 1024 * 10) / 10,
+    },
+    connections: wss.clients.size,
+    lobbyCount: lobbyClients.size,
+    adminCount: adminClients.size,
+    activeGames,
+    totalRooms: rooms.size,
+    tickLoad,
+    temperature,
+    netInRate: serverBytesInRate,
+    netOutRate: serverBytesOutRate,
+    games: gamesList,
+  };
+}
+
+setInterval(() => {
+  if (adminClients.size === 0) return;
+
+  // Compute per-second rates from accumulators and reset
+  for (const [code, m] of roomMetrics) {
+    m.bytesSentRate = m.bytesSentAcc;
+    m.msgsSentRate = m.msgsSentAcc;
+    m.bytesSentAcc = 0;
+    m.msgsSentAcc = 0;
+  }
+  serverBytesInRate = serverBytesInAcc;
+  serverBytesOutRate = serverBytesOutAcc;
+  serverBytesInAcc = 0;
+  serverBytesOutAcc = 0;
+
+  const snapshot = JSON.stringify(buildAdminSnapshot());
+  for (const ws of adminClients) {
+    if (ws.readyState === 1) ws.send(snapshot);
+  }
+}, 1000);
