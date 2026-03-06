@@ -508,6 +508,84 @@ document.getElementById('btn-mute').addEventListener('click', () => {
 // Init UI from saved prefs
 syncMusicUI();
 
+// ── SFX System ────────────────────────────────────────────────────
+const SFX_FILES = [
+  'volcano', 'earthquake', 'armageddon', 'flood', 'knight', 'swamp',
+  'victory', 'defeat', 'settle', 'levelup', 'destroy', 'combat', 'terrain'
+];
+const sfxBuffers = {};
+let sfxVolume = parseFloat(localStorage.getItem('sfxVolume') ?? '0.5');
+let sfxMuted = localStorage.getItem('sfxMuted') === 'true';
+let settingSfx = localStorage.getItem('settingSfx') !== 'false'; // default true
+
+// Preload all SFX
+for (const name of SFX_FILES) {
+  const a = new Audio('snd/' + name + '.mp3');
+  a.preload = 'auto';
+  sfxBuffers[name] = a;
+}
+
+let lastCombatSfxTime = 0;
+
+function playSfx(name) {
+  if (!settingSfx || sfxMuted) return;
+  const src = sfxBuffers[name];
+  if (!src) return;
+  const clone = src.cloneNode();
+  clone.volume = sfxVolume;
+  clone.play().catch(() => {});
+}
+
+function setSfxVolume(v) {
+  sfxVolume = Math.max(0, Math.min(1, v));
+  localStorage.setItem('sfxVolume', String(sfxVolume));
+  syncSfxUI();
+}
+
+function syncSfxUI() {
+  const slider = document.getElementById('sfx-vol');
+  if (slider) slider.value = sfxVolume * 100;
+}
+
+// SFX volume slider
+const sfxVolSlider = document.getElementById('sfx-vol');
+if (sfxVolSlider) {
+  sfxVolSlider.addEventListener('input', (e) => {
+    setSfxVolume(e.target.valueAsNumber / 100);
+    if (sfxMuted) { sfxMuted = false; localStorage.setItem('sfxMuted', String(sfxMuted)); }
+  });
+}
+
+syncSfxUI();
+
+// ── Server-Driven SFX Processing ─────────────────────────────────────
+const GLOBAL_SFX = new Set(['earthquake', 'swamp', 'knight', 'volcano', 'flood', 'armageddon']);
+const PROXIMITY_ZOOM_THRESHOLD = 0.7;
+
+function processSfxEvents(events) {
+  if (!events || events.length === 0) return;
+  const now = performance.now();
+  for (const evt of events) {
+    if (GLOBAL_SFX.has(evt.n)) {
+      playSfx(evt.n);
+    } else {
+      if (zoom < PROXIMITY_ZOOM_THRESHOLD) continue;
+      if (evt.x === undefined || evt.y === undefined) continue;
+      const h = heightAt(evt.x, evt.y);
+      const world = project(evt.x, evt.y, h);
+      const sx = world.x * zoom + _vpCX * (1 - zoom);
+      const sy = world.y * zoom + _vpCY * (1 - zoom);
+      if (sx >= _vpLeft && sx <= canvas.width && sy >= 0 && sy <= canvas.height) {
+        if (evt.n === 'combat') {
+          if (now - lastCombatSfxTime < 500) continue;
+          lastCombatSfxTime = now;
+        }
+        playSfx(evt.n);
+      }
+    }
+  }
+}
+
 // ── Lobby Background Animation ──────────────────────────────────────
 const lobbyBg = document.getElementById('lobby-bg');
 const lobbyCtx = lobbyBg.getContext('2d');
@@ -2794,7 +2872,9 @@ function render() {
     ctx.fillStyle = 'rgba(200, 210, 230, 0.7)';
     const subText = won
       ? `${teamPlayerNames[myTeam] || 'You'}, the ${TEAM_NAMES[myTeam]} God`
-      : `${gameWinnerName}, the ${TEAM_NAMES[gameWinner]} God has prevailed`;
+      : gameWinnerName === TEAM_NAMES[gameWinner]
+        ? `The ${TEAM_NAMES[gameWinner]} God has prevailed`
+        : `${gameWinnerName}, the ${TEAM_NAMES[gameWinner]} God has prevailed`;
     ctx.fillText(subText, cx, cy + 10);
 
     const lineW = 160;
@@ -3268,6 +3348,7 @@ function handleServerMessage(msg) {
       gameOver = true;
       gameWinner = msg.winner;
       gameWinnerName = msg.winnerName || TEAM_NAMES[msg.winner];
+      playSfx(msg.winner === myTeam ? 'victory' : 'defeat');
       break;
 
     case 'error':
@@ -3411,6 +3492,7 @@ function applyFullSnapshot(msg) {
   fires = msg.fires || [];
   minimapDirty = true;
 
+  processSfxEvents(msg.sfx);
   detectTerrainDirty(msg);
 }
 
@@ -3453,12 +3535,14 @@ function applyDeltaSnapshot(msg) {
   // Settlement delta
   if (msg.sUpd) {
     for (const s of msg.sUpd) {
-      settlementMap.set(s.tx + ',' + s.ty, s);
+      const key = s.tx + ',' + s.ty;
+      settlementMap.set(key, s);
     }
   }
   if (msg.sRem) {
     for (let i = 0; i < msg.sRem.length; i += 2) {
-      settlementMap.delete(msg.sRem[i] + ',' + msg.sRem[i + 1]);
+      const key = msg.sRem[i] + ',' + msg.sRem[i + 1];
+      settlementMap.delete(key);
     }
   }
   if (msg.sUpd || msg.sRem) {
@@ -3490,6 +3574,7 @@ function applyDeltaSnapshot(msg) {
     if (armageddon && !wasArmageddon) onArmageddonStart();
   }
 
+  processSfxEvents(msg.sfx);
   minimapDirty = true;
   detectTerrainDirty(msg);
 }
@@ -3704,10 +3789,12 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 0) {
     const { px, py } = screenToGrid(e.clientX, e.clientY);
     sendMessage({ type: 'raise', px, py });
+    playSfx('terrain');
   }
   if (e.button === 2) {
     const { px, py } = screenToGrid(e.clientX, e.clientY);
     sendMessage({ type: 'lower', px, py });
+    playSfx('terrain');
   }
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -3971,6 +4058,10 @@ function toggleSetting(key) {
         startMusic();
       }
       break;
+    case 'sfx':
+      settingSfx = !settingSfx;
+      localStorage.setItem('settingSfx', String(settingSfx));
+      break;
     case 'lowZoomSimplify':
       settingLowZoomSimplify = !settingLowZoomSimplify;
       localStorage.setItem('settingLowZoomSimplify', String(settingLowZoomSimplify));
@@ -3985,15 +4076,18 @@ function syncSettingsUI() {
     hiRes: settingHiRes,
     effects: settingEffects,
     music: settingMusic,
+    sfx: settingSfx,
     lowZoomSimplify: settingLowZoomSimplify,
   };
   for (const btn of btns) {
     const key = btn.dataset.setting;
     if (key in vals) btn.classList.toggle('on', vals[key]);
   }
-  // Show/hide volume slider based on music setting
+  // Show/hide volume sliders based on settings
   const volRow = document.getElementById('music-vol-row');
   if (volRow) volRow.style.display = settingMusic ? 'flex' : 'none';
+  const sfxRow = document.getElementById('sfx-vol-row');
+  if (sfxRow) sfxRow.style.display = settingSfx ? 'flex' : 'none';
 }
 
 // Wire setting buttons

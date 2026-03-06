@@ -278,6 +278,7 @@ function createGameState(mapW, mapH, numTeams) {
     cropCounts: [],
     cropOwnerMap: new Int32Array(mapW * mapH).fill(-1),
     fires: [],
+    sfxQueue: [],
     seaLevel: C.SEA_LEVEL,
     leaders,
     magnetLocked,
@@ -1035,6 +1036,7 @@ function settleWalker(state, w, tx, ty) {
   };
   state.settlements.push(s);
   setSettlement(state, tx, ty, s);
+  queueSfx(state, 'settle', w.team, tx, ty);
 
   state.trees.delete(tx + ',' + ty);
 
@@ -1106,6 +1108,7 @@ function countSettlementCrops(state, s) {
 }
 
 function evaluateSettlementLevels(state) {
+  let levelUpSfxCount = 0;
   for (let si = 0; si < state.settlements.length; si++) {
     const s = state.settlements[si];
     if (s.dead) continue;
@@ -1113,6 +1116,7 @@ function evaluateSettlementLevels(state) {
     if (!isTileFlat(state, s.tx, s.ty)) {
       s.dead = true;
       clearSettlementFootprint(state, s);
+      queueSfx(state, 'destroy', s.team, s.tx, s.ty);
       if (s.population > 0) {
         const angle = Math.random() * Math.PI * 2;
         const sTech = C.SETTLEMENT_LEVELS[s.level] ? C.SETTLEMENT_LEVELS[s.level].tech : 0;
@@ -1141,6 +1145,10 @@ function evaluateSettlementLevels(state) {
     }
 
     if (newLevel !== s.level) {
+      if (newLevel > s.level && levelUpSfxCount < 3) {
+        queueSfx(state, 'levelup', s.team, s.tx, s.ty);
+        levelUpSfxCount++;
+      }
       clearSettlementFootprint(state, s);
       s.level = newLevel;
       updateSettlementFootprint(s);
@@ -1300,6 +1308,8 @@ function updatePopulationGrowth(state, dt) {
 function handleWalkerCollisions(state) {
   rebuildWalkerGrid(state);
 
+  let combatDeathCount = 0, combatSumX = 0, combatSumY = 0;
+
   for (let i = 0; i < state.walkers.length; i++) {
     const w = state.walkers[i];
     if (w.dead) continue;
@@ -1338,13 +1348,16 @@ function handleWalkerCollisions(state) {
               const t = other.strength / wMult;
               w.strength = Math.max(1, Math.round(w.strength - oMult * t));
               other.dead = true;
+              combatDeathCount++; combatSumX += other.x; combatSumY += other.y;
             } else if (oEff > wEff) {
               const t = w.strength / oMult;
               other.strength = Math.max(1, Math.round(other.strength - wMult * t));
               w.dead = true;
+              combatDeathCount++; combatSumX += w.x; combatSumY += w.y;
             } else {
               w.dead = true;
               other.dead = true;
+              combatDeathCount += 2; combatSumX += w.x + other.x; combatSumY += w.y + other.y;
             }
           }
         }
@@ -1444,8 +1457,10 @@ function handleWalkerCollisions(state) {
         es.dead = true;
         clearSettlementFootprint(state, es);
         state.fires.push({ x: es.tx, y: es.ty, age: 0 });
+        queueSfx(state, 'destroy', es.team, es.tx, es.ty);
         pickFightTarget(state, best);
       } else if (best) {
+        queueSfx(state, 'settle', best.team, es.tx, es.ty);
         es.team = best.team;
         es.population = Math.max(1, best.strength);
         es.popFrac = 0;
@@ -1455,12 +1470,17 @@ function handleWalkerCollisions(state) {
       } else {
         es.dead = true;
         clearSettlementFootprint(state, es);
+        queueSfx(state, 'destroy', es.team, es.tx, es.ty);
       }
     }
   }
 
   for (const es of state.settlements) {
     delete es._attackers;
+  }
+
+  if (combatDeathCount > 0) {
+    queueSfx(state, 'combat', -1, combatSumX / combatDeathCount, combatSumY / combatDeathCount);
   }
 }
 
@@ -1679,6 +1699,7 @@ function serializeState(state, team, heightsPayload) {
     armageddon: state.armageddon,
     magnetLocked: state.magnetLocked.slice(),
     teamPop,
+    sfx: state.sfxQueue.length > 0 ? state.sfxQueue : undefined,
   };
 }
 
@@ -1908,6 +1929,8 @@ function computeDelta(state, heightsPayload) {
     state._prevArmageddon = state.armageddon;
   }
 
+  if (state.sfxQueue.length > 0) delta.sfx = state.sfxQueue;
+
   return delta;
 }
 
@@ -1970,6 +1993,16 @@ function serializeFullState(state, team, heightsPayload) {
   return msg;
 }
 
+// ── SFX Queue ──────────────────────────────────────────────────────
+function queueSfx(state, name, team, x, y) {
+  const evt = { n: name, t: team };
+  if (x !== undefined && y !== undefined) {
+    evt.x = Math.round(x * 10) / 10;
+    evt.y = Math.round(y * 10) / 10;
+  }
+  state.sfxQueue.push(evt);
+}
+
 // ── Divine Powers ───────────────────────────────────────────────────
 function executePowerEarthquake(state, team, px, py) {
   const r = C.EARTHQUAKE_RADIUS;
@@ -1992,6 +2025,7 @@ function executePowerEarthquake(state, team, px, py) {
   invalidateTrees(state);
   invalidateRuins(state);
   evaluateSettlementLevels(state);
+  queueSfx(state, 'earthquake', team, px, py);
 }
 
 function executePowerSwamp(state, team, tx, ty) {
@@ -2010,6 +2044,7 @@ function executePowerSwamp(state, team, tx, ty) {
     state.swampSet.add(key);
     placed.push(key);
   }
+  if (placed.length > 0) queueSfx(state, 'swamp', team, tx, ty);
   return placed.length > 0;
 }
 
@@ -2046,6 +2081,7 @@ function executePowerKnight(state, team) {
     state.fires.push({ x: hostSettlement.tx, y: hostSettlement.ty, age: 0 });
 
     pickFightTarget(state, knight);
+    queueSfx(state, 'knight', team, hostSettlement.tx, hostSettlement.ty);
     return true;
   }
 
@@ -2080,6 +2116,7 @@ function executePowerKnight(state, team) {
   state.fires.push({ x: hostSettlement.tx, y: hostSettlement.ty, age: 0 });
 
   pickFightTarget(state, leader);
+  queueSfx(state, 'knight', team, hostSettlement.tx, hostSettlement.ty);
   return true;
 }
 
@@ -2134,6 +2171,7 @@ function executePowerVolcano(state, team, px, py) {
   invalidatePebbles(state);
   invalidateRuins(state);
   evaluateSettlementLevels(state);
+  queueSfx(state, 'volcano', team, px, py);
 }
 
 function executePowerFlood(state, team) {
@@ -2167,6 +2205,7 @@ function executePowerFlood(state, team) {
   invalidatePebbles(state);
   invalidateRuins(state);
   evaluateSettlementLevels(state);
+  queueSfx(state, 'flood', team);
 }
 
 function executePowerArmageddon(state, team) {
@@ -2193,6 +2232,7 @@ function executePowerArmageddon(state, team) {
     s.dead = true;
     clearSettlementFootprint(state, s);
   }
+  queueSfx(state, 'armageddon', team);
 }
 
 // ── Basic AI ────────────────────────────────────────────────────────
@@ -2461,6 +2501,8 @@ function startGame(room) {
 
     if (periodicFull) state._fullSnapshotCounter = 0;
     else state._fullSnapshotCounter++;
+
+    state.sfxQueue = [];
 
     // Record tick timing
     const _tickEnd = performance.now();
