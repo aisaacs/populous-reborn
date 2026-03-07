@@ -346,14 +346,48 @@ function makeNoise2D() {
   };
 }
 
+// Offset constants for height constraint propagation
+const NB8_OFFSETS = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+const TILE_OFFSETS = [[0,0],[-1,0],[-1,-1],[0,-1]]; // 4 tiles sharing a height point
+
+function isSaddleTile(state, tx, ty) {
+  const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
+  const b = state.heights[tx + 1][ty + 1], l = state.heights[tx][ty + 1];
+  return t === b && r === l && t !== r;
+}
+
+function fixSaddleRaise(state, tx, ty, queue) {
+  const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
+  const high = Math.max(t, r);
+  if (t < high) {
+    if (state.heights[tx][ty] < C.MAX_HEIGHT) { state.heights[tx][ty] = high; queue.push([tx, ty]); }
+    if (state.heights[tx + 1][ty + 1] < C.MAX_HEIGHT) { state.heights[tx + 1][ty + 1] = high; queue.push([tx + 1, ty + 1]); }
+  } else {
+    if (state.heights[tx + 1][ty] < C.MAX_HEIGHT) { state.heights[tx + 1][ty] = high; queue.push([tx + 1, ty]); }
+    if (state.heights[tx][ty + 1] < C.MAX_HEIGHT) { state.heights[tx][ty + 1] = high; queue.push([tx, ty + 1]); }
+  }
+}
+
+function fixSaddleLower(state, tx, ty, queue) {
+  const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
+  const low = Math.min(t, r);
+  if (t > low) {
+    if (state.heights[tx][ty] > 0) { state.heights[tx][ty] = low; queue.push([tx, ty]); }
+    if (state.heights[tx + 1][ty + 1] > 0) { state.heights[tx + 1][ty + 1] = low; queue.push([tx + 1, ty + 1]); }
+  } else {
+    if (state.heights[tx + 1][ty] > 0) { state.heights[tx + 1][ty] = low; queue.push([tx + 1, ty]); }
+    if (state.heights[tx][ty + 1] > 0) { state.heights[tx][ty + 1] = low; queue.push([tx, ty + 1]); }
+  }
+}
+
 function enforceAdjacency(state) {
   const W = state.mapW, H = state.mapH;
   for (let pass = 0; pass < 30; pass++) {
     let changed = false;
     for (let x = 0; x <= W; x++) {
       for (let y = 0; y <= H; y++) {
-        const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]];
-        for (const [nx, ny] of nb) {
+        for (const [dx, dy] of NB8_OFFSETS) {
+          const nx = x + dx, ny = y + dy;
           if (nx < 0 || nx > W || ny < 0 || ny > H) continue;
           if (state.heights[x][y] - state.heights[nx][ny] > 1) {
             state.heights[x][y] = state.heights[nx][ny] + 1;
@@ -365,18 +399,16 @@ function enforceAdjacency(state) {
     // Fix saddle tiles (opposite corners equal, adjacent corners equal, but different)
     for (let tx = 0; tx < W; tx++) {
       for (let ty = 0; ty < H; ty++) {
+        if (!isSaddleTile(state, tx, ty)) continue;
         const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
-        const b = state.heights[tx + 1][ty + 1], l = state.heights[tx][ty + 1];
-        if (t === b && r === l && t !== r) {
-          if (t > r) {
-            state.heights[tx][ty]--;
-            state.heights[tx + 1][ty + 1]--;
-          } else {
-            state.heights[tx + 1][ty]--;
-            state.heights[tx][ty + 1]--;
-          }
-          changed = true;
+        if (t > r) {
+          if (state.heights[tx][ty] > 0) state.heights[tx][ty]--;
+          if (state.heights[tx + 1][ty + 1] > 0) state.heights[tx + 1][ty + 1]--;
+        } else {
+          if (state.heights[tx + 1][ty] > 0) state.heights[tx + 1][ty]--;
+          if (state.heights[tx][ty + 1] > 0) state.heights[tx][ty + 1]--;
         }
+        changed = true;
       }
     }
     if (!changed) break;
@@ -667,29 +699,18 @@ function raisePoint(state, px, py) {
   while (queue.length) {
     const [x, y] = queue.shift();
     const h = state.heights[x][y];
-    const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]];
-    for (const [nx, ny] of nb) {
+    for (const [dx, dy] of NB8_OFFSETS) {
+      const nx = x + dx, ny = y + dy;
       if (nx < 0 || nx > W || ny < 0 || ny > H) continue;
       if (h - state.heights[nx][ny] > 1) {
         state.heights[nx][ny] = h - 1;
         queue.push([nx, ny]);
       }
     }
-    // Fix saddle tiles containing this point
-    for (const [tx, ty] of [[x, y], [x - 1, y], [x - 1, y - 1], [x, y - 1]]) {
+    for (const [dx, dy] of TILE_OFFSETS) {
+      const tx = x + dx, ty = y + dy;
       if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
-      const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
-      const b = state.heights[tx + 1][ty + 1], l = state.heights[tx][ty + 1];
-      if (t === b && r === l && t !== r) {
-        const high = Math.max(t, r);
-        if (t < high) {
-          if (state.heights[tx][ty] < C.MAX_HEIGHT) { state.heights[tx][ty] = high; queue.push([tx, ty]); }
-          if (state.heights[tx + 1][ty + 1] < C.MAX_HEIGHT) { state.heights[tx + 1][ty + 1] = high; queue.push([tx + 1, ty + 1]); }
-        } else {
-          if (state.heights[tx + 1][ty] < C.MAX_HEIGHT) { state.heights[tx + 1][ty] = high; queue.push([tx + 1, ty]); }
-          if (state.heights[tx][ty + 1] < C.MAX_HEIGHT) { state.heights[tx][ty + 1] = high; queue.push([tx, ty + 1]); }
-        }
-      }
+      if (isSaddleTile(state, tx, ty)) fixSaddleRaise(state, tx, ty, queue);
     }
   }
   for (const [dx, dy] of [[0,0],[-1,0],[0,-1],[-1,-1]]) {
@@ -713,29 +734,18 @@ function lowerPoint(state, px, py) {
   while (queue.length) {
     const [x, y] = queue.shift();
     const h = state.heights[x][y];
-    const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]];
-    for (const [nx, ny] of nb) {
+    for (const [dx, dy] of NB8_OFFSETS) {
+      const nx = x + dx, ny = y + dy;
       if (nx < 0 || nx > W || ny < 0 || ny > H) continue;
       if (state.heights[nx][ny] - h > 1) {
         state.heights[nx][ny] = h + 1;
         queue.push([nx, ny]);
       }
     }
-    // Fix saddle tiles containing this point
-    for (const [tx, ty] of [[x, y], [x - 1, y], [x - 1, y - 1], [x, y - 1]]) {
+    for (const [dx, dy] of TILE_OFFSETS) {
+      const tx = x + dx, ty = y + dy;
       if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
-      const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
-      const b = state.heights[tx + 1][ty + 1], l = state.heights[tx][ty + 1];
-      if (t === b && r === l && t !== r) {
-        const low = Math.min(t, r);
-        if (t > low) {
-          if (state.heights[tx][ty] > 0) { state.heights[tx][ty] = low; queue.push([tx, ty]); }
-          if (state.heights[tx + 1][ty + 1] > 0) { state.heights[tx + 1][ty + 1] = low; queue.push([tx + 1, ty + 1]); }
-        } else {
-          if (state.heights[tx + 1][ty] > 0) { state.heights[tx + 1][ty] = low; queue.push([tx + 1, ty]); }
-          if (state.heights[tx][ty + 1] > 0) { state.heights[tx][ty + 1] = low; queue.push([tx, ty + 1]); }
-        }
-      }
+      if (isSaddleTile(state, tx, ty)) fixSaddleLower(state, tx, ty, queue);
     }
   }
   for (const [dx, dy] of [[0,0],[-1,0],[0,-1],[-1,-1]]) {
@@ -1499,7 +1509,7 @@ function handleWalkerCollisions(state) {
       const wTech = w.tech || 0;
       const techDiff = wTech - sTech;
       const wMult = techDiff > 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, techDiff) : 1;
-      const strMult = Math.max(1, w.strength / 5);
+      const strMult = w.isKnight ? C.KNIGHT_ASSAULT_MULT : Math.max(1, w.strength / 5);
       totalDmgToSett += C.ASSAULT_DMG_PER_SEC * dt * wMult * strMult;
     }
 
@@ -1518,7 +1528,7 @@ function handleWalkerCollisions(state) {
       const wTech = w.tech || 0;
       const techDiff = wTech - sTech;
       const sMult = techDiff < 0 ? Math.pow(C.TECH_ADVANTAGE_MULT, -techDiff) : 1;
-      const retalMult = w.isKnight ? 0.6 : 1;
+      const retalMult = w.isKnight ? C.KNIGHT_RETAL_MULT : 1;
       w.assaultFrac = (w.assaultFrac || 0) + retalPerWalker * sMult * retalMult;
       if (w.assaultFrac >= 1) {
         const loss = Math.floor(w.assaultFrac);
