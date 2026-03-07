@@ -290,7 +290,8 @@ const VALID_SHAPE_KEYS = [];
       for (let db = 0; db <= 2; db++)
         for (let dl = 0; dl <= 2; dl++) {
           if (Math.abs(dt - dr) > 1 || Math.abs(dr - db) > 1 ||
-              Math.abs(db - dl) > 1 || Math.abs(dl - dt) > 1) continue;
+              Math.abs(db - dl) > 1 || Math.abs(dl - dt) > 1 ||
+              Math.abs(dt - db) > 1 || Math.abs(dr - dl) > 1) continue;
           VALID_SHAPE_KEYS.push(dt * 27 + dr * 9 + db * 3 + dl);
         }
 })();
@@ -3919,24 +3920,28 @@ document.getElementById('btn-create').addEventListener('click', () => {
   const selPlayers = document.getElementById('sel-players');
   const selMapsize = document.getElementById('sel-mapsize');
   const selVis = document.getElementById('sel-visibility');
+  const selTerrain = document.getElementById('sel-terrain');
   const maxPlayers = selPlayers ? parseInt(selPlayers.value) || 2 : 2;
   const mapSize = selMapsize ? selMapsize.value : 'small';
   const isPublic = selVis ? selVis.value === 'public' : true;
+  const terrainType = selTerrain ? selTerrain.value : 'continental';
   const gameName = (document.getElementById('game-name').value || '').trim();
   room_lastMaxPlayers = maxPlayers;
   room_lastMapSize = mapSize;
-  sendMessage({ type: 'create', maxPlayers, mapSize, playerName: getPlayerName(), gameName, isPublic });
+  sendMessage({ type: 'create', maxPlayers, mapSize, terrainType, playerName: getPlayerName(), gameName, isPublic });
 });
 
 document.getElementById('btn-ai').addEventListener('click', () => {
   room_wasAI = true;
   const selPlayers = document.getElementById('sel-players');
   const selMapsize = document.getElementById('sel-mapsize');
+  const selTerrain = document.getElementById('sel-terrain');
   const maxPlayers = selPlayers ? parseInt(selPlayers.value) || 2 : 2;
   const mapSize = selMapsize ? selMapsize.value : 'small';
+  const terrainType = selTerrain ? selTerrain.value : 'continental';
   room_lastMaxPlayers = maxPlayers;
   room_lastMapSize = mapSize;
-  sendMessage({ type: 'create_ai', maxPlayers, mapSize, playerName: getPlayerName() });
+  sendMessage({ type: 'create_ai', maxPlayers, mapSize, terrainType, playerName: getPlayerName() });
 });
 
 document.getElementById('btn-join').addEventListener('click', () => {

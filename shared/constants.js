@@ -66,7 +66,7 @@ const POWERS = [
 ];
 const EARTHQUAKE_RADIUS = 7;
 const VOLCANO_RADIUS = 5;
-const KNIGHT_STRENGTH_MULT = 2;
+const KNIGHT_STRENGTH_MULT = 1.75;
 const KNIGHT_SPEED_MULT = 1.5;
 const KNIGHT_ATTRITION_PER_SEC = 0.5; // knights burn out ~8-10x faster than normal walkers
 
@@ -93,6 +93,7 @@ const MANA_MAX = 6000;
 // ── Combat ──────────────────────────────────────────────────────────
 const TECH_ADVANTAGE_MULT = 1.5;
 const WALKER_ATTRITION_PER_SEC = 0.05;
+const HOMELESS_ATTRITION_PER_SEC = 0.5;
 const ASSAULT_DMG_PER_SEC = 3; // damage dealt per second when assaulting a settlement
 const ASSAULT_RETALIATE_FRAC = 0.5; // fraction of damage the settlement deals back
 
@@ -103,6 +104,42 @@ const BUILD_PROXIMITY_RADIUS = 6;
 const START_WALKERS = 3;
 const START_STRENGTH = 5;
 const START_MANA = 50;
+
+// ── Terrain Type Presets ───────────────────────────────────────────
+const TERRAIN_TYPE_PRESETS = {
+  continental: {
+    noiseScale: 0.7, noiseBias: 0.5, heightMul: 1.55,
+    maskPower: 1.0, seaLevel: 0,
+    rockRate: 0.03, freqBase: 0.03, freqRange: 0.05,
+    spawnRBase: 0.4, spawnRRange: 0.25,
+    extraRBase: 0.2, extraRRange: 0.35, extraCentersMax: 4,
+    treeRate: 0.06, pebbleRate: 0.04,
+  },
+  archipelago: {
+    noiseScale: 0.9, noiseBias: 0.45, heightMul: 1.5,
+    maskPower: 0.3, seaLevel: 3,
+    rockRate: 0.02, freqBase: 0.06, freqRange: 0.04,
+    spawnRBase: 0.45, spawnRRange: 0.2,
+    extraRBase: 0.3, extraRRange: 0.2, extraCentersMax: 3,
+    treeRate: 0.04, pebbleRate: 0.03,
+  },
+  mountains: {
+    noiseScale: 0.9, noiseBias: 0.45, heightMul: 1.5,
+    maskPower: 0.3, seaLevel: 0,
+    rockRate: 0.06, freqBase: 0.06, freqRange: 0.04,
+    spawnRBase: 0.45, spawnRRange: 0.2,
+    extraRBase: 0.3, extraRRange: 0.2, extraCentersMax: 3,
+    treeRate: 0.03, pebbleRate: 0.06,
+  },
+  flatlands: {
+    noiseScale: 0.5, noiseBias: 0.6, heightMul: 0.75,
+    maskPower: 0.5, seaLevel: 0,
+    rockRate: 0.01, freqBase: 0.02, freqRange: 0.03,
+    spawnRBase: 0.55, spawnRRange: 0.25,
+    extraRBase: 0.4, extraRRange: 0.35, extraCentersMax: 5,
+    treeRate: 0.08, pebbleRate: 0.02,
+  },
+};
 
 // ── Tick ────────────────────────────────────────────────────────────
 const TICK_RATE = 20;
@@ -121,9 +158,10 @@ if (typeof module !== 'undefined') {
     CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, GROWTH_PER_CROP_PER_SEC,
     EJECT_DWELL_TIME, EJECT_FRACTION, EJECT_MIN_STRENGTH,
     MANA_PER_POP_PER_SEC, MANA_MAX,
-    TECH_ADVANTAGE_MULT, WALKER_ATTRITION_PER_SEC, ASSAULT_DMG_PER_SEC, ASSAULT_RETALIATE_FRAC,
+    TECH_ADVANTAGE_MULT, WALKER_ATTRITION_PER_SEC, HOMELESS_ATTRITION_PER_SEC, ASSAULT_DMG_PER_SEC, ASSAULT_RETALIATE_FRAC,
     BUILD_PROXIMITY_RADIUS,
     START_WALKERS, START_STRENGTH, START_MANA,
+    TERRAIN_TYPE_PRESETS,
     TICK_RATE, TICK_INTERVAL,
   };
 }

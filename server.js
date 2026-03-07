@@ -103,6 +103,7 @@ function buildGameList() {
       players: humanCount + room.aiCount,
       maxPlayers: room.maxPlayers,
       mapSize: room.mapSize || 'small',
+      terrainType: room.terrainType || 'continental',
       creatorName: room.creatorName || 'Player',
     });
   }
@@ -193,6 +194,7 @@ function createRoom(maxPlayers, mapSize, opts) {
     aiTimer: 0,
     name: sanitizeName(opts.gameName) || '',
     isPublic: !!opts.isPublic,
+    terrainType: opts.terrainType || 'continental',
     creatorName: opts.creatorName || 'Player',
     chatLog: [],
     createdAt: Date.now(),
@@ -225,7 +227,7 @@ function computeSpawnZones(mapW, mapH, numTeams) {
 }
 
 // ── Game State ──────────────────────────────────────────────────────
-function createGameState(mapW, mapH, numTeams) {
+function createGameState(mapW, mapH, numTeams, terrainType) {
   mapW = mapW || C.MAP_W;
   mapH = mapH || C.MAP_H;
   numTeams = numTeams || 2;
@@ -260,6 +262,7 @@ function createGameState(mapW, mapH, numTeams) {
     mapW,
     mapH,
     numTeams,
+    terrainType: terrainType || 'continental',
     walkers: [],
     settlements: [],
     settlementMap: new Int32Array(mapW * mapH).fill(-1),
@@ -284,6 +287,7 @@ function createGameState(mapW, mapH, numTeams) {
     magnetLocked,
     eliminated,
     spawnZones,
+    teamHadSettlement: new Array(numTeams).fill(false),
     armageddon: false,
     levelEvalTimer: 0,
     pruneTimer: 0,
@@ -318,8 +322,6 @@ function createGameState(mapW, mapH, numTeams) {
 }
 
 // ── Terrain Generation ──────────────────────────────────────────────
-const TERRAIN_FLATNESS = 0.3;
-const TERRAIN_ROCKS = 0.03;
 
 function makeNoise2D() {
   const SIZE = 256;
@@ -350,13 +352,30 @@ function enforceAdjacency(state) {
     let changed = false;
     for (let x = 0; x <= W; x++) {
       for (let y = 0; y <= H; y++) {
-        const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+        const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]];
         for (const [nx, ny] of nb) {
           if (nx < 0 || nx > W || ny < 0 || ny > H) continue;
           if (state.heights[x][y] - state.heights[nx][ny] > 1) {
             state.heights[x][y] = state.heights[nx][ny] + 1;
             changed = true;
           }
+        }
+      }
+    }
+    // Fix saddle tiles (opposite corners equal, adjacent corners equal, but different)
+    for (let tx = 0; tx < W; tx++) {
+      for (let ty = 0; ty < H; ty++) {
+        const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
+        const b = state.heights[tx + 1][ty + 1], l = state.heights[tx][ty + 1];
+        if (t === b && r === l && t !== r) {
+          if (t > r) {
+            state.heights[tx][ty]--;
+            state.heights[tx + 1][ty + 1]--;
+          } else {
+            state.heights[tx + 1][ty]--;
+            state.heights[tx][ty + 1]--;
+          }
+          changed = true;
         }
       }
     }
@@ -389,13 +408,14 @@ function hasSpawnFlat(state, cx, cy) {
 function generateTerrain(state) {
   const W = state.mapW, H = state.mapH;
   const spawns = state.spawnZones;
+  const tp = C.TERRAIN_TYPE_PRESETS[state.terrainType] || C.TERRAIN_TYPE_PRESETS.continental;
 
   for (let attempt = 0; attempt < 20; attempt++) {
     const noise = makeNoise2D();
 
-    const freq = 0.03 + Math.random() * 0.05;
-    const heightMul = (2.0 - TERRAIN_FLATNESS * 1.5) * (0.85 + Math.random() * 0.3);
-    const numCenters = Math.max(spawns.length, 2 + Math.floor(Math.random() * 4));
+    const freq = tp.freqBase + Math.random() * tp.freqRange;
+    const heightMul = tp.heightMul * (0.85 + Math.random() * 0.3);
+    const numCenters = Math.max(spawns.length, 2 + Math.floor(Math.random() * tp.extraCentersMax));
     const centers = [];
 
     // Always include centers near spawn zones
@@ -403,7 +423,7 @@ function generateTerrain(state) {
       centers.push({
         x: sp.cx + (Math.random() - 0.5) * 10,
         y: sp.cy + (Math.random() - 0.5) * 10,
-        r: 0.4 + Math.random() * 0.25,
+        r: tp.spawnRBase + Math.random() * tp.spawnRRange,
       });
     }
 
@@ -412,7 +432,7 @@ function generateTerrain(state) {
       centers.push({
         x: 8 + Math.random() * (W - 16),
         y: 8 + Math.random() * (H - 16),
-        r: 0.2 + Math.random() * 0.35,
+        r: tp.extraRBase + Math.random() * tp.extraRRange,
       });
     }
 
@@ -429,15 +449,48 @@ function generateTerrain(state) {
           mask = Math.max(mask, Math.max(0, 1 - d));
         }
 
+        // Apply maskPower: lower values compress mask toward 1, filling interior
+        if (tp.maskPower && tp.maskPower !== 1) mask = Math.pow(mask, tp.maskPower);
+
         const ex = Math.min(x, W - x) / 5;
         const ey = Math.min(y, H - y) / 5;
         mask *= Math.min(1, ex, ey);
 
-        v = (v * 0.7 + 0.5) * mask;
-        state.heights[x][y] = Math.max(0, Math.min(C.MAX_HEIGHT, Math.round(v * C.MAX_HEIGHT * heightMul)));
+        v = (v * tp.noiseScale + tp.noiseBias) * mask;
+        const h = Math.round(v * C.MAX_HEIGHT * heightMul) - (tp.seaLevel || 0);
+        state.heights[x][y] = Math.max(0, Math.min(C.MAX_HEIGHT, h));
       }
     }
 
+    enforceAdjacency(state);
+
+    // Force-flatten spawn areas (critical for noisy terrain types like archipelago)
+    for (const sp of spawns) {
+      // Find the most common non-zero height in spawn area, or use 1
+      const hCounts = new Array(C.MAX_HEIGHT + 1).fill(0);
+      for (let dx = -2; dx <= 7; dx++) {
+        for (let dy = -2; dy <= 7; dy++) {
+          const px = sp.cx + dx, py = sp.cy + dy;
+          if (px >= 0 && px <= W && py >= 0 && py <= H) {
+            hCounts[state.heights[px][py]]++;
+          }
+        }
+      }
+      let spawnH = 1;
+      let bestCount = 0;
+      for (let h = 1; h <= C.MAX_HEIGHT; h++) {
+        if (hCounts[h] > bestCount) { bestCount = hCounts[h]; spawnH = h; }
+      }
+      // Flatten 6×6 point grid (covers 5×5 tiles) at spawn center
+      for (let dx = 0; dx <= 5; dx++) {
+        for (let dy = 0; dy <= 5; dy++) {
+          const px = sp.cx + dx, py = sp.cy + dy;
+          if (px >= 0 && px <= W && py >= 0 && py <= H) {
+            state.heights[px][py] = spawnH;
+          }
+        }
+      }
+    }
     enforceAdjacency(state);
 
     // Scatter rocks
@@ -450,7 +503,7 @@ function generateTerrain(state) {
           if (Math.abs(x - sp.cx) + Math.abs(y - sp.cy) < 8) { nearSpawn = true; break; }
         }
         if (nearSpawn) continue;
-        if (Math.random() < TERRAIN_ROCKS) state.rocks.add(x + ',' + y);
+        if (Math.random() < tp.rockRate) state.rocks.add(x + ',' + y);
       }
     }
 
@@ -465,7 +518,7 @@ function generateTerrain(state) {
           if (Math.abs(x - sp.cx) + Math.abs(y - sp.cy) < 8) { nearSpawn = true; break; }
         }
         if (nearSpawn) continue;
-        if (Math.random() < C.TERRAIN_TREES) state.trees.add(x + ',' + y);
+        if (Math.random() < tp.treeRate) state.trees.add(x + ',' + y);
       }
     }
 
@@ -482,7 +535,7 @@ function generateTerrain(state) {
           if (Math.abs(x - sp.cx) + Math.abs(y - sp.cy) < 8) { nearSpawn = true; break; }
         }
         if (nearSpawn) continue;
-        if (Math.random() < C.TERRAIN_PEBBLES) state.pebbles.add(key);
+        if (Math.random() < tp.pebbleRate) state.pebbles.add(key);
       }
     }
 
@@ -610,15 +663,32 @@ function raisePoint(state, px, py) {
   if (state.heights[px][py] >= C.MAX_HEIGHT) return;
   state.heights[px][py]++;
   const queue = [[px, py]];
+  const W = state.mapW, H = state.mapH;
   while (queue.length) {
     const [x, y] = queue.shift();
     const h = state.heights[x][y];
-    const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+    const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]];
     for (const [nx, ny] of nb) {
-      if (nx < 0 || nx > state.mapW || ny < 0 || ny > state.mapH) continue;
+      if (nx < 0 || nx > W || ny < 0 || ny > H) continue;
       if (h - state.heights[nx][ny] > 1) {
         state.heights[nx][ny] = h - 1;
         queue.push([nx, ny]);
+      }
+    }
+    // Fix saddle tiles containing this point
+    for (const [tx, ty] of [[x, y], [x - 1, y], [x - 1, y - 1], [x, y - 1]]) {
+      if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
+      const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
+      const b = state.heights[tx + 1][ty + 1], l = state.heights[tx][ty + 1];
+      if (t === b && r === l && t !== r) {
+        const high = Math.max(t, r);
+        if (t < high) {
+          if (state.heights[tx][ty] < C.MAX_HEIGHT) { state.heights[tx][ty] = high; queue.push([tx, ty]); }
+          if (state.heights[tx + 1][ty + 1] < C.MAX_HEIGHT) { state.heights[tx + 1][ty + 1] = high; queue.push([tx + 1, ty + 1]); }
+        } else {
+          if (state.heights[tx + 1][ty] < C.MAX_HEIGHT) { state.heights[tx + 1][ty] = high; queue.push([tx + 1, ty]); }
+          if (state.heights[tx][ty + 1] < C.MAX_HEIGHT) { state.heights[tx][ty + 1] = high; queue.push([tx, ty + 1]); }
+        }
       }
     }
   }
@@ -639,15 +709,32 @@ function lowerPoint(state, px, py) {
   if (state.heights[px][py] <= 0) return;
   state.heights[px][py]--;
   const queue = [[px, py]];
+  const W = state.mapW, H = state.mapH;
   while (queue.length) {
     const [x, y] = queue.shift();
     const h = state.heights[x][y];
-    const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+    const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]];
     for (const [nx, ny] of nb) {
-      if (nx < 0 || nx > state.mapW || ny < 0 || ny > state.mapH) continue;
+      if (nx < 0 || nx > W || ny < 0 || ny > H) continue;
       if (state.heights[nx][ny] - h > 1) {
         state.heights[nx][ny] = h + 1;
         queue.push([nx, ny]);
+      }
+    }
+    // Fix saddle tiles containing this point
+    for (const [tx, ty] of [[x, y], [x - 1, y], [x - 1, y - 1], [x, y - 1]]) {
+      if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
+      const t = state.heights[tx][ty], r = state.heights[tx + 1][ty];
+      const b = state.heights[tx + 1][ty + 1], l = state.heights[tx][ty + 1];
+      if (t === b && r === l && t !== r) {
+        const low = Math.min(t, r);
+        if (t > low) {
+          if (state.heights[tx][ty] > 0) { state.heights[tx][ty] = low; queue.push([tx, ty]); }
+          if (state.heights[tx + 1][ty + 1] > 0) { state.heights[tx + 1][ty + 1] = low; queue.push([tx + 1, ty + 1]); }
+        } else {
+          if (state.heights[tx + 1][ty] > 0) { state.heights[tx + 1][ty] = low; queue.push([tx + 1, ty]); }
+          if (state.heights[tx][ty + 1] > 0) { state.heights[tx][ty + 1] = low; queue.push([tx, ty + 1]); }
+        }
       }
     }
   }
@@ -1007,9 +1094,19 @@ function updateWalkers(state, dt) {
   }
 
   // Walker attrition
+  // Cache which teams have settlements for homeless attrition
+  const teamHasSettlement = new Array(state.numTeams).fill(false);
+  for (const s of state.settlements) {
+    if (!s.dead) teamHasSettlement[s.team] = true;
+  }
   for (const w of state.walkers) {
     if (w.dead) continue;
-    const attrRate = w.isKnight ? C.KNIGHT_ATTRITION_PER_SEC : C.WALKER_ATTRITION_PER_SEC;
+    let attrRate = C.WALKER_ATTRITION_PER_SEC;
+    if (w.isKnight) {
+      attrRate = C.KNIGHT_ATTRITION_PER_SEC;
+    } else if (state.teamHadSettlement[w.team] && !teamHasSettlement[w.team]) {
+      attrRate = C.HOMELESS_ATTRITION_PER_SEC;
+    }
     w.attritionFrac = (w.attritionFrac || 0) + attrRate * dt;
     if (w.attritionFrac >= 1) {
       const loss = Math.floor(w.attritionFrac);
@@ -1036,6 +1133,7 @@ function settleWalker(state, w, tx, ty) {
   };
   state.settlements.push(s);
   setSettlement(state, tx, ty, s);
+  state.teamHadSettlement[w.team] = true;
   queueSfx(state, 'settle', w.team, tx, ty);
 
   state.trees.delete(tx + ',' + ty);
@@ -2102,7 +2200,7 @@ function executePowerKnight(state, team) {
   if (!hostSettlement) return false;
 
   leader.isKnight = true;
-  leader.strength = Math.min(255, leader.strength * C.KNIGHT_STRENGTH_MULT);
+  leader.strength = Math.min(255, Math.round(leader.strength * C.KNIGHT_STRENGTH_MULT));
   leader.isLeader = false;
   state.leaders[team] = -1;
 
@@ -2271,7 +2369,7 @@ function updateAI(state, room, dt) {
 
     // Powers
     if (!state.armageddon) {
-      if (myStats.pop > bestEnemyPop * 2.5 && myStats.pop > 200 && mana >= 100) {
+      if (myStats.pop > bestEnemyPop * 2.5 && myStats.pop > 200 && mana >= 6000) {
         executePowerArmageddon(state, team);
         return;
       }
@@ -2288,7 +2386,7 @@ function updateAI(state, room, dt) {
           enemySett = s;
           break;
         }
-        if (enemySett && Math.random() < 0.3) {
+        if (enemySett && Math.random() < 0.1) {
           const sx = enemySett.tx + Math.floor(Math.random() * 7) - 3;
           const sy = enemySett.ty + Math.floor(Math.random() * 7) - 3;
           if (sx >= 0 && sx < state.mapW && sy >= 0 && sy < state.mapH && isTileFlat(state, sx, sy)) {
@@ -2340,43 +2438,55 @@ function updateAI(state, room, dt) {
 
     // Terrain flattening
     const ownSettlements = state.settlements.filter(s => !s.dead && s.team === team);
-    if (ownSettlements.length === 0) continue;
-    const target = ownSettlements[Math.floor(Math.random() * ownSettlements.length)];
-
-    const th = state.heights[target.tx][target.ty];
-    const cx = target.tx, cy = target.ty;
-    const flatR = 4;
-
-    const offsets = [];
-    for (let ddx = -flatR; ddx <= flatR; ddx++) {
-      for (let ddy = -flatR; ddy <= flatR; ddy++) {
-        offsets.push([ddx, ddy]);
+    if (ownSettlements.length === 0) {
+      // No settlements: flatten near strongest walker to help it settle
+      let bestWalker = null;
+      for (const w of state.walkers) {
+        if (w.dead || w.team !== team || w.isKnight) continue;
+        if (!bestWalker || w.strength > bestWalker.strength) bestWalker = w;
       }
+      if (!bestWalker) continue;
+      const wx = Math.floor(bestWalker.x), wy = Math.floor(bestWalker.y);
+      const wh = (state.heights[wx] && state.heights[wx][wy] != null) ? state.heights[wx][wy] : 1;
+      aiTryFlatten(state, team, wx, wy, wh);
+    } else {
+      const target = ownSettlements[Math.floor(Math.random() * ownSettlements.length)];
+      aiTryFlatten(state, team, target.tx, target.ty, state.heights[target.tx][target.ty]);
     }
-    for (let i = offsets.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
-    }
+  }
+}
 
-    let modsLeft = 3;
-    for (const [ddx, ddy] of offsets) {
-      if (modsLeft <= 0) break;
-      const tx = cx + ddx, ty = cy + ddy;
-      if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
-      if (isTileFlat(state, tx, ty) && state.heights[tx][ty] === th) continue;
-      for (const [px, py] of [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]]) {
-        if (px < 0 || px > state.mapW || py < 0 || py > state.mapH) continue;
-        if (state.heights[px][py] < th && state.mana[team] >= C.TERRAIN_RAISE_COST) {
-          state.mana[team] -= C.TERRAIN_RAISE_COST;
-          raisePoint(state, px, py);
-          modsLeft--;
-          break;
-        } else if (state.heights[px][py] > th && state.mana[team] >= C.TERRAIN_LOWER_COST) {
-          state.mana[team] -= C.TERRAIN_LOWER_COST;
-          lowerPoint(state, px, py);
-          modsLeft--;
-          break;
-        }
+function aiTryFlatten(state, team, cx, cy, th) {
+  const flatR = 4;
+  const offsets = [];
+  for (let ddx = -flatR; ddx <= flatR; ddx++) {
+    for (let ddy = -flatR; ddy <= flatR; ddy++) {
+      offsets.push([ddx, ddy]);
+    }
+  }
+  for (let i = offsets.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
+  }
+
+  let modsLeft = 3;
+  for (const [ddx, ddy] of offsets) {
+    if (modsLeft <= 0) break;
+    const tx = cx + ddx, ty = cy + ddy;
+    if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) continue;
+    if (isTileFlat(state, tx, ty) && state.heights[tx][ty] === th) continue;
+    for (const [px, py] of [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]]) {
+      if (px < 0 || px > state.mapW || py < 0 || py > state.mapH) continue;
+      if (state.heights[px][py] < th && state.mana[team] >= C.TERRAIN_RAISE_COST) {
+        state.mana[team] -= C.TERRAIN_RAISE_COST;
+        raisePoint(state, px, py);
+        modsLeft--;
+        break;
+      } else if (state.heights[px][py] > th && state.mana[team] >= C.TERRAIN_LOWER_COST) {
+        state.mana[team] -= C.TERRAIN_LOWER_COST;
+        lowerPoint(state, px, py);
+        modsLeft--;
+        break;
       }
     }
   }
@@ -2384,7 +2494,7 @@ function updateAI(state, room, dt) {
 
 // ── Tick Loop ───────────────────────────────────────────────────────
 function startGame(room) {
-  const state = createGameState(room.mapW, room.mapH, room.maxPlayers);
+  const state = createGameState(room.mapW, room.mapH, room.maxPlayers, room.terrainType);
   generateTerrain(state);
   spawnInitialWalkers(state);
   room.state = state;
@@ -2664,11 +2774,13 @@ wss.on('connection', (ws) => {
       case 'create': {
         const maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, msg.maxPlayers || 2));
         const mapSize = msg.mapSize || 'small';
+        const terrainType = msg.terrainType || 'continental';
         const pName = sanitizeName(msg.playerName);
         playerNames.set(ws, pName);
         const room = createRoom(maxPlayers, mapSize, {
           gameName: msg.gameName,
           isPublic: msg.isPublic,
+          terrainType,
           creatorName: pName,
         });
         room.players[0] = ws;
@@ -2695,9 +2807,10 @@ wss.on('connection', (ws) => {
       case 'create_ai': {
         const maxPlayers = Math.max(2, Math.min(C.MAX_TEAMS, msg.maxPlayers || 2));
         const mapSize = msg.mapSize || 'small';
+        const terrainType = msg.terrainType || 'continental';
         const pName = sanitizeName(msg.playerName);
         playerNames.set(ws, pName);
-        const room = createRoom(maxPlayers, mapSize, { creatorName: pName });
+        const room = createRoom(maxPlayers, mapSize, { terrainType, creatorName: pName });
         room.players[0] = ws;
         room.ai = true;
         room.aiCount = maxPlayers - 1;
