@@ -282,7 +282,7 @@ let prevRuinTiles = null;
 let prevSeaLevel = -1;
 const TERRAIN_BUFFER_MAX_BYTES = 40 * 1024 * 1024; // 40 MB memory guard
 
-// Precompute valid shape keys (adjacency constraint: |diff|≤1 between neighbors)
+/// Precompute renderable shape keys (includes edge slopes + corner tiles for terrain gen compatibility)
 const VALID_SHAPE_KEYS = [];
 (function() {
   for (let dt = 0; dt <= 2; dt++)
@@ -602,7 +602,7 @@ for (let i = 0; i < LOBBY_STAR_COUNT; i++) {
     size: Math.random() < 0.8 ? 1 : (Math.random() < 0.9 ? 1.5 : 2),
     brightness: 0.2 + Math.random() * 0.8,
     twinkleSpeed: 0.3 + Math.random() * 1.5,
-    hue: Math.random() < 0.7 ? 0 : (Math.random() < 0.5 ? 220 : 30),
+    hue: Math.random() < 0.7 ? 0 : (Math.random() < 0.5 ? 30 : 45),
   });
 }
 
@@ -616,7 +616,7 @@ for (let i = 0; i < LOBBY_MOTE_COUNT; i++) {
     vy: -0.002 - Math.random() * 0.006,
     size: 1 + Math.random() * 2,
     alpha: 0.1 + Math.random() * 0.3,
-    hue: 200 + Math.random() * 40,
+    hue: 30 + Math.random() * 30,
   });
 }
 
@@ -634,19 +634,19 @@ function renderLobby(now) {
   const W = lobbyBg.width, H = lobbyBg.height;
   const t = now / 1000;
 
-  // Dark background with subtle gradient
+  // Dark background with subtle warm gradient
   const bg = lobbyCtx.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.4, Math.max(W, H) * 0.7);
-  bg.addColorStop(0, '#0c0c24');
-  bg.addColorStop(1, '#040410');
+  bg.addColorStop(0, '#14100a');
+  bg.addColorStop(1, '#080604');
   lobbyCtx.fillStyle = bg;
   lobbyCtx.fillRect(0, 0, W, H);
 
-  // Nebula clouds
+  // Nebula clouds — warm amber/earth tones
   const nebulae = [
-    { x: 0.25, y: 0.3, r: 0.3, color: [30, 20, 80] },
-    { x: 0.75, y: 0.6, r: 0.35, color: [15, 30, 70] },
-    { x: 0.5, y: 0.15, r: 0.2, color: [20, 40, 60] },
-    { x: 0.6, y: 0.8, r: 0.25, color: [40, 15, 50] },
+    { x: 0.25, y: 0.3, r: 0.3, color: [60, 35, 10] },
+    { x: 0.75, y: 0.6, r: 0.35, color: [50, 30, 8] },
+    { x: 0.5, y: 0.15, r: 0.2, color: [40, 25, 10] },
+    { x: 0.6, y: 0.8, r: 0.25, color: [55, 25, 5] },
   ];
   for (const n of nebulae) {
     const nx = n.x * W, ny = n.y * H;
@@ -669,9 +669,9 @@ function renderLobby(now) {
     if (star.hue === 0) {
       lobbyCtx.fillStyle = `rgba(255, 255, 255, ${a.toFixed(2)})`;
     } else {
-      const r = star.hue === 220 ? 180 : 255;
-      const g = star.hue === 220 ? 200 : 240;
-      const b = star.hue === 220 ? 255 : 200;
+      const r = star.hue === 30 ? 255 : 240;
+      const g = star.hue === 30 ? 220 : 200;
+      const b = star.hue === 30 ? 160 : 120;
       lobbyCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
     }
     lobbyCtx.fillRect(Math.floor(sx), Math.floor(sy), star.size, star.size);
@@ -693,7 +693,7 @@ function renderLobby(now) {
     if (m.x > 1.05) m.x = -0.05;
     const pulse = 0.6 + 0.4 * Math.sin(t * 0.8 + m.x * 20);
     const a = m.alpha * pulse;
-    lobbyCtx.fillStyle = `rgba(${Math.floor(m.hue - 60)}, ${Math.floor(m.hue - 20)}, 255, ${a.toFixed(2)})`;
+    lobbyCtx.fillStyle = `rgba(${Math.floor(180 + m.hue)}, ${Math.floor(120 + m.hue)}, ${Math.floor(40 + m.hue * 0.5)}, ${a.toFixed(2)})`;
     lobbyCtx.beginPath();
     lobbyCtx.arc(m.x * W, m.y * H, m.size, 0, Math.PI * 2);
     lobbyCtx.fill();
@@ -1440,18 +1440,6 @@ function drawTileToBuffer(tx, ty) {
         bCtx.fill();
       }
 
-      // Sprite overlays (rocks, trees, pebbles, ruins) — use buffer context
-      const needSprites = rockTiles[tileIdx] || treeTiles[tileIdx] ||
-                          pebbleTiles[tileIdx] || ruinTiles[tileIdx];
-      if (needSprites) {
-        const pRightX = bOriginX + (tx + 1 - ty) * TILE_HALF_W;
-        const pRightY = bOriginY + (tx + 1 + ty) * TILE_HALF_H - r * HEIGHT_STEP;
-        const pBottomX = bOriginX + (tx + 1 - ty - 1) * TILE_HALF_W;
-        const pBottomY = bOriginY + (tx + 1 + ty + 1) * TILE_HALF_H - b * HEIGHT_STEP;
-        const pLeftX = bOriginX + (tx - ty - 1) * TILE_HALF_W;
-        const pLeftY = bOriginY + (tx + ty + 1) * TILE_HALF_H - l * HEIGHT_STEP;
-        drawTileSpritesToCtx(bCtx, tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY);
-      }
       return;
     }
   }
@@ -2651,7 +2639,8 @@ function render() {
       ctx.lineWidth = 1;
       for (let row = _startRow; row < _endRow; row++) {
         for (let col = _startCol; col < _endCol; col++) {
-          if (fallenTiles[row * localMapW + col]) continue;
+          const tileIdx = row * localMapW + col;
+          if (fallenTiles[tileIdx]) continue;
           const t = heights[col][row], r = heights[col + 1][row];
           const b = heights[col + 1][row + 1], l = heights[col][row + 1];
           const pTopX = _originX + (col - row) * TILE_HALF_W;
@@ -2664,6 +2653,26 @@ function render() {
           ctx.closePath();
           ctx.stroke();
         }
+      }
+    }
+
+    // Sprite overlays (rocks, trees, pebbles, ruins) — drawn after grid so they appear on top
+    for (let row = _startRow; row < _endRow; row++) {
+      for (let col = _startCol; col < _endCol; col++) {
+        const tileIdx = row * localMapW + col;
+        if (fallenTiles[tileIdx]) continue;
+        if (!rockTiles[tileIdx] && !treeTiles[tileIdx] && !pebbleTiles[tileIdx] && !ruinTiles[tileIdx]) continue;
+        const t = heights[col][row], r = heights[col + 1][row];
+        const b = heights[col + 1][row + 1], l = heights[col][row + 1];
+        const pTopX = _originX + (col - row) * TILE_HALF_W;
+        const pTopY = _originY + (col + row) * TILE_HALF_H - t * HEIGHT_STEP;
+        const pRightX = _originX + (col + 1 - row) * TILE_HALF_W;
+        const pRightY = _originY + (col + 1 + row) * TILE_HALF_H - r * HEIGHT_STEP;
+        const pBottomX = _originX + (col + 1 - row - 1) * TILE_HALF_W;
+        const pBottomY = _originY + (col + 1 + row + 1) * TILE_HALF_H - b * HEIGHT_STEP;
+        const pLeftX = _originX + (col - row - 1) * TILE_HALF_W;
+        const pLeftY = _originY + (col + row + 1) * TILE_HALF_H - l * HEIGHT_STEP;
+        drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY);
       }
     }
 
@@ -2822,7 +2831,7 @@ function render() {
 
     ctx.shadowColor = `rgba(255, 40, 0, ${(pulse * 0.8).toFixed(2)})`;
     ctx.shadowBlur = 30 + pulse * 20;
-    ctx.font = "bold 52px 'Cinzel Decorative', 'Cinzel', serif";
+    ctx.font = "900 52px 'Cinzel', serif";
     ctx.fillStyle = `rgba(255, ${Math.floor(60 + pulse * 40)}, 0, 0.95)`;
     ctx.fillText('ARMAGEDDON', cx, 55);
 
@@ -2843,7 +2852,7 @@ function render() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const hlColor = won ? 'rgba(40, 80, 200, 0.12)' : 'rgba(200, 40, 40, 0.08)';
+    const hlColor = won ? 'rgba(200, 168, 76, 0.1)' : 'rgba(200, 40, 40, 0.08)';
     const hlGrad = ctx.createRadialGradient(cx, cy - 40, 0, cx, cy - 40, 300);
     hlGrad.addColorStop(0, hlColor);
     hlGrad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -2855,13 +2864,13 @@ function render() {
     ctx.textBaseline = 'middle';
 
     const resultText = won ? 'VICTORY' : 'DEFEAT';
-    const resultColor = won ? '#6aafff' : '#ff5544';
-    const glowColor = won ? 'rgba(80, 140, 255, 0.6)' : 'rgba(255, 60, 40, 0.5)';
+    const resultColor = won ? '#c9a84c' : '#ff5544';
+    const glowColor = won ? 'rgba(200, 168, 76, 0.6)' : 'rgba(255, 60, 40, 0.5)';
     const pulse = 0.8 + 0.2 * Math.sin(t * 2);
 
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = 25 * pulse;
-    ctx.font = "900 64px 'Cinzel Decorative', 'Cinzel', serif";
+    ctx.font = "900 64px 'Cinzel', serif";
     ctx.fillStyle = resultColor;
     ctx.fillText(resultText, cx, cy - 50);
 
@@ -2880,9 +2889,9 @@ function render() {
 
     const lineW = 160;
     const lineGrad = ctx.createLinearGradient(cx - lineW, 0, cx + lineW, 0);
-    lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
-    lineGrad.addColorStop(0.5, 'rgba(255,255,255,0.15)');
-    lineGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    lineGrad.addColorStop(0, 'rgba(200,168,76,0)');
+    lineGrad.addColorStop(0.5, 'rgba(200,168,76,0.2)');
+    lineGrad.addColorStop(1, 'rgba(200,168,76,0)');
     ctx.fillStyle = lineGrad;
     ctx.fillRect(cx - lineW, cy + 35, lineW * 2, 1);
 
@@ -2893,22 +2902,22 @@ function render() {
     const btnW = 140, btnH = 40;
 
     const b1hover = gameOverHover === 'again';
-    ctx.fillStyle = b1hover ? 'rgba(40, 65, 130, 0.9)' : 'rgba(25, 40, 80, 0.8)';
-    ctx.strokeStyle = b1hover ? 'rgba(100, 160, 255, 0.6)' : 'rgba(80, 120, 200, 0.3)';
+    ctx.fillStyle = b1hover ? 'rgba(70, 55, 22, 0.95)' : 'rgba(40, 32, 14, 0.85)';
+    ctx.strokeStyle = b1hover ? 'rgba(200, 168, 76, 0.6)' : 'rgba(180, 150, 80, 0.3)';
     ctx.lineWidth = 1;
     roundRect(ctx, btn1X - btnW/2, btnY - btnH/2, btnW, btnH, 6);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = b1hover ? '#fff' : 'rgba(180, 210, 255, 0.9)';
+    ctx.fillStyle = b1hover ? '#fff5e0' : 'rgba(220, 200, 150, 0.9)';
     ctx.fillText('PLAY AGAIN', btn1X, btnY);
 
     const b2hover = gameOverHover === 'lobby';
-    ctx.fillStyle = b2hover ? 'rgba(50, 50, 60, 0.9)' : 'rgba(30, 30, 40, 0.8)';
-    ctx.strokeStyle = b2hover ? 'rgba(160, 160, 180, 0.5)' : 'rgba(100, 100, 120, 0.3)';
+    ctx.fillStyle = b2hover ? 'rgba(50, 42, 25, 0.9)' : 'rgba(25, 20, 10, 0.8)';
+    ctx.strokeStyle = b2hover ? 'rgba(180, 150, 80, 0.4)' : 'rgba(120, 100, 50, 0.2)';
     roundRect(ctx, btn2X - btnW/2, btnY - btnH/2, btnW, btnH, 6);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = b2hover ? '#fff' : 'rgba(180, 180, 200, 0.8)';
+    ctx.fillStyle = b2hover ? '#fff5e0' : 'rgba(200, 185, 150, 0.7)';
     ctx.fillText('LOBBY', btn2X, btnY);
 
     gameOverBtns.again = { x: btn1X - btnW/2, y: btnY - btnH/2, w: btnW, h: btnH };

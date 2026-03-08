@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Populous Reborn</title>
+  <title>The Flattening</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Raleway:wght@300;400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;600&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #060611; overflow: hidden; font-family: 'Raleway', sans-serif; color: #ccc; }
@@ -29,8 +29,8 @@
       z-index: 10;
     }
     .lobby-box {
-      background: radial-gradient(ellipse at center, rgba(15, 15, 40, 0.92) 0%, rgba(8, 8, 22, 0.96) 100%);
-      border: 1px solid rgba(100, 140, 255, 0.15);
+      background: radial-gradient(ellipse at center, rgba(18, 14, 8, 0.94) 0%, rgba(10, 8, 5, 0.97) 100%);
+      border: 1px solid rgba(180, 150, 80, 0.18);
       border-radius: 16px;
       padding: 36px 44px;
       text-align: center;
@@ -39,50 +39,46 @@
       max-height: 85vh;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 0 60px rgba(40, 60, 120, 0.15), 0 0 120px rgba(30, 50, 100, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+      box-shadow: 0 0 60px rgba(160, 120, 40, 0.1), 0 0 120px rgba(120, 90, 30, 0.06), inset 0 1px 0 rgba(255, 240, 200, 0.03);
       backdrop-filter: blur(8px);
     }
     .lobby-box h1 {
-      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-family: 'Cinzel', serif;
       font-weight: 900;
-      font-size: 48px;
-      letter-spacing: 8px;
-      margin-bottom: 0;
+      font-size: 46px;
+      letter-spacing: 10px;
+      margin-bottom: 2px;
       line-height: 1.1;
-      background: linear-gradient(180deg, #b8d8ff 0%, #4488ff 40%, #2266cc 100%);
+      background: linear-gradient(180deg, #fff5d4 0%, #c9a84c 40%, #7a5a1e 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      filter: drop-shadow(0 0 20px rgba(68, 136, 255, 0.4));
+      filter: drop-shadow(0 0 20px rgba(200, 168, 76, 0.4));
       animation: titlePulse 4s ease-in-out infinite;
     }
     @keyframes titlePulse {
-      0%, 100% { filter: drop-shadow(0 0 20px rgba(68, 136, 255, 0.3)); }
-      50% { filter: drop-shadow(0 0 35px rgba(68, 136, 255, 0.6)); }
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(200, 168, 76, 0.3)); }
+      50% { filter: drop-shadow(0 0 35px rgba(200, 168, 76, 0.6)); }
     }
-    .lobby-box .title-sub {
-      font-family: 'Raleway', sans-serif;
-      font-weight: 300;
-      font-size: 18px;
-      letter-spacing: 14px;
-      text-transform: uppercase;
-      color: rgba(130, 170, 255, 0.45);
-      margin-bottom: 6px;
-      margin-left: 14px;
+    .lobby-box .title-rule {
+      width: 180px;
+      height: 1px;
+      margin: 8px auto 10px;
+      background: linear-gradient(90deg, transparent, rgba(200, 168, 76, 0.4), transparent);
     }
     .lobby-box .subtitle {
       font-family: 'Raleway', sans-serif;
       font-weight: 300;
-      color: rgba(160, 180, 220, 0.45);
+      color: rgba(200, 180, 140, 0.5);
       font-size: 11px;
-      letter-spacing: 5px;
+      letter-spacing: 6px;
       text-transform: uppercase;
       margin-bottom: 36px;
     }
     .lobby-box button {
-      background: linear-gradient(180deg, rgba(30, 50, 100, 0.9) 0%, rgba(18, 32, 70, 0.95) 100%);
-      color: rgba(180, 210, 255, 0.9);
-      border: 1px solid rgba(80, 130, 255, 0.25);
+      background: linear-gradient(180deg, rgba(50, 40, 18, 0.9) 0%, rgba(30, 24, 10, 0.95) 100%);
+      color: rgba(220, 200, 150, 0.9);
+      border: 1px solid rgba(180, 150, 80, 0.25);
       padding: 12px 28px;
       font: 600 13px 'Raleway', sans-serif;
       letter-spacing: 2px;
@@ -93,18 +89,18 @@
       text-transform: uppercase;
     }
     .lobby-box button:hover {
-      background: linear-gradient(180deg, rgba(40, 65, 130, 0.95) 0%, rgba(25, 45, 95, 0.95) 100%);
-      border-color: rgba(100, 160, 255, 0.5);
-      box-shadow: 0 0 25px rgba(68, 136, 255, 0.2);
-      color: #fff;
+      background: linear-gradient(180deg, rgba(70, 55, 22, 0.95) 0%, rgba(45, 36, 14, 0.95) 100%);
+      border-color: rgba(200, 168, 76, 0.5);
+      box-shadow: 0 0 25px rgba(200, 168, 76, 0.2);
+      color: #fff5e0;
     }
     .lobby-box button:active {
       transform: scale(0.97);
     }
     .lobby-box input[type="text"] {
-      background: rgba(5, 5, 20, 0.8);
-      color: #b8d8ff;
-      border: 1px solid rgba(100, 140, 255, 0.25);
+      background: rgba(8, 6, 3, 0.8);
+      color: #e0d4b8;
+      border: 1px solid rgba(180, 150, 80, 0.25);
       padding: 10px 14px;
       font: 600 14px 'Raleway', sans-serif;
       border-radius: 6px;
@@ -116,11 +112,11 @@
     }
     .lobby-box input[type="text"]:focus {
       outline: none;
-      border-color: rgba(100, 140, 255, 0.5);
-      box-shadow: 0 0 15px rgba(68, 136, 255, 0.15);
+      border-color: rgba(200, 168, 76, 0.5);
+      box-shadow: 0 0 15px rgba(200, 168, 76, 0.15);
     }
     .lobby-box input[type="text"]::placeholder {
-      color: rgba(100, 130, 180, 0.35);
+      color: rgba(160, 140, 100, 0.35);
       letter-spacing: 3px;
     }
 
@@ -136,7 +132,7 @@
     }
     .lobby-name-row label {
       font: 300 11px 'Raleway', sans-serif;
-      color: rgba(160, 180, 220, 0.5);
+      color: rgba(200, 180, 140, 0.5);
       text-transform: uppercase;
       letter-spacing: 2px;
       margin-right: 8px;
@@ -158,12 +154,12 @@
     .lobby-col-right { flex: 0.8; }
     .lobby-col-title {
       font: 600 11px 'Raleway', sans-serif;
-      color: rgba(130, 170, 255, 0.6);
+      color: rgba(200, 175, 120, 0.6);
       text-transform: uppercase;
       letter-spacing: 3px;
       margin-bottom: 10px;
       padding-bottom: 6px;
-      border-bottom: 1px solid rgba(100, 140, 255, 0.1);
+      border-bottom: 1px solid rgba(180, 150, 80, 0.1);
     }
 
     /* ── Lobby Tabs ───────────────────────────────────────── */
@@ -174,13 +170,13 @@
     }
     .lobby-tab {
       flex: 1;
-      background: rgba(5, 5, 20, 0.4);
-      border: 1px solid rgba(100, 140, 255, 0.1);
+      background: rgba(10, 8, 4, 0.4);
+      border: 1px solid rgba(180, 150, 80, 0.1);
       border-bottom: none;
       border-radius: 6px 6px 0 0;
       padding: 8px 0;
       font: 600 11px 'Raleway', sans-serif;
-      color: rgba(130, 170, 255, 0.35);
+      color: rgba(200, 175, 120, 0.35);
       text-transform: uppercase;
       letter-spacing: 2px;
       cursor: pointer;
@@ -190,13 +186,13 @@
     .lobby-tab:first-child { border-right: none; }
     .lobby-tab:last-child { border-left: none; }
     .lobby-tab.active {
-      background: rgba(15, 15, 40, 0.6);
-      color: rgba(130, 170, 255, 0.8);
-      border-color: rgba(100, 140, 255, 0.2);
+      background: rgba(18, 14, 8, 0.6);
+      color: rgba(200, 175, 120, 0.8);
+      border-color: rgba(180, 150, 80, 0.2);
     }
     .lobby-tab:hover:not(.active) {
-      color: rgba(130, 170, 255, 0.55);
-      background: rgba(10, 10, 30, 0.5);
+      color: rgba(200, 175, 120, 0.55);
+      background: rgba(14, 11, 6, 0.5);
     }
     .lobby-tab-panel {
       position: relative;
@@ -214,8 +210,8 @@
       flex-direction: column;
     }
     .lobby-tab-body {
-      background: rgba(15, 15, 40, 0.3);
-      border: 1px solid rgba(100, 140, 255, 0.1);
+      background: rgba(14, 11, 6, 0.3);
+      border: 1px solid rgba(180, 150, 80, 0.1);
       border-top: none;
       border-radius: 0 0 6px 6px;
       padding: 14px;
@@ -232,7 +228,7 @@
     .create-field label {
       display: block;
       font: 300 10px 'Raleway', sans-serif;
-      color: rgba(160, 180, 220, 0.5);
+      color: rgba(200, 180, 140, 0.5);
       text-transform: uppercase;
       letter-spacing: 2px;
       margin-bottom: 3px;
@@ -280,17 +276,17 @@
 
     /* ── Game Browser ─────────────────────────────────────── */
     .game-browser {
-      background: rgba(5, 5, 20, 0.6);
-      border: 1px solid rgba(100, 140, 255, 0.12);
+      background: rgba(8, 6, 3, 0.6);
+      border: 1px solid rgba(180, 150, 80, 0.12);
       border-radius: 6px;
       min-height: 60px;
       overflow-y: auto;
       flex: 1;
     }
     .game-browser::-webkit-scrollbar { width: 4px; }
-    .game-browser::-webkit-scrollbar-thumb { background: rgba(100, 140, 255, 0.2); border-radius: 2px; }
+    .game-browser::-webkit-scrollbar-thumb { background: rgba(180, 150, 80, 0.2); border-radius: 2px; }
     .game-browser-empty {
-      color: rgba(100, 130, 180, 0.35);
+      color: rgba(160, 140, 100, 0.35);
       font: 300 11px 'Raleway', sans-serif;
       text-align: center;
       padding: 20px 10px;
@@ -300,25 +296,25 @@
       display: flex;
       align-items: center;
       padding: 8px 10px;
-      border-bottom: 1px solid rgba(100, 140, 255, 0.06);
+      border-bottom: 1px solid rgba(180, 150, 80, 0.06);
       cursor: pointer;
       transition: background 0.15s;
     }
     .game-browser-item:hover {
-      background: rgba(100, 140, 255, 0.08);
+      background: rgba(180, 150, 80, 0.08);
     }
     .game-browser-item:last-child { border-bottom: none; }
     .gb-name {
       flex: 1;
       font: 600 12px 'Raleway', sans-serif;
-      color: #b8d8ff;
+      color: #e0d4b8;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .gb-info {
       font: 300 10px 'Raleway', sans-serif;
-      color: rgba(160, 180, 220, 0.5);
+      color: rgba(200, 180, 140, 0.5);
       margin: 0 8px;
       white-space: nowrap;
     }
@@ -347,8 +343,8 @@
       min-height: 0;
     }
     .chat-messages {
-      background: rgba(5, 5, 20, 0.6);
-      border: 1px solid rgba(100, 140, 255, 0.12);
+      background: rgba(8, 6, 3, 0.6);
+      border: 1px solid rgba(180, 150, 80, 0.12);
       border-radius: 6px 6px 0 0;
       flex: 1;
       min-height: 80px;
@@ -358,14 +354,14 @@
       text-align: left;
     }
     .chat-messages::-webkit-scrollbar { width: 4px; }
-    .chat-messages::-webkit-scrollbar-thumb { background: rgba(100, 140, 255, 0.2); border-radius: 2px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: rgba(180, 150, 80, 0.2); border-radius: 2px; }
     .chat-msg {
       margin-bottom: 3px;
       line-height: 1.4;
       word-wrap: break-word;
     }
     .chat-msg-name {
-      color: #6aa8ff;
+      color: #c9a84c;
       font-weight: 600;
     }
     .chat-msg-text {
@@ -382,9 +378,9 @@
     }
     .lobby-box input.chat-input {
       flex: 1;
-      background: rgba(5, 5, 20, 0.8);
-      color: #b8d8ff;
-      border: 1px solid rgba(100, 140, 255, 0.2);
+      background: rgba(8, 6, 3, 0.8);
+      color: #e0d4b8;
+      border: 1px solid rgba(180, 150, 80, 0.2);
       border-top: none;
       border-radius: 0 0 0 6px;
       padding: 6px 8px;
@@ -396,17 +392,17 @@
       outline: none;
     }
     .lobby-box input.chat-input:focus {
-      border-color: rgba(100, 140, 255, 0.4);
+      border-color: rgba(200, 168, 76, 0.4);
     }
     .lobby-box input.chat-input::placeholder {
-      color: rgba(100, 130, 180, 0.3);
+      color: rgba(160, 140, 100, 0.3);
       text-transform: none;
       letter-spacing: 0;
     }
     .lobby-box .chat-send-btn {
-      background: linear-gradient(180deg, rgba(30, 50, 100, 0.9) 0%, rgba(18, 32, 70, 0.95) 100%);
-      color: rgba(180, 210, 255, 0.8);
-      border: 1px solid rgba(80, 130, 255, 0.25);
+      background: linear-gradient(180deg, rgba(50, 40, 18, 0.9) 0%, rgba(30, 24, 10, 0.95) 100%);
+      color: rgba(220, 200, 150, 0.8);
+      border: 1px solid rgba(180, 150, 80, 0.25);
       border-top: none;
       border-left: none;
       border-radius: 0 0 6px 0;
@@ -429,12 +425,12 @@
       margin: 12px 0;
     }
     .waiting-player-tag {
-      background: rgba(40, 60, 120, 0.5);
-      border: 1px solid rgba(100, 140, 255, 0.25);
+      background: rgba(60, 48, 20, 0.5);
+      border: 1px solid rgba(200, 168, 76, 0.25);
       border-radius: 4px;
       padding: 4px 10px;
       font: 600 11px 'Raleway', sans-serif;
-      color: #b8d8ff;
+      color: #e0d4b8;
     }
     .waiting-player-tag.ai-tag {
       background: rgba(120, 100, 30, 0.5);
@@ -442,9 +438,9 @@
       color: #e8d860;
     }
     .waiting-player-tag.empty-tag {
-      background: rgba(30, 30, 50, 0.4);
-      border-color: rgba(100, 100, 140, 0.15);
-      color: rgba(100, 130, 180, 0.3);
+      background: rgba(30, 25, 15, 0.4);
+      border-color: rgba(140, 120, 70, 0.15);
+      color: rgba(160, 140, 100, 0.3);
     }
     .waiting-ai-btns {
       display: flex;
@@ -475,13 +471,13 @@
     }
     .waiting-game-name {
       font: 300 14px 'Raleway', sans-serif;
-      color: rgba(160, 180, 220, 0.6);
+      color: rgba(200, 180, 140, 0.6);
       margin-bottom: 4px;
     }
     .lobby-box select {
-      background: rgba(5, 5, 20, 0.8);
-      color: #b8d8ff;
-      border: 1px solid rgba(100, 140, 255, 0.25);
+      background: rgba(8, 6, 3, 0.8);
+      color: #e0d4b8;
+      border: 1px solid rgba(180, 150, 80, 0.25);
       padding: 8px 12px;
       font: 600 13px 'Raleway', sans-serif;
       border-radius: 6px;
@@ -491,11 +487,11 @@
     }
     .lobby-box select:focus {
       outline: none;
-      border-color: rgba(100, 140, 255, 0.5);
+      border-color: rgba(200, 168, 76, 0.5);
     }
     .lobby-box select option {
-      background: #0a0a1a;
-      color: #b8d8ff;
+      background: #0a0908;
+      color: #e0d4b8;
     }
     .lobby-settings {
       display: flex;
@@ -507,12 +503,12 @@
     }
     .lobby-setting-label {
       font: 300 11px 'Raleway', sans-serif;
-      color: rgba(160, 180, 220, 0.5);
+      color: rgba(200, 180, 140, 0.5);
       text-transform: uppercase;
       letter-spacing: 2px;
     }
     .divider {
-      color: rgba(100, 140, 200, 0.3);
+      color: rgba(180, 150, 80, 0.3);
       margin: 12px 0 6px;
       font-size: 10px;
       letter-spacing: 4px;
@@ -526,22 +522,22 @@
       width: 60px;
       height: 1px;
     }
-    .divider::before { right: calc(50% + 36px); background: linear-gradient(90deg, transparent, rgba(100, 140, 255, 0.15)); }
-    .divider::after { left: calc(50% + 36px); background: linear-gradient(-90deg, transparent, rgba(100, 140, 255, 0.15)); }
+    .divider::before { right: calc(50% + 36px); background: linear-gradient(90deg, transparent, rgba(180, 150, 80, 0.15)); }
+    .divider::after { left: calc(50% + 36px); background: linear-gradient(-90deg, transparent, rgba(180, 150, 80, 0.15)); }
     #waiting-section {
       display: none;
     }
     .room-code-display {
-      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-family: 'Cinzel', serif;
       font-weight: 700;
       font-size: 36px;
-      color: #6aa8ff;
+      color: #c9a84c;
       letter-spacing: 10px;
       margin: 16px 0;
-      text-shadow: 0 0 20px rgba(68, 136, 255, 0.4);
+      text-shadow: 0 0 20px rgba(200, 168, 76, 0.4);
     }
     #waiting-text {
-      color: rgba(160, 180, 220, 0.6);
+      color: rgba(200, 180, 140, 0.6);
       font-size: 14px;
       font-weight: 300;
       letter-spacing: 1px;
@@ -604,30 +600,34 @@
       top: 0; left: 0;
       width: 160px;
       height: 100vh;
-      background: rgba(10, 10, 20, 0.85);
-      border-right: 1px solid #333;
+      background: linear-gradient(180deg, rgba(16, 13, 8, 0.92) 0%, rgba(10, 8, 5, 0.95) 100%);
+      border-right: 1px solid rgba(120, 100, 50, 0.12);
+      box-shadow: 2px 0 16px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(200, 168, 76, 0.04);
       z-index: 20;
       user-select: none;
       overflow-y: auto;
-      padding: 8px;
+      padding: 10px 8px 8px;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
     }
     #sidebar.visible { display: flex; }
+    #sidebar::-webkit-scrollbar { width: 3px; }
+    #sidebar::-webkit-scrollbar-thumb { background: rgba(180, 150, 80, 0.15); border-radius: 2px; }
 
     .sb-section {
-      border-bottom: 1px solid #282828;
+      border-bottom: 1px solid rgba(180, 150, 80, 0.08);
       padding-bottom: 6px;
       margin-bottom: 2px;
     }
     .sb-section:last-child { border-bottom: none; }
+    .sb-bottom-section { border-bottom: none; border-top: 1px solid rgba(180, 150, 80, 0.08); padding-top: 6px; }
 
     .sb-label {
-      font: bold 9px monospace;
-      color: #666;
+      font: 600 8px 'Raleway', sans-serif;
+      color: rgba(200, 168, 76, 0.5);
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 3px;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
     }
 
     /* Population bars */
@@ -644,10 +644,10 @@
     }
     .pop-bar-bg {
       flex: 1;
-      height: 10px;
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 2px;
+      height: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(180, 150, 80, 0.1);
+      border-radius: 1px;
       overflow: hidden;
     }
     .pop-bar-fill {
@@ -656,7 +656,7 @@
     }
     .pop-val {
       font: 9px monospace;
-      color: #888;
+      color: rgba(200, 185, 150, 0.6);
       width: 30px;
       text-align: right;
     }
@@ -664,21 +664,21 @@
     /* Mana */
     .mana-bar-bg {
       width: 100%;
-      height: 12px;
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 2px;
+      height: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(80, 120, 180, 0.15);
+      border-radius: 1px;
       overflow: hidden;
-      margin-bottom: 2px;
+      margin-bottom: 3px;
     }
     .mana-bar-fill {
       height: 100%;
-      background: #66aaff;
+      background: linear-gradient(90deg, #3a6aaa, #5a9aee);
       transition: width 0.15s;
     }
     .mana-text {
       font: 10px monospace;
-      color: #8af;
+      color: rgba(120, 170, 240, 0.8);
       text-align: center;
     }
 
@@ -689,35 +689,53 @@
       gap: 3px;
     }
     .mode-btn {
-      background: rgba(40, 40, 60, 0.9);
-      border: 1px solid #444;
+      background: linear-gradient(180deg, rgba(30, 25, 14, 0.9) 0%, rgba(20, 16, 8, 0.95) 100%);
+      border: 1px solid rgba(180, 150, 80, 0.12);
       border-radius: 3px;
-      color: #aaa;
-      font: bold 10px monospace;
+      color: rgba(200, 185, 150, 0.65);
+      font: 600 9px 'Raleway', sans-serif;
+      letter-spacing: 0.5px;
       padding: 6px 0;
       cursor: pointer;
       text-align: center;
-      transition: border-color 0.1s, color 0.1s;
+      transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
     }
-    .mode-btn:hover { border-color: #888; color: #ddd; }
-    .mode-btn.active { border-color: #4a4; color: #6d6; background: rgba(40, 80, 40, 0.6); }
+    .mode-btn:hover {
+      border-color: rgba(200, 168, 76, 0.3);
+      color: rgba(230, 210, 170, 0.9);
+    }
+    .mode-btn.active {
+      border-color: rgba(200, 168, 76, 0.5);
+      color: #c9a84c;
+      background: linear-gradient(180deg, rgba(60, 48, 18, 0.7) 0%, rgba(35, 28, 10, 0.8) 100%);
+      box-shadow: 0 0 6px rgba(200, 168, 76, 0.15), inset 0 1px 0 rgba(200, 168, 76, 0.08);
+    }
 
     /* Tool buttons */
     .tool-btn {
       width: 100%;
-      background: rgba(40, 40, 60, 0.9);
-      border: 1px solid #444;
+      background: linear-gradient(180deg, rgba(30, 25, 14, 0.9) 0%, rgba(20, 16, 8, 0.95) 100%);
+      border: 1px solid rgba(180, 150, 80, 0.12);
       border-radius: 3px;
-      color: #aaa;
-      font: bold 10px monospace;
+      color: rgba(200, 185, 150, 0.65);
+      font: 600 9px 'Raleway', sans-serif;
+      letter-spacing: 0.5px;
       padding: 5px 0;
       cursor: pointer;
       text-align: center;
-      transition: border-color 0.1s, color 0.1s;
+      transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
       margin-bottom: 2px;
     }
-    .tool-btn:hover { border-color: #888; color: #ddd; }
-    .tool-btn.active { border-color: #ff8c00; color: #ffaa33; background: rgba(80, 60, 20, 0.6); }
+    .tool-btn:hover {
+      border-color: rgba(200, 168, 76, 0.3);
+      color: rgba(230, 210, 170, 0.9);
+    }
+    .tool-btn.active {
+      border-color: rgba(200, 168, 76, 0.5);
+      color: #c9a84c;
+      background: linear-gradient(180deg, rgba(60, 48, 18, 0.7) 0%, rgba(35, 28, 10, 0.8) 100%);
+      box-shadow: 0 0 6px rgba(200, 168, 76, 0.15), inset 0 1px 0 rgba(200, 168, 76, 0.08);
+    }
 
     /* Power buttons in sidebar */
     .power-list {
@@ -729,39 +747,46 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      background: rgba(40, 40, 60, 0.9);
-      border: 1px solid #444;
+      background: linear-gradient(180deg, rgba(30, 25, 14, 0.9) 0%, rgba(20, 16, 8, 0.95) 100%);
+      border: 1px solid rgba(180, 150, 80, 0.1);
       border-radius: 3px;
-      padding: 4px 6px;
+      padding: 5px 6px;
       cursor: pointer;
-      transition: border-color 0.15s, opacity 0.15s;
+      transition: border-color 0.15s, opacity 0.15s, background 0.15s, box-shadow 0.15s;
     }
-    .power-btn:hover { border-color: #888; }
-    .power-btn.disabled { opacity: 0.35; cursor: default; }
-    .power-btn.active { border-color: #ff8c00; box-shadow: 0 0 4px rgba(255,140,0,0.4); }
+    .power-btn:hover {
+      border-color: rgba(200, 168, 76, 0.3);
+      background: linear-gradient(180deg, rgba(40, 33, 16, 0.9) 0%, rgba(25, 20, 10, 0.95) 100%);
+    }
+    .power-btn.disabled { opacity: 0.45; cursor: default; }
+    .power-btn.active {
+      border-color: rgba(200, 168, 76, 0.6);
+      box-shadow: 0 0 8px rgba(200, 168, 76, 0.25), inset 0 1px 0 rgba(200, 168, 76, 0.1);
+      background: linear-gradient(180deg, rgba(55, 44, 16, 0.9) 0%, rgba(35, 28, 10, 0.95) 100%);
+    }
     .power-hotkey {
       font: bold 10px monospace;
-      color: #ff8c00;
+      color: #c9a84c;
       width: 12px;
       text-align: center;
     }
     .power-name {
-      font: bold 9px monospace;
-      color: #ddd;
+      font: 600 9px 'Raleway', sans-serif;
+      color: rgba(220, 205, 170, 0.85);
       flex: 1;
     }
     .power-cost {
       font: 9px monospace;
-      color: #8af;
+      color: rgba(120, 170, 240, 0.7);
     }
 
     /* Stats */
     .stat-line {
-      font: 10px monospace;
-      color: #888;
-      line-height: 1.4;
+      font: 10px 'Raleway', sans-serif;
+      color: rgba(200, 185, 150, 0.5);
+      line-height: 1.5;
     }
-    .stat-val { color: #ccc; }
+    .stat-val { color: rgba(220, 205, 170, 0.85); font-weight: 600; }
 
     /* Slider rows */
     .sb-slider-row {
@@ -775,67 +800,73 @@
       appearance: none;
       flex: 1;
       height: 3px;
-      background: #333;
+      background: rgba(180, 150, 80, 0.12);
       border-radius: 2px;
       outline: none;
       cursor: pointer;
     }
     .sb-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 8px; height: 8px;
+      width: 10px; height: 10px;
       border-radius: 50%;
-      background: #aaa;
+      background: #c9a84c;
       cursor: pointer;
+      box-shadow: 0 0 4px rgba(200, 168, 76, 0.3);
     }
     .sb-slider::-moz-range-thumb {
-      width: 8px; height: 8px;
+      width: 10px; height: 10px;
       border-radius: 50%;
-      background: #aaa;
+      background: #c9a84c;
       border: none;
       cursor: pointer;
+      box-shadow: 0 0 4px rgba(200, 168, 76, 0.3);
     }
     .sb-icon-btn {
       background: none;
       border: none;
-      color: #888;
+      color: rgba(200, 168, 76, 0.5);
       font: 12px monospace;
       cursor: pointer;
       padding: 0;
       line-height: 1;
     }
-    .sb-icon-btn:hover { color: #ccc; }
+    .sb-icon-btn:hover { color: #c9a84c; }
 
     /* Settings toggle buttons */
     .setting-btn {
       width: 100%;
-      background: rgba(40, 40, 60, 0.9);
-      border: 1px solid #444;
+      background: linear-gradient(180deg, rgba(30, 25, 14, 0.9) 0%, rgba(20, 16, 8, 0.95) 100%);
+      border: 1px solid rgba(180, 150, 80, 0.1);
       border-radius: 3px;
-      color: #888;
-      font: bold 9px monospace;
-      padding: 4px 6px;
+      color: rgba(200, 185, 150, 0.5);
+      font: 600 9px 'Raleway', sans-serif;
+      padding: 5px 6px;
       cursor: pointer;
       text-align: left;
-      transition: border-color 0.1s, color 0.1s;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
       margin-bottom: 2px;
     }
-    .setting-btn:hover { border-color: #888; color: #ddd; }
-    .setting-btn.on { border-color: #4a4; color: #6d6; background: rgba(40, 80, 40, 0.5); }
+    .setting-btn:hover { border-color: rgba(200, 168, 76, 0.3); color: rgba(220, 205, 170, 0.8); }
+    .setting-btn.on {
+      border-color: rgba(200, 168, 76, 0.4);
+      color: #c9a84c;
+      background: linear-gradient(180deg, rgba(50, 40, 16, 0.6) 0%, rgba(30, 24, 8, 0.7) 100%);
+    }
 
     .sb-music-vol { padding: 4px 0 2px 0; }
 
     /* Gear button */
     .gear-btn {
       background: none;
-      border: 1px solid #444;
+      border: 1px solid rgba(180, 150, 80, 0.15);
       border-radius: 3px;
-      color: #888;
+      color: rgba(200, 168, 76, 0.4);
       font-size: 18px;
       cursor: pointer;
       padding: 3px 12px;
       transition: color 0.15s, border-color 0.15s;
     }
-    .gear-btn:hover { color: #ddd; border-color: #888; }
+    .gear-btn:hover { color: #c9a84c; border-color: rgba(200, 168, 76, 0.4); }
 
     /* Settings popup */
     .settings-popup {
@@ -844,20 +875,21 @@
       left: 170px;
       bottom: 60px;
       width: 180px;
-      background: rgba(15, 15, 30, 0.95);
-      border: 1px solid #444;
+      background: linear-gradient(180deg, rgba(18, 15, 8, 0.97) 0%, rgba(12, 10, 6, 0.98) 100%);
+      border: 1px solid rgba(180, 150, 80, 0.15);
       border-radius: 6px;
       padding: 10px;
       z-index: 30;
       flex-direction: column;
       gap: 4px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 1px rgba(200, 168, 76, 0.1);
     }
     .settings-popup.visible { display: flex; }
     .settings-title {
-      font: bold 10px monospace;
-      color: #666;
+      font: 600 8px 'Raleway', sans-serif;
+      color: rgba(200, 168, 76, 0.5);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
       margin-bottom: 4px;
     }
 
@@ -873,15 +905,15 @@
     }
     #name-prompt-overlay.visible { display: flex; }
     #name-prompt-modal {
-      background: radial-gradient(ellipse at center, rgba(15, 15, 40, 0.97) 0%, rgba(8, 8, 22, 0.99) 100%);
-      border: 1px solid rgba(100, 140, 255, 0.25);
+      background: radial-gradient(ellipse at center, rgba(18, 14, 8, 0.97) 0%, rgba(10, 8, 5, 0.99) 100%);
+      border: 1px solid rgba(200, 168, 76, 0.25);
       border-radius: 12px;
       padding: 32px 40px;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 16px;
-      box-shadow: 0 0 60px rgba(40, 60, 120, 0.25), 0 0 120px rgba(30, 50, 100, 0.1);
+      box-shadow: 0 0 60px rgba(160, 120, 40, 0.2), 0 0 120px rgba(120, 90, 30, 0.08);
       animation: namePromptIn 0.3s ease-out;
     }
     @keyframes namePromptIn {
@@ -890,14 +922,14 @@
     }
     #name-prompt-header {
       font: 600 13px 'Raleway', sans-serif;
-      color: #8ab;
+      color: #c9a84c;
       text-transform: uppercase;
       letter-spacing: 3px;
     }
     #name-prompt-input {
-      background: rgba(5, 5, 20, 0.8);
-      color: #b8d8ff;
-      border: 1px solid rgba(100, 140, 255, 0.25);
+      background: rgba(8, 6, 3, 0.8);
+      color: #e0d4b8;
+      border: 1px solid rgba(200, 168, 76, 0.25);
       border-radius: 6px;
       padding: 10px 16px;
       font: 15px 'Raleway', sans-serif;
@@ -908,17 +940,17 @@
     }
     #name-prompt-input:focus {
       outline: none;
-      border-color: rgba(100, 140, 255, 0.5);
-      box-shadow: 0 0 15px rgba(68, 136, 255, 0.15);
+      border-color: rgba(200, 168, 76, 0.5);
+      box-shadow: 0 0 15px rgba(200, 168, 76, 0.15);
     }
     #name-prompt-input::placeholder {
-      color: rgba(100, 130, 180, 0.35);
+      color: rgba(160, 140, 100, 0.35);
       letter-spacing: 2px;
     }
     #name-prompt-btn {
-      background: linear-gradient(180deg, rgba(30, 50, 100, 0.9) 0%, rgba(18, 32, 70, 0.95) 100%);
-      color: rgba(180, 210, 255, 0.9);
-      border: 1px solid rgba(80, 130, 255, 0.25);
+      background: linear-gradient(180deg, rgba(50, 40, 18, 0.9) 0%, rgba(30, 24, 10, 0.95) 100%);
+      color: rgba(220, 200, 150, 0.9);
+      border: 1px solid rgba(200, 168, 76, 0.25);
       border-radius: 6px;
       padding: 10px 32px;
       font: 600 12px 'Raleway', sans-serif;
@@ -928,10 +960,10 @@
       transition: all 0.25s;
     }
     #name-prompt-btn:hover {
-      background: linear-gradient(180deg, rgba(40, 65, 130, 0.95) 0%, rgba(25, 45, 95, 0.95) 100%);
-      border-color: rgba(100, 160, 255, 0.5);
-      box-shadow: 0 0 25px rgba(68, 136, 255, 0.2);
-      color: #fff;
+      background: linear-gradient(180deg, rgba(70, 55, 22, 0.95) 0%, rgba(45, 36, 14, 0.95) 100%);
+      border-color: rgba(200, 168, 76, 0.5);
+      box-shadow: 0 0 25px rgba(200, 168, 76, 0.2);
+      color: #fff5e0;
     }
     #name-prompt-btn:active { transform: scale(0.97); }
 
@@ -947,8 +979,8 @@
     }
     #guide-overlay.visible { display: flex; }
     #guide-modal {
-      background: rgba(12, 14, 28, 0.97);
-      border: 1px solid #444;
+      background: rgba(14, 12, 8, 0.97);
+      border: 1px solid rgba(180, 150, 80, 0.2);
       border-radius: 8px;
       width: 680px;
       max-width: 90vw;
@@ -962,17 +994,17 @@
       justify-content: space-between;
       align-items: center;
       padding: 12px 16px;
-      border-bottom: 1px solid #333;
+      border-bottom: 1px solid rgba(180, 150, 80, 0.15);
     }
     #guide-header span {
       font: bold 13px 'Raleway', monospace;
-      color: #8ab;
+      color: #c9a84c;
       text-transform: uppercase;
       letter-spacing: 2px;
     }
     #guide-close {
       background: none;
-      border: 1px solid #444;
+      border: 1px solid rgba(180, 150, 80, 0.2);
       border-radius: 3px;
       color: #888;
       font: 14px monospace;
@@ -987,22 +1019,22 @@
       font: 13px/1.7 'Raleway', sans-serif;
       color: #c0c8d8;
     }
-    #guide-body h1 { font: bold 18px 'Raleway', sans-serif; color: #8af; margin: 0 0 12px 0; }
-    #guide-body h2 { font: bold 15px 'Raleway', sans-serif; color: #8ab; margin: 20px 0 8px 0; border-bottom: 1px solid #282828; padding-bottom: 4px; }
-    #guide-body h3 { font: bold 13px 'Raleway', sans-serif; color: #9ac; margin: 14px 0 6px 0; }
+    #guide-body h1 { font: bold 18px 'Raleway', sans-serif; color: #c9a84c; margin: 0 0 12px 0; }
+    #guide-body h2 { font: bold 15px 'Raleway', sans-serif; color: #b89840; margin: 20px 0 8px 0; border-bottom: 1px solid rgba(180, 150, 80, 0.12); padding-bottom: 4px; }
+    #guide-body h3 { font: bold 13px 'Raleway', sans-serif; color: #c4a860; margin: 14px 0 6px 0; }
     #guide-body p { margin: 0 0 8px 0; }
     #guide-body ul, #guide-body ol { margin: 0 0 8px 0; padding-left: 20px; }
     #guide-body li { margin-bottom: 3px; }
     #guide-body strong { color: #d0d8e8; }
-    #guide-body code { background: rgba(255,255,255,0.07); padding: 1px 4px; border-radius: 2px; font: 12px monospace; color: #aab; }
+    #guide-body code { background: rgba(200, 168, 76, 0.08); padding: 1px 4px; border-radius: 2px; font: 12px monospace; color: #b8a070; }
     #guide-body table { border-collapse: collapse; margin: 8px 0; width: 100%; font-size: 12px; }
-    #guide-body th { text-align: left; padding: 4px 8px; border-bottom: 1px solid #444; color: #8ab; font-weight: bold; }
-    #guide-body td { padding: 3px 8px; border-bottom: 1px solid #1e1e2e; }
+    #guide-body th { text-align: left; padding: 4px 8px; border-bottom: 1px solid rgba(180, 150, 80, 0.2); color: #c9a84c; font-weight: bold; }
+    #guide-body td { padding: 3px 8px; border-bottom: 1px solid rgba(180, 150, 80, 0.06); }
     #guide-body tr:hover td { background: rgba(255,255,255,0.03); }
     #guide-body::-webkit-scrollbar { width: 6px; }
     #guide-body::-webkit-scrollbar-track { background: transparent; }
-    #guide-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-    #guide-body::-webkit-scrollbar-thumb:hover { background: #555; }
+    #guide-body::-webkit-scrollbar-thumb { background: rgba(180, 150, 80, 0.2); border-radius: 3px; }
+    #guide-body::-webkit-scrollbar-thumb:hover { background: rgba(180, 150, 80, 0.35); }
 
     /* Sidebar bottom links */
     .sb-bottom-links {
@@ -1015,22 +1047,22 @@
     .sb-bottom-link {
       background: none;
       border: none;
-      color: #555;
-      font: 8px monospace;
+      color: rgba(200, 168, 76, 0.5);
+      font: 500 8px 'Raleway', sans-serif;
       cursor: pointer;
       padding: 0;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
       transition: color 0.15s;
     }
-    .sb-bottom-link:hover { color: #aaa; }
-    .sb-bottom-sep { color: #333; font: 8px monospace; }
+    .sb-bottom-link:hover { color: rgba(200, 168, 76, 0.7); }
+    .sb-bottom-sep { color: rgba(180, 150, 80, 0.3); font: 8px monospace; }
 
     /* Lobby how-to-play link */
     .lobby-guide-link {
       background: none;
       border: none;
-      color: rgba(140, 175, 240, 0.5);
+      color: rgba(200, 175, 120, 0.5);
       font: 300 11px 'Raleway', sans-serif;
       letter-spacing: 1px;
       cursor: pointer;
@@ -1039,18 +1071,18 @@
       transition: color 0.2s;
       text-decoration: underline;
       text-underline-offset: 3px;
-      text-decoration-color: rgba(140, 175, 240, 0.2);
+      text-decoration-color: rgba(200, 175, 120, 0.2);
     }
-    .lobby-guide-link:hover { color: rgba(150, 190, 255, 0.85); text-decoration-color: rgba(150, 190, 255, 0.4); }
+    .lobby-guide-link:hover { color: rgba(220, 195, 140, 0.85); text-decoration-color: rgba(220, 195, 140, 0.4); }
   </style>
 </head>
 <body>
   <canvas id="lobby-bg"></canvas>
   <div id="lobby">
     <div class="lobby-box">
-      <h1>POPULOUS</h1>
-      <div class="title-sub">Reborn</div>
-      <div class="subtitle">Multiplayer God Game</div>
+      <h1>THE FLATTENING</h1>
+      <div class="title-rule"></div>
+      <div class="subtitle">Reshape the World</div>
 
       <div class="lobby-name-row">
         <label for="player-name">Your Name</label>
@@ -1187,7 +1219,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <!-- Population (dynamically built) -->
-    <div class="sb-section" id="pop-section">
+    <div class="sb-section" id="pop-section" style="padding-top:2px;padding-bottom:8px">
       <div class="sb-label">Population</div>
       <div id="pop-bars"></div>
     </div>
@@ -1224,32 +1256,24 @@
     </div>
 
     <!-- Tools -->
-    <div class="sb-section">
+    <div class="sb-section" style="border-bottom:none">
       <div class="sb-label">Tools</div>
-      <button id="btn-magnet" class="tool-btn">Magnet (F)</button>
+      <button id="btn-magnet" class="tool-btn">Beacon (F)</button>
       <button id="btn-inspect" class="tool-btn">Inspect (I)</button>
     </div>
 
-    <!-- Stats -->
-    <div class="sb-section">
-      <div class="sb-label">Your Team</div>
-      <div class="stat-line">Settlements: <span id="stat-my-set" class="stat-val">0</span></div>
-      <div class="stat-line">Walkers: <span id="stat-my-walk" class="stat-val">0</span></div>
-    </div>
-    <div class="sb-section" id="opp-stats-section">
-      <div class="sb-label">Opponents</div>
-      <div id="opp-stats"></div>
-    </div>
+    <!-- Spacer pushes bottom links down -->
+    <div style="flex:1"></div>
 
-    <!-- Bottom: Settings / Guide / FPS -->
-    <div class="sb-section" style="border-bottom:none">
+    <!-- Bottom: Settings / Guide / FPS — pinned -->
+    <div class="sb-section sb-bottom-section">
       <div class="sb-bottom-links">
         <button id="btn-settings-gear" class="sb-bottom-link" title="Settings">Settings</button>
         <span class="sb-bottom-sep">|</span>
         <button id="sidebar-guide-btn" class="sb-bottom-link" title="How to Play">How to Play</button>
       </div>
-      <div class="stat-line" style="text-align:center;margin-top:4px">
-        <span style="color:#444;font-size:8px">FPS: <span id="perf-fps" class="stat-val" style="font-size:8px">--</span> &middot; <span id="perf-frame" class="stat-val" style="font-size:8px">--</span>ms</span>
+      <div style="text-align:center;margin-top:3px">
+        <span style="color:rgba(200,168,76,0.35);font-size:7px;font-family:'Raleway',sans-serif">FPS <span id="perf-fps" style="font-family:monospace;font-size:7px;color:rgba(200,168,76,0.45)">--</span> &middot; <span id="perf-frame" style="font-family:monospace;font-size:7px;color:rgba(200,168,76,0.45)">--</span>ms</span>
       </div>
     </div>
   </div>
@@ -1277,7 +1301,7 @@
     <div id="name-prompt-modal">
       <div id="name-prompt-header">Enter Your Name</div>
       <input id="name-prompt-input" type="text" maxlength="16" placeholder="Your name..." autofocus>
-      <button id="name-prompt-btn">Enter the Realm</button>
+      <button id="name-prompt-btn">Shape the Earth</button>
     </div>
   </div>
 

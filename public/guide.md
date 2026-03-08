@@ -1,4 +1,4 @@
-# How to Play Populous: Reborn
+# How to Play The Flattening
 
 ## Goal
 Wipe out all opposing civilizations. The last team with population standing wins.
@@ -9,7 +9,7 @@ Wipe out all opposing civilizations. The last team with population standing wins
 |--------|-------|
 | **Raise terrain** | Left-click |
 | **Lower terrain** | Right-click |
-| **Move papal magnet** | Shift + Left-click |
+| **Move beacon** | Shift + Left-click |
 | **Pan camera** | Middle-click drag / Arrow keys / Edge of screen |
 | **Zoom** | Mouse wheel |
 | **Toggle grid** | G |
@@ -22,9 +22,9 @@ Wipe out all opposing civilizations. The last team with population standing wins
 Your walkers obey whichever mode you select:
 
 - **Settle (1)** — Walkers seek flat land and build settlements. Settlements at capacity eject new walkers after 15 seconds.
-- **Magnet (2)** — Walkers walk toward the papal magnet (your flag). Move it with Shift+Click.
+- **Magnet (2)** — Walkers walk toward the beacon (your flag). Move it with Shift+Click.
 - **Fight (3)** — Walkers march toward the nearest enemy walker or settlement.
-- **Gather (4)** — Walkers gather near the magnet, useful for amassing forces before switching to Fight.
+- **Gather (4)** — Walkers gather near the beacon, useful for amassing forces before switching to Fight.
 
 ## Terrain
 
@@ -74,10 +74,10 @@ Walkers are your people. They move across the map, fight enemies, and build sett
 - **Same-team walkers** that collide merge their strength (max 255) and keep the higher tech.
 - **Enemy walkers** that collide fight — the stronger one survives with reduced strength. Tech advantage multiplies effective strength.
 
-### Leaders & the Papal Magnet
-- When a walker moves near the papal magnet and no leader exists, it becomes the **Leader** (shown with a gold crown).
+### Leaders & the Beacon
+- When a walker moves near the beacon and no leader exists, it becomes the **Leader** (shown with a gold crown).
 - The Leader is required for the **Knight** power.
-- When a Leader dies, the magnet drops at their death location and **locks** — you cannot move it until a new leader is assigned.
+- When a Leader dies, the beacon drops at their death location and **locks** — you cannot move it until a new leader is assigned.
 
 ## Mana
 

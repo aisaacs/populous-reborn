@@ -30,22 +30,22 @@ Dual-environment: loaded as `<script>` tag on client (globals), `require()` on s
 - **Modes:** `MODE_SETTLE=0`, `MODE_MAGNET=1`, `MODE_FIGHT=2`, `MODE_GATHER=3`
 - **Gameplay:** `WALKER_SPEED=0.8`, `MAX_LEVEL=9`, `LEVEL_CAPACITY=[0,4,8,15,30,55,90,140,200,255]`
 - **Settlement Levels:** `SETTLEMENT_LEVELS` array (index 0=null, 1-9) with `{name, minCrops, capacity, tech, sprite, footprint}`. 9 levels: tent→hut→cottage→house→largehouse→manor→towerhouse→fortress→castle. Castle (level 9) has 5×5 footprint, all others 1×1.
-- **Powers:** `POWERS` array of `{id, name, cost, hotkey, targeted}` for 6 powers; `EARTHQUAKE_RADIUS=7`, `VOLCANO_RADIUS=5`, `KNIGHT_STRENGTH_MULT=2`, `KNIGHT_SPEED_MULT=1.5`, `KNIGHT_ATTRITION_PER_SEC=0.5`
+- **Powers:** `POWERS` array of `{id, name, cost, hotkey, targeted}` for 6 powers; `EARTHQUAKE_RADIUS=7`, `VOLCANO_RADIUS=5`, `KNIGHT_STRENGTH_MULT=1.75`, `KNIGHT_SPEED_MULT=1.5`, `KNIGHT_ATTRITION_PER_SEC=0.5`, `KNIGHT_ASSAULT_MULT=8` (fixed siege damage multiplier), `KNIGHT_RETAL_MULT=2` (settlements deal 2× retaliation to knights)
 - **Terrain:** `TERRAIN_TREES=0.06`, `TERRAIN_PEBBLES=0.04`, `TERRAIN_RAISE_COST=1`, `TERRAIN_LOWER_COST=1`
 - **Crops:** `CROP_ZONE_RADIUS=2` (5×5 zone), `CROP_LEVEL_THRESHOLDS=[0,0,2,4,7,10,13,17,20,24]`, `GROWTH_PER_CROP_PER_SEC=0.1`
 - **Ejection:** `EJECT_DWELL_TIME=15` (seconds at cap), `EJECT_FRACTION=0.5`, `EJECT_MIN_STRENGTH=2`
 - **Mana:** `MANA_PER_POP_PER_SEC=0.0075`, `MANA_MAX=6000`
-- **Combat:** `TECH_ADVANTAGE_MULT=1.5` (damage multiplier per tech level difference), `WALKER_ATTRITION_PER_SEC=0.05`, `ASSAULT_DMG_PER_SEC=3`, `ASSAULT_RETALIATE_FRAC=0.5`
+- **Combat:** `TECH_ADVANTAGE_MULT=1.5` (damage multiplier per tech level difference), `WALKER_ATTRITION_PER_SEC=0.05`, `HOMELESS_ATTRITION_PER_SEC=0.5` (walkers with no settlements), `ASSAULT_DMG_PER_SEC=3`, `ASSAULT_RETALIATE_FRAC=0.5`
 - **Build proximity:** `BUILD_PROXIMITY_RADIUS=6`
 - **Start:** `START_WALKERS=3`, `START_STRENGTH=5`, `START_MANA=50`
 - **Tick:** `TICK_RATE=20`, `TICK_INTERVAL=50`
 
 ### Server (`server.js`)
 - **HTTP:** Serves `public/` at root and `shared/` at `/shared/` using raw `http` + `fs` (no Express). MIME types for `.html`, `.js`, `.css`, `.mp3`, `.png`, `.jpg`, `.json`, `.md`.
-- **Rooms:** Map of 4-letter room codes to game instances. Supports public/private rooms, variable player counts (2-6), AI players, and three map sizes.
+- **Rooms:** Map of 4-letter room codes to game instances. Supports public/private rooms, variable player counts (2-6), AI players, three map sizes, and four terrain types.
 - **Lobby:** Game browser, lobby chat, room chat, waiting room with player list, add/remove AI, host-controlled game start.
 - **Simulation:** Runs at 20Hz tick rate. All game logic lives server-side. Every function takes `state` as first parameter.
-- **Game state** (`createGameState`): `heights` 2D array, `walkers[]`, `settlements[]`, `settlementMap` Int32Array, `walkerGrid`, `teamMode[]`, `magnetPos[]`, `magnetLocked[]`, `mana[]`, `swamps[]`, `swampSet`, `rocks` Set, `trees` Set, `pebbles` Set, `ruins[]`, `ruinSet`, `crops[]`, `cropCounts[]`, `cropOwnerMap` Int32Array, `fires[]`, `seaLevel` (mutable), `leaders[]`, `eliminated[]`, `spawnZones[]`, `armageddon` bool, timers, `nextWalkerId`, `gameOver`, `winner`, plus delta tracking fields (`_prev*`).
+- **Game state** (`createGameState`): `heights` 2D array, `walkers[]`, `settlements[]`, `settlementMap` Int32Array, `walkerGrid`, `teamMode[]`, `magnetPos[]`, `magnetLocked[]`, `mana[]`, `swamps[]`, `swampSet`, `rocks` Set, `trees` Set, `pebbles` Set, `ruins[]`, `ruinSet`, `crops[]`, `cropCounts[]`, `cropOwnerMap` Int32Array, `fires[]`, `seaLevel` (mutable), `leaders[]`, `eliminated[]`, `spawnZones[]`, `teamHadSettlement[]`, `armageddon` bool, `terrainType`, timers, `nextWalkerId`, `gameOver`, `winner`, plus delta tracking fields (`_prev*`).
 - **WebSocket protocol:**
   - Client sends: `set_name`, `create`, `create_ai`, `join`, `start_game`, `add_ai`, `remove_ai`, `raise`, `lower`, `mode`, `magnet`, `power`, `resync`, `lobby_chat`, `room_chat`, `request_game_list`, `admin_subscribe`, `godmode`
   - Server sends: `created`, `joined`, `start`, `state` (20/sec, full or delta), `gameover`, `error`, `game_list`, `lobby_chat`, `room_chat`, `waiting_update`, `admin_snapshot`
@@ -71,21 +71,23 @@ The server uses delta compression to reduce bandwidth by ~98%. Instead of sendin
 
 #### Terrain System
 - `heights[x][y]` — height point grid (mapW+1 x mapH+1), values 0 to MAX_HEIGHT
-- `raisePoint`/`lowerPoint` — modify single point, cascade adjacency constraint (max 1 diff between neighbors). Costs `TERRAIN_RAISE_COST`/`TERRAIN_LOWER_COST` mana (1 each). Restricted by build proximity (`canBuildAtPoint`). Also clears pebbles and ruins on affected tiles.
+- **Height constraints:** All 8 neighbors (cardinal + diagonal) must differ by at most 1. Additionally, no "saddle" tiles allowed (opposite corners equal but different from other pair: `t===b && r===l && t!==r`). Enforced by `enforceAdjacency`, `raisePoint`, and `lowerPoint`. Helper constants `NB8_OFFSETS`, `TILE_OFFSETS` and functions `isSaddleTile`, `fixSaddleRaise`, `fixSaddleLower`.
+- `raisePoint`/`lowerPoint` — modify single point, BFS cascade for adjacency + saddle constraints. Costs `TERRAIN_RAISE_COST`/`TERRAIN_LOWER_COST` mana (1 each). Restricted by build proximity (`canBuildAtPoint`). Also clears pebbles and ruins on affected tiles.
 - **Build proximity:** `canBuildAtPoint(state, team, px, py)` — terraforming only allowed within `BUILD_PROXIMITY_RADIUS=6` of own walkers or settlements. Prevents cross-map manipulation.
 - `isTileWater` — all 4 corners <= seaLevel
 - `isTileFlat` — all 4 corners equal AND > seaLevel AND not a rock/pebble tile
-- `generateTerrain` — procedural island generation with noise + multi-center blob masks + `enforceAdjacency`. Retries up to 20 times until all spawn zones have 5×5 flat areas. Scatters rocks (`TERRAIN_ROCKS=0.03`), trees, and pebbles.
+- **Terrain type presets:** `TERRAIN_TYPE_PRESETS` in constants — continental (default), archipelago (high sea level, fragmented islands), mountains (steep, rocky), flatlands (gentle terrain, many trees). Each preset defines noise, height, mask, scatter, and sea level parameters. Selected at room creation.
+- `generateTerrain` — procedural island generation with noise + multi-center blob masks + `enforceAdjacency`. Uses terrain type preset for all parameters. Force-flattens spawn areas after generation. Retries up to 20 times until all spawn zones have 5×5 flat areas. Scatters rocks, trees, and pebbles at preset-defined rates.
 - `invalidateSwamps`/`invalidateRocks`/`invalidateTrees`/`invalidatePebbles`/`invalidateRuins` — remove entities on invalid tiles (submerged, terrain changed). Called after terrain-altering operations.
-- Trees: scattered at `TERRAIN_TREES` rate on land tiles (excluding spawn zones). Soft obstacles — auto-cleared by settlements and crop zones.
-- Pebbles: scattered at `TERRAIN_PEBBLES` rate. Block tile flatness (prevent settlement/crops). Cleared by terrain modification.
+- Trees: scattered at preset `treeRate` on land tiles (excluding spawn zones). Soft obstacles — auto-cleared by settlements and crop zones.
+- Pebbles: scattered at preset `pebbleRate`. Block tile flatness (prevent settlement/crops). Cleared by terrain modification.
 - Ruins: left behind when knights destroy settlements. Block tile settleability. Cleared by terrain modification.
 
 #### Walker System
 - Walkers have: `id`, `team`, `strength` (0-255), `x/y` (float position), `tx/ty` (target), `dead`, `tech` (0-4, inherited from settlement), optional `isLeader`/`isKnight`, `attritionFrac` (accumulator)
 - Targeting by team mode: `pickSettleTarget`, `pickMagnetTarget`, `pickFightTarget`, `pickGatherTarget`, `pickRandomTarget`
 - `isTileSettleable` — tile must be flat, not in a settlement footprint, not claimed by cropOwnerMap, not a ruin, not adjacent to rocks
-- Knights always use `pickFightTarget`, move at `WALKER_SPEED * KNIGHT_SPEED_MULT`, immune to swamps, avoid swamps via perpendicular dodge, higher attrition (`KNIGHT_ATTRITION_PER_SEC=0.5`)
+- Knights always use `pickFightTarget` (player cannot steer them), move at `WALKER_SPEED * KNIGHT_SPEED_MULT`, immune to swamps, avoid swamps via perpendicular dodge, higher attrition (`KNIGHT_ATTRITION_PER_SEC=0.5`)
 - Leaders: auto-assigned when walker is within radius 2 of team's magnet and no leader exists. Cleared on death in `pruneDeadEntities`.
 - **Papal magnet lifecycle:** `magnetLocked[team]` state. When leader dies, magnet drops at leader's death location and becomes locked. Locked magnet cannot be moved by player. When a new leader is assigned (walker near magnet), magnet unlocks.
 - Armageddon: all walkers use `pickArmageddonTarget` (head to map center, fight when near), auto-raise terrain when blocked by water
@@ -96,7 +98,9 @@ The server uses delta compression to reduce bandwidth by ~98%. Instead of sendin
 #### Combat System
 - **Tech advantage:** Each tech level difference gives a `TECH_ADVANTAGE_MULT` (1.5×) damage multiplier. Walker tech inherited from settlement level at ejection.
 - **Walker vs walker:** Effective strength = `strength × 1.5^(techAdvantage)`. Higher effective strength wins. Survivor keeps remainder adjusted for tech ratio.
-- **Settlement assault:** Walkers on enemy settlements deal `ASSAULT_DMG_PER_SEC` damage per tick (modified by tech and walker strength). Settlement retaliates at `ASSAULT_RETALIATE_FRAC`. When population reaches 0: best attacker captures (or knight destroys + leaves ruins + fire). Uses fractional accumulators for sub-integer damage.
+- **Settlement assault:** Walkers on enemy settlements deal `ASSAULT_DMG_PER_SEC` damage per tick (modified by tech and walker strength via `strMult = strength/5`). Settlement retaliates at `ASSAULT_RETALIATE_FRAC`. When population reaches 0: best attacker captures (or knight destroys + leaves ruins + fire). Uses fractional accumulators for sub-integer damage.
+- **Knight siege:** Knights use fixed `KNIGHT_ASSAULT_MULT=8` instead of strength-based damage, creating a gradual siege rather than instant destruction. Settlements deal `KNIGHT_RETAL_MULT=2×` retaliation to knights. Both sides trade damage over time — small settlements fall quickly with minimal knight loss, but fortresses/castles deal heavy damage and can kill knights.
+- **Homeless attrition:** `HOMELESS_ATTRITION_PER_SEC=0.5` — walkers whose team once had settlements but now has none (all destroyed) suffer 10× normal attrition. Tracked via `state.teamHadSettlement[]`.
 - **Same-team merge:** Strengths sum (capped 255), highest tech kept. Knights don't merge.
 
 #### Settlement System
@@ -127,7 +131,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 | Power | Cost | Hotkey | Targeted | Function |
 |-------|------|--------|----------|----------|
 | Swamp | 60 | W | Yes | Place 3-5 swamp tiles near target; enemy walkers die on contact (knights immune) |
-| Knight | 200 | E | No | Leader at a settlement consumes it, becomes knight (2× strength, 1.5× speed, fast attrition, fights only), leaves fire |
+| Knight | 200 | E | No | Leader at a settlement consumes it, becomes knight (1.75× strength, 1.5× speed, fast attrition, auto-fights only), leaves fire |
 | Flood | 500 | T | No | Lower all terrain by 1, kill/destroy newly submerged entities |
 | Earthquake | 1500 | Q | Yes | Randomly raise/lower points 0-2 times within radius 7 |
 | Volcano | 5000 | R | Yes | Raise terrain to MAX_HEIGHT with falloff, add rock tiles, kill units in radius 5 |
@@ -142,7 +146,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - AI runs every 1.5 seconds for each AI-controlled team
 - Mode selection: settle if few settlements, fight if population advantage, gather if low walkers
 - Powers: armageddon at 2.5× pop advantage, knight when leader available, swamps near enemies, earthquake/flood/volcano probabilistically
-- Terrain flattening: raises/lowers up to 3 points near random own settlement (costs mana per click)
+- Terrain flattening: raises/lowers up to 3 points near random own settlement (costs mana per click). If no settlements, flattens near strongest walker to help it settle. Extracted to `aiTryFlatten` helper.
 
 #### Tick Loop (`startGame`)
 1. `updateWalkers` — movement, swamp check, knight swamp avoidance, leader assignment, targeting, attrition
@@ -170,7 +174,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Space background:** Dark cosmic void with 300 twinkling stars and 3 nebula glows (cached to offscreen canvas). Stars have random brightness and twinkle speed. Rare diffraction spikes.
 - **Waterfall particles:** 3000-particle pool on front map edges. Particles stored in grid coordinates with pixel offsets so they scroll with the map. Edge mist effect.
 - **Fire particles:** Spawned at burning settlement ruins (from `fires[]` in state). Intensity decreases over 5s fire lifetime.
-- **Terrain rendering:** Pre-rendered land tile cache (shape × color × swamp variants). Terrain buffer (full-map offscreen canvas) with dirty-tile tracking for incremental redraws. `detectTerrainDirty` compares typed arrays for overlay changes.
+- **Terrain rendering:** Pre-rendered land tile cache (shape × color × swamp variants, `VALID_SHAPE_KEYS` excludes saddle shapes). Terrain buffer (full-map offscreen canvas) with dirty-tile tracking for incremental redraws. `detectTerrainDirty` compares typed arrays for overlay changes.
 - **Drawing pipeline:** Space background (screen space) → zoom transform → terrain buffer blit → settlements (depth-sorted) → walkers via grid (leader crown / knight cross) → fire particles → targeting overlay → magnet flags → edge mist → waterfall particles → reset to screen space → sidebar update → minimap → population meters → inspect tooltip → armageddon/game over overlays.
 - **Overlays:** Crop tiles (per-team colors via `CROP_OVERLAY_COLORS`), swamp tiles (green-brown, baked into land tile cache), rock tiles (boulder sprite), pebble tiles (pebble sprite), ruin tiles (ruin sprite), tree tiles (tree sprite). All use Uint8Array typed arrays for O(1) lookup.
 - **Targeting mode:** `targetingPower` variable. For earthquake/volcano shows orange-tinted radius overlay. For swamp shows single-tile highlight. Click sends `{type:'power', power, x, y}`, Escape cancels.
@@ -205,7 +209,7 @@ All server-side. Cost deducted from `state.mana[team]`. Armageddon blocks all fu
 - **Mutable sea level:** `state.seaLevel` replaces the constant `SEA_LEVEL` on server, `seaLevel` variable replaces it on client, enabling the Flood power.
 - **Power validation:** Server validates power name against POWERS array, checks mana, validates coordinates for targeted powers. Some powers (`swamp`, `knight`) return false on invalid state to prevent mana deduction.
 - **Crop-based settlement levels:** Settlement level determined by count of flat tiles in zone, not by flat square size. No settlement merges.
-- **Settlement assault:** Gradual siege with damage accumulators. Capture on population depletion (knight exception: destroy + ruins).
+- **Settlement assault:** Gradual siege with damage accumulators. Capture on population depletion (knight exception: destroy + ruins). Knights use fixed assault multiplier and take 2× retaliation for balanced siege gameplay.
 - **Tech inheritance:** Walkers inherit tech level from their settlement when ejected. Tech affects combat via `TECH_ADVANTAGE_MULT`.
 - **Papal magnet lifecycle:** Magnet drops and locks on leader death, unlocks when new leader assigned. Prevents magnet manipulation without a leader.
 - **localStorage persistence:** Music volume, mute state, graphics settings saved across sessions.
