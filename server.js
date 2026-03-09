@@ -47,7 +47,7 @@ const server = http.createServer((req, res) => {
 
 const PORT = process.env.PORT || 4321;
 server.listen(PORT, () => {
-  console.log(`Populous server running on http://localhost:${PORT}`);
+  console.log(`The Flattening server running on http://localhost:${PORT}`);
 });
 
 // ── Room Management ─────────────────────────────────────────────────
@@ -842,7 +842,7 @@ function pickArmageddonTarget(state, w) {
 function spawnWalker(state, team, strength, x, y, tech) {
   const w = {
     id: state.nextWalkerId++,
-    team, strength: Math.min(255, strength),
+    team, strength: Math.min(255, Math.round(strength)),
     x, y,
     tx: x, ty: y,
     dead: false,
@@ -1518,6 +1518,7 @@ function handleWalkerCollisions(state) {
       const loss = Math.floor(es.assaultFrac);
       es.assaultFrac -= loss;
       es.population -= loss;
+      queueSfx(state, 'combat', -1, es.tx, es.ty);
     }
 
     const popScale = Math.max(0.2, es.population / 20);
@@ -2148,6 +2149,7 @@ function executePowerSwamp(state, team, tx, ty) {
     const key = sx + ',' + sy;
     if (state.swampSet.has(key)) continue;
     if (!isTileFlat(state, sx, sy)) continue;
+    if (state.settlementMap[sy * state.mapW + sx] >= 0) continue;
     state.swamps.push({ x: sx, y: sy, team });
     state.swampSet.add(key);
     placed.push(key);
@@ -2172,7 +2174,7 @@ function executePowerKnight(state, team) {
   if (hostSettlement) {
     const sx = hostSettlement.tx + 0.5;
     const sy = hostSettlement.ty + 0.5;
-    const knightStrength = Math.min(255, hostSettlement.population * C.KNIGHT_STRENGTH_MULT);
+    const knightStrength = Math.min(255, Math.round(hostSettlement.population * C.KNIGHT_STRENGTH_MULT));
     const sTech = C.SETTLEMENT_LEVELS[hostSettlement.level] ? C.SETTLEMENT_LEVELS[hostSettlement.level].tech : 0;
 
     const knight = spawnWalker(state, team, knightStrength, sx, sy, sTech);
@@ -2631,10 +2633,13 @@ function startGame(room) {
 
     // Send game over
     if (state.gameOver) {
-      const winnerWs = room.players[state.winner];
-      const winnerName = winnerWs
-        ? (playerNames.get(winnerWs) || C.TEAM_NAMES[state.winner])
-        : C.TEAM_NAMES[state.winner];
+      let winnerName = null;
+      if (state.winner >= 0) {
+        const winnerWs = room.players[state.winner];
+        winnerName = winnerWs
+          ? (playerNames.get(winnerWs) || C.TEAM_NAMES[state.winner])
+          : C.TEAM_NAMES[state.winner];
+      }
       const goMsg = JSON.stringify({ type: 'gameover', winner: state.winner, winnerName });
       for (let i = 0; i < room.maxPlayers; i++) {
         const ws = room.players[i];
@@ -3069,7 +3074,14 @@ wss.on('connection', (ws) => {
         if (humansAlive <= 1 && aliveTeams.length <= 1) {
           room.state.gameOver = true;
           room.state.winner = aliveTeams.length === 1 ? aliveTeams[0] : -1;
-          const goMsg = JSON.stringify({ type: 'gameover', winner: room.state.winner });
+          let winnerName = null;
+          if (room.state.winner >= 0) {
+            const winnerWs = room.players[room.state.winner];
+            winnerName = winnerWs
+              ? (playerNames.get(winnerWs) || C.TEAM_NAMES[room.state.winner])
+              : C.TEAM_NAMES[room.state.winner];
+          }
+          const goMsg = JSON.stringify({ type: 'gameover', winner: room.state.winner, winnerName });
           for (let i = 0; i < room.maxPlayers; i++) {
             const ws2 = room.players[i];
             if (ws2 && ws2.readyState === 1) ws2.send(goMsg);

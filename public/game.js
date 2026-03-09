@@ -10,6 +10,37 @@ const TERRAIN_COLORS = {
   7: '#887755', 8: '#887755',
 };
 const SLOPE_DARKEN = 20;
+const SHADE_PER_UNIT = 12; // RGB adjustment per shade unit
+
+// Directional shade for a triangle surface facing the player
+// Corners: 0=Top(0,0), 1=Right(1,0), 2=Bottom(1,1), 3=Left(0,1)
+const _SHADE_GX = [0, 1, 1, 0];
+const _SHADE_GY = [0, 0, 1, 1];
+function triShade(ci, cj, ck, h) {
+  const ax = _SHADE_GX[ci], ay = _SHADE_GY[ci], ah = h[ci];
+  const bx = _SHADE_GX[cj], by = _SHADE_GY[cj], bh = h[cj];
+  const cx = _SHADE_GX[ck], cy = _SHADE_GY[ck], ch = h[ck];
+  const nx = (by - ay) * (ch - ah) - (bh - ah) * (cy - ay);
+  const ny = (bh - ah) * (cx - ax) - (bx - ax) * (ch - ah);
+  // Primary: toward player (1,1). Secondary: from left (1,-1) for E-W differentiation
+  return (nx + ny) + 0.3 * (nx - ny); // = 1.3*nx + 0.7*ny
+}
+
+// Terrain band index for a tile. Flat tiles use exact height.
+// Slopes use ceil(avg) so 3+1 and 2+2 tiles at the same boundary use the same terrain band.
+function tileColorIdx(t, r, b, l) {
+  if (t === r && r === b && b === l) return Math.max(1, Math.min(MAX_HEIGHT, t));
+  return Math.max(1, Math.min(MAX_HEIGHT, Math.ceil((t + r + b + l) / 4)));
+}
+
+function shadeColor(hex, shade) {
+  if (shade === 0) return hex;
+  const amt = Math.round(shade * SHADE_PER_UNIT);
+  const r = Math.max(0, Math.min(255, parseInt(hex.slice(1, 3), 16) + amt));
+  const g = Math.max(0, Math.min(255, parseInt(hex.slice(3, 5), 16) + amt));
+  const b = Math.max(0, Math.min(255, parseInt(hex.slice(5, 7), 16) + amt));
+  return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+}
 const GRID_MODES = [null, 'rgba(0,0,0,0.15)', 'rgba(255,255,255,0.25)'];
 let gridMode = 2;
 
@@ -64,10 +95,10 @@ function getTileTexture(tx, ty) {
     return terrainTextures.water;
   }
 
-  const avg = (t + r + b + l) / 4;
-  if (avg <= 1) return terrainTextures.sand;
-  if (avg <= 5) return terrainTextures.grass;
-  if (avg <= 7) return terrainTextures.rock;
+  const ci = tileColorIdx(t, r, b, l);
+  if (ci <= 1) return terrainTextures.sand;
+  if (ci <= 5) return terrainTextures.grass;
+  if (ci <= 7) return terrainTextures.rock;
   return terrainTextures.snow;
 }
 
@@ -296,16 +327,7 @@ const VALID_SHAPE_KEYS = [];
         }
 })();
 
-// Land tile color fill colors — precomputed flat/slope variants
-const LAND_FILL_COLORS = {};
-(function() {
-  for (let idx = 1; idx <= 8; idx++) {
-    LAND_FILL_COLORS[idx] = {
-      flat: TERRAIN_COLORS[idx],
-      slope: darkenColor(TERRAIN_COLORS[idx], SLOPE_DARKEN),
-    };
-  }
-})();
+// (Directional shading computed per-surface in buildLandTileFrames via triShade/shadeColor)
 
 function buildLandTileFrames() {
   const cacheSize = 81 * 18; // max shapeKey(80) * 18 + 17 = 1475
@@ -343,6 +365,42 @@ function buildLandTileFrames() {
 
     const isFlat = (dt === dr && dr === db && db === dl);
 
+    const relVals = [dt, dr, db, dl];
+
+    // Detect 3+1 tiles (3 corners at one height, 1 corner different)
+    let oddCorner = -1;
+    if (!isFlat) {
+      const cnts = {};
+      for (const v of relVals) cnts[v] = (cnts[v] || 0) + 1;
+      if (Object.values(cnts).includes(3)) {
+        for (const [val, cnt] of Object.entries(cnts)) {
+          if (cnt === 1) { oddCorner = relVals.indexOf(+val); break; }
+        }
+      }
+    }
+    const is31 = oddCorner >= 0;
+
+    // Split diagonal for 3+1: from the odd corner to its opposite
+    //   T or B odd → split T↔B (odd corner to opposite)
+    //   R or L odd → split R↔L (odd corner to opposite)
+    // For 2+2 and flat: default T↔B split
+    let tri1, tri2, tri1Idx, tri2Idx;
+    if (is31 && (oddCorner === 1 || oddCorner === 3)) {
+      // R↔L split (R or L is odd)
+      tri1 = [[topX, topY], [rightX, rightY], [leftX, leftY]];       tri1Idx = [0, 1, 3];
+      tri2 = [[rightX, rightY], [bottomX, bottomY], [leftX, leftY]]; tri2Idx = [1, 2, 3];
+    } else {
+      // T↔B split (default, and T or B odd)
+      tri1 = [[topX, topY], [rightX, rightY], [bottomX, bottomY]];   tri1Idx = [0, 1, 2];
+      tri2 = [[topX, topY], [bottomX, bottomY], [leftX, leftY]];     tri2Idx = [0, 2, 3];
+    }
+
+    // Compute directional shade per triangle
+    const h = relVals; // [dt, dr, db, dl]
+    const shade1 = isFlat ? 0 : triShade(tri1Idx[0], tri1Idx[1], tri1Idx[2], h);
+    const shade2 = isFlat ? 0 : triShade(tri2Idx[0], tri2Idx[1], tri2Idx[2], h);
+    const needsSplit = is31 || (!isFlat && shade1 !== shade2);
+
     for (let colorIdx = 1; colorIdx <= 8; colorIdx++) {
       for (let swampFlag = 0; swampFlag <= 1; swampFlag++) {
         const idx = shapeKey * 18 + (colorIdx - 1) * 2 + swampFlag;
@@ -352,20 +410,19 @@ function buildLandTileFrames() {
         c.height = ch;
         const oc = c.getContext('2d');
 
-        // Diamond path
+        const baseColor = TERRAIN_COLORS[colorIdx];
+
+        // Always fill full diamond with uniform base color (shade applied as overlay after texture)
         oc.beginPath();
         oc.moveTo(topX, topY);
         oc.lineTo(rightX, rightY);
         oc.lineTo(bottomX, bottomY);
         oc.lineTo(leftX, leftY);
         oc.closePath();
-
-        // Fill base color
-        const colors = LAND_FILL_COLORS[colorIdx];
-        oc.fillStyle = isFlat ? colors.flat : colors.slope;
+        oc.fillStyle = baseColor;
         oc.fill();
 
-        // Texture overlay (same 2-triangle affine mapping as original)
+        // Texture overlay
         if (textureOpacity > 0) {
           let tex;
           if (swampFlag) {
@@ -383,40 +440,76 @@ function buildLandTileFrames() {
           if (tex) {
             const iw = tex.width, ih = tex.height;
 
-            // Triangle 1: Top -> Right -> Bottom
+            // Texture triangle 1
             oc.save();
             oc.beginPath();
-            oc.moveTo(topX, topY);
-            oc.lineTo(rightX, rightY);
-            oc.lineTo(bottomX, bottomY);
+            oc.moveTo(tri1[0][0], tri1[0][1]);
+            oc.lineTo(tri1[1][0], tri1[1][1]);
+            oc.lineTo(tri1[2][0], tri1[2][1]);
             oc.closePath();
             oc.clip();
             oc.globalAlpha = textureOpacity;
             oc.setTransform(
-              (rightX - topX) / iw, (rightY - topY) / iw,
-              (bottomX - rightX) / ih, (bottomY - rightY) / ih,
-              topX, topY
+              (tri1[1][0] - tri1[0][0]) / iw, (tri1[1][1] - tri1[0][1]) / iw,
+              (tri1[2][0] - tri1[0][0]) / ih, (tri1[2][1] - tri1[0][1]) / ih,
+              tri1[0][0], tri1[0][1]
             );
             oc.drawImage(tex, 0, 0);
             oc.restore();
 
-            // Triangle 2: Top -> Bottom -> Left
+            // Texture triangle 2
             oc.save();
             oc.beginPath();
-            oc.moveTo(topX, topY);
-            oc.lineTo(bottomX, bottomY);
-            oc.lineTo(leftX, leftY);
+            oc.moveTo(tri2[0][0], tri2[0][1]);
+            oc.lineTo(tri2[1][0], tri2[1][1]);
+            oc.lineTo(tri2[2][0], tri2[2][1]);
             oc.closePath();
             oc.clip();
             oc.globalAlpha = textureOpacity;
             oc.setTransform(
-              (bottomX - leftX) / iw, (bottomY - leftY) / iw,
-              (leftX - topX) / ih, (leftY - topY) / ih,
-              topX, topY
+              (tri2[1][0] - tri2[0][0]) / iw, (tri2[1][1] - tri2[0][1]) / iw,
+              (tri2[2][0] - tri2[0][0]) / ih, (tri2[2][1] - tri2[0][1]) / ih,
+              tri2[0][0], tri2[0][1]
             );
             oc.drawImage(tex, 0, 0);
             oc.restore();
           }
+        }
+
+        // Directional shade overlay (applied on top of texture)
+        if (needsSplit) {
+          // Shade each triangle separately
+          if (shade1 !== 0) {
+            oc.beginPath();
+            oc.moveTo(tri1[0][0], tri1[0][1]);
+            oc.lineTo(tri1[1][0], tri1[1][1]);
+            oc.lineTo(tri1[2][0], tri1[2][1]);
+            oc.closePath();
+            const a1 = Math.min(0.35, Math.abs(shade1) * 0.12);
+            oc.fillStyle = shade1 > 0 ? 'rgba(255,255,255,' + a1 + ')' : 'rgba(0,0,0,' + a1 + ')';
+            oc.fill();
+          }
+          if (shade2 !== 0) {
+            oc.beginPath();
+            oc.moveTo(tri2[0][0], tri2[0][1]);
+            oc.lineTo(tri2[1][0], tri2[1][1]);
+            oc.lineTo(tri2[2][0], tri2[2][1]);
+            oc.closePath();
+            const a2 = Math.min(0.35, Math.abs(shade2) * 0.12);
+            oc.fillStyle = shade2 > 0 ? 'rgba(255,255,255,' + a2 + ')' : 'rgba(0,0,0,' + a2 + ')';
+            oc.fill();
+          }
+        } else if (!isFlat && shade1 !== 0) {
+          // Shade entire diamond for uniform slopes
+          oc.beginPath();
+          oc.moveTo(topX, topY);
+          oc.lineTo(rightX, rightY);
+          oc.lineTo(bottomX, bottomY);
+          oc.lineTo(leftX, leftY);
+          oc.closePath();
+          const a = Math.min(0.35, Math.abs(shade1) * 0.12);
+          oc.fillStyle = shade1 > 0 ? 'rgba(255,255,255,' + a + ')' : 'rgba(0,0,0,' + a + ')';
+          oc.fill();
         }
 
         // Swamp color overlay (baked in)
@@ -1037,11 +1130,13 @@ function getTileColor(tx, ty) {
     return WATER_COLOR;
   }
 
-  const avg = (t + r + b + l) / 4;
-  const idx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+  const idx = tileColorIdx(t, r, b, l);
   const base = TERRAIN_COLORS[idx];
   const isFlat = (t === r && r === b && b === l);
-  return isFlat ? base : darkenColor(base, SLOPE_DARKEN);
+  if (isFlat) return base;
+  const minH = Math.min(t, r, b, l);
+  const shade = triShade(0, 1, 2, [t - minH, r - minH, b - minH, l - minH]);
+  return shadeColor(base, shade);
 }
 
 function getSettlementDiamondColor(team, level) {
@@ -1116,11 +1211,15 @@ function drawTile(tx, ty) {
     ctx.lineTo(pLeftX, pLeftY);
     ctx.closePath();
 
-    const avg = (t + r + b + l) / 4;
-    const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+    const colorIdx = tileColorIdx(t, r, b, l);
     const isFlat = (t === r && r === b && b === l);
-    const colors = LAND_FILL_COLORS[colorIdx];
-    ctx.fillStyle = isFlat ? colors.flat : colors.slope;
+    if (isFlat) {
+      ctx.fillStyle = TERRAIN_COLORS[colorIdx];
+    } else {
+      const minH = Math.min(t, r, b, l);
+      const shade = triShade(0, 1, 2, [t - minH, r - minH, b - minH, l - minH]);
+      ctx.fillStyle = shadeColor(TERRAIN_COLORS[colorIdx], shade);
+    }
     ctx.fill();
 
     if (GRID_MODES[gridMode]) {
@@ -1146,8 +1245,7 @@ function drawTile(tx, ty) {
     const minH = Math.min(t, r, b, l);
     const dt = t - minH, dr = r - minH, db = b - minH, dl = l - minH;
     const shapeKey = dt * 27 + dr * 9 + db * 3 + dl;
-    const avg = (t + r + b + l) / 4;
-    const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+    const colorIdx = tileColorIdx(t, r, b, l);
     const swampFlag = swampTiles[tileIdx] ? 1 : 0;
     const cacheIdx = shapeKey * 18 + (colorIdx - 1) * 2 + swampFlag;
     const frame = landTileCache[cacheIdx];
@@ -1405,8 +1503,7 @@ function drawTileToBuffer(tx, ty) {
     const minH = Math.min(t, r, b, l);
     const dt = t - minH, dr = r - minH, db = b - minH, dl = l - minH;
     const shapeKey = dt * 27 + dr * 9 + db * 3 + dl;
-    const avg = (t + r + b + l) / 4;
-    const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+    const colorIdx = tileColorIdx(t, r, b, l);
     const swampFlag = swampTiles[tileIdx] ? 1 : 0;
     const cacheIdx = shapeKey * 18 + (colorIdx - 1) * 2 + swampFlag;
     const frame = landTileCache[cacheIdx];
@@ -1460,11 +1557,15 @@ function drawTileToBuffer(tx, ty) {
   bCtx.lineTo(pBottomX, pBottomY);
   bCtx.lineTo(pLeftX, pLeftY);
   bCtx.closePath();
-  const avg = (t + r + b + l) / 4;
-  const colorIdx = Math.max(1, Math.min(MAX_HEIGHT, Math.round(avg)));
+  const colorIdx = tileColorIdx(t, r, b, l);
   const isFlat = (t === r && r === b && b === l);
-  const colors = LAND_FILL_COLORS[colorIdx];
-  bCtx.fillStyle = isFlat ? colors.flat : colors.slope;
+  if (isFlat) {
+    bCtx.fillStyle = TERRAIN_COLORS[colorIdx];
+  } else {
+    const minH = Math.min(t, r, b, l);
+    const shade = triShade(0, 1, 2, [t - minH, r - minH, b - minH, l - minH]);
+    bCtx.fillStyle = shadeColor(TERRAIN_COLORS[colorIdx], shade);
+  }
   bCtx.fill();
 }
 
@@ -2393,7 +2494,7 @@ function updateSidebar() {
     const popBar = document.getElementById('pop-bar-' + i);
     const popVal = document.getElementById('pop-val-' + i);
     if (popBar) popBar.style.width = pct + '%';
-    if (popVal) popVal.textContent = teamPop[i] || 0;
+    if (popVal) popVal.textContent = Math.floor(teamPop[i] || 0);
   }
 
   // Mana
@@ -2775,6 +2876,21 @@ function render() {
     }
   }
 
+  // Terrain crosshair — show which height point will be raised/lowered
+  if (!targetingPower && !inspectMode && !armageddon && heights && localMapW > 0) {
+    const { px, py } = screenToGrid(mouseX, mouseY);
+    if (px >= 0 && px <= localMapW && py >= 0 && py <= localMapH) {
+      const sp = project(px, py, heights[px][py]);
+      const sz = 3; // crosshair arm length in pixels
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sp.x - sz, sp.y); ctx.lineTo(sp.x + sz, sp.y);
+      ctx.moveTo(sp.x, sp.y - sz); ctx.lineTo(sp.x, sp.y + sz);
+      ctx.stroke();
+    }
+  }
+
   if (_p) { const _t = performance.now(); _sample.targeting = _t - _t0; _t0 = _t; }
 
   // Magnet flags — draw for all teams
@@ -2863,9 +2979,10 @@ function render() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const resultText = won ? 'VICTORY' : 'DEFEAT';
-    const resultColor = won ? '#c9a84c' : '#ff5544';
-    const glowColor = won ? 'rgba(200, 168, 76, 0.6)' : 'rgba(255, 60, 40, 0.5)';
+    const isDraw = gameWinner < 0;
+    const resultText = won ? 'VICTORY' : (isDraw ? 'DRAW' : 'DEFEAT');
+    const resultColor = won ? '#c9a84c' : (isDraw ? '#aaa' : '#ff5544');
+    const glowColor = won ? 'rgba(200, 168, 76, 0.6)' : (isDraw ? 'rgba(160, 160, 160, 0.5)' : 'rgba(255, 60, 40, 0.5)');
     const pulse = 0.8 + 0.2 * Math.sin(t * 2);
 
     ctx.shadowColor = glowColor;
@@ -2882,9 +2999,11 @@ function render() {
     ctx.fillStyle = 'rgba(200, 210, 230, 0.7)';
     const subText = won
       ? `${teamPlayerNames[myTeam] || 'You'}, the ${TEAM_NAMES[myTeam]} God`
-      : gameWinnerName === TEAM_NAMES[gameWinner]
-        ? `The ${TEAM_NAMES[gameWinner]} God has prevailed`
-        : `${gameWinnerName}, the ${TEAM_NAMES[gameWinner]} God has prevailed`;
+      : isDraw
+        ? 'All civilizations have perished'
+        : gameWinnerName === TEAM_NAMES[gameWinner]
+          ? `The ${TEAM_NAMES[gameWinner]} God has prevailed`
+          : `${gameWinnerName}, the ${TEAM_NAMES[gameWinner]} God has prevailed`;
     ctx.fillText(subText, cx, cy + 10);
 
     const lineW = 160;
@@ -2948,6 +3067,10 @@ function roundRect(c, x, y, w, h, r) {
 let gameOverHover = null;
 const gameOverBtns = { again: null, lobby: null };
 
+function updateCursor() {
+  canvas.style.cursor = gameOverHover ? 'pointer' : (gameOver ? 'default' : (inspectMode ? 'zoom-in' : (targetingPower ? 'cell' : (magnetMode ? 'move' : 'crosshair'))));
+}
+
 // Track hover over game over buttons
 window.addEventListener('mousemove', (e) => {
   if (!gameOver) { gameOverHover = null; return; }
@@ -2960,7 +3083,7 @@ window.addEventListener('mousemove', (e) => {
       break;
     }
   }
-  canvas.style.cursor = gameOverHover ? 'pointer' : (gameOver ? 'default' : 'crosshair');
+  updateCursor();
 });
 
 function returnToLobby() {
@@ -3016,7 +3139,7 @@ function returnToLobby() {
   document.getElementById('lobby-chat-messages').innerHTML = '';
   document.getElementById('start-game-row').style.display = 'none';
   isCreator = false;
-  canvas.style.cursor = 'crosshair';
+  canvas.style.cursor = 'default';
 
   // Restart lobby background
   lobbyActive = true;
@@ -3357,7 +3480,7 @@ function handleServerMessage(msg) {
     case 'gameover':
       gameOver = true;
       gameWinner = msg.winner;
-      gameWinnerName = msg.winnerName || TEAM_NAMES[msg.winner];
+      gameWinnerName = msg.winnerName || (msg.winner >= 0 ? TEAM_NAMES[msg.winner] : null);
       playSfx(msg.winner === myTeam ? 'victory' : 'defeat');
       break;
 
@@ -3786,6 +3909,7 @@ canvas.addEventListener('mousedown', (e) => {
     const { px, py } = screenToGrid(e.clientX, e.clientY);
     sendMessage({ type: 'power', power: targetingPower, x: px, y: py });
     targetingPower = null;
+    updateCursor();
     return;
   }
 
@@ -3820,6 +3944,7 @@ function activatePower(powerDef) {
   } else {
     sendMessage({ type: 'power', power: powerDef.id });
   }
+  updateCursor();
 }
 
 window.addEventListener('keydown', (e) => {
@@ -3830,6 +3955,7 @@ window.addEventListener('keydown', (e) => {
     inspectMode = false;
     inspectData = null;
     magnetMode = false;
+    updateCursor();
     return;
   }
 
@@ -3847,12 +3973,14 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'f' || e.key === 'F') {
     magnetMode = !magnetMode;
     if (magnetMode) { inspectMode = false; inspectData = null; targetingPower = null; }
+    updateCursor();
     return;
   }
   if (e.key === 'i' || e.key === 'I') {
     inspectMode = !inspectMode;
     if (inspectMode) { magnetMode = false; targetingPower = null; }
     if (!inspectMode) inspectData = null;
+    updateCursor();
     return;
   }
   if (e.key === 'm' || e.key === 'M') {
@@ -4040,12 +4168,14 @@ document.getElementById('btn-magnet').addEventListener('click', () => {
   if (!gameStarted || armageddon) return;
   magnetMode = !magnetMode;
   if (magnetMode) { inspectMode = false; inspectData = null; targetingPower = null; }
+  updateCursor();
 });
 document.getElementById('btn-inspect').addEventListener('click', () => {
   if (!gameStarted) return;
   inspectMode = !inspectMode;
   if (inspectMode) { magnetMode = false; targetingPower = null; }
   if (!inspectMode) inspectData = null;
+  updateCursor();
 });
 
 // ── Settings Panel ─────────────────────────────────────────────────
@@ -4442,12 +4572,15 @@ function updatePowerBar() {
 function performInspect(sx, sy) {
   const { px, py } = screenToGrid(sx, sy);
 
-  // Check settlements first
+  // Check settlements first — click must be within footprint
   for (const s of settlements) {
-    if (Math.abs(s.tx - px) <= 1 && Math.abs(s.ty - py) <= 1) {
+    const sz = (s.sz || 1);
+    const ox = s.ox !== undefined ? s.ox : s.tx;
+    const oy = s.oy !== undefined ? s.oy : s.ty;
+    if (px >= ox && px < ox + sz && py >= oy && py < oy + sz) {
       const levelDef = SETTLEMENT_LEVELS ? SETTLEMENT_LEVELS[s.l] : null;
       inspectData = {
-        type: 'settlement', screenX: sx, screenY: sy,
+        type: 'settlement', stx: s.tx, sty: s.ty,
         team: s.t, level: s.l,
         name: levelDef ? levelDef.name : 'Level ' + s.l,
         pop: s.p, cap: LEVEL_CAPACITY[s.l] || 0,
@@ -4491,13 +4624,28 @@ function drawInspectTooltip() {
     d.team = w.team;
     const h = heightAt(w.x, w.y);
     const p = project(w.x, w.y, h);
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    anchorX = p.x * zoom + cx * (1 - zoom);
-    anchorY = p.y * zoom + cy * (1 - zoom);
+    anchorX = p.x * zoom + _vpCX * (1 - zoom);
+    anchorY = p.y * zoom + _vpCY * (1 - zoom);
   } else {
-    anchorX = d.screenX;
-    anchorY = d.screenY;
+    // Settlement — find live data and recompute screen position
+    const s = settlements.find(s => s.tx === d.stx && s.ty === d.sty);
+    if (!s) { inspectData = null; return; }
+    d.pop = s.p;
+    d.team = s.t;
+    d.level = s.l;
+    const levelDef = SETTLEMENT_LEVELS ? SETTLEMENT_LEVELS[s.l] : null;
+    d.name = levelDef ? levelDef.name : 'Level ' + s.l;
+    d.cap = LEVEL_CAPACITY[s.l] || 0;
+    d.tech = levelDef ? levelDef.tech : 0;
+    d.hasLeader = !!s.hl;
+    const h = heightAt(s.tx + 0.5, s.ty + 0.5);
+    const p = project(s.tx + 0.5, s.ty + 0.5, h);
+    anchorX = p.x * zoom + _vpCX * (1 - zoom);
+    anchorY = p.y * zoom + _vpCY * (1 - zoom);
   }
+
+  // Hide tooltip if subject is off screen
+  if (anchorX < 0 || anchorX > canvas.width || anchorY < 0 || anchorY > canvas.height) return;
 
   const lines = [];
   if (d.type === 'settlement') {
@@ -4522,9 +4670,12 @@ function drawInspectTooltip() {
   for (const l of lines) maxW = Math.max(maxW, ctx.measureText(l).width);
   const tw = maxW + pad * 2;
   const th = lines.length * lineH + pad * 2;
-  let tx = anchorX + 12;
-  let ty = anchorY - th / 2;
-  if (tx + tw > canvas.width) tx = anchorX - tw - 12;
+  let tx, ty;
+  tx = anchorX - tw / 2;
+  ty = anchorY - th - 14;
+  if (ty < 0) ty = anchorY + 14;
+  if (tx + tw > canvas.width) tx = canvas.width - tw;
+  if (tx < 0) tx = 0;
   if (ty < 0) ty = 0;
   if (ty + th > canvas.height) ty = canvas.height - th;
 
