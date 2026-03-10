@@ -57,12 +57,12 @@ const SETTLEMENT_LEVELS = [
 
 // ── Powers ──────────────────────────────────────────────────────────
 const POWERS = [
-  { id: 'earthquake', name: 'Earthquake', cost: 1500,  hotkey: 'Q', targeted: true },
-  { id: 'swamp',      name: 'Swamp',      cost: 60,    hotkey: 'W', targeted: true },
-  { id: 'knight',     name: 'Knight',     cost: 200,   hotkey: 'E', targeted: false },
-  { id: 'volcano',    name: 'Volcano',    cost: 5000,  hotkey: 'R', targeted: true },
-  { id: 'flood',      name: 'Flood',      cost: 500,   hotkey: 'T', targeted: false },
-  { id: 'armageddon', name: 'Armageddon', cost: 6000,  hotkey: 'Y', targeted: false },
+  { id: 'swamp',      name: 'Swamp',      cost: 75,    hotkey: 'Q', targeted: true },
+  { id: 'earthquake', name: 'Earthquake', cost: 250,   hotkey: 'W', targeted: true },
+  { id: 'knight',     name: 'Knight',     cost: 400,   hotkey: 'E', targeted: false },
+  { id: 'volcano',    name: 'Volcano',    cost: 1500,  hotkey: 'R', targeted: true },
+  { id: 'flood',      name: 'Flood',      cost: 3000,  hotkey: 'T', targeted: false },
+  { id: 'armageddon', name: 'Armageddon', cost: 5000,  hotkey: 'Y', targeted: false },
 ];
 const EARTHQUAKE_RADIUS = 7;
 const VOLCANO_RADIUS = 5;
@@ -75,13 +75,15 @@ const KNIGHT_RETAL_MULT = 2; // settlements deal extra retaliation damage to kni
 // ── Terrain ──────────────────────────────────────────────────────────
 const TERRAIN_TREES = 0.06;
 const TERRAIN_PEBBLES = 0.04;
-const TERRAIN_RAISE_COST = 1;
-const TERRAIN_LOWER_COST = 1;
+const TERRAIN_RAISE_COST = 6;
+const TERRAIN_LOWER_COST = 6;
 
 // ── Crops ────────────────────────────────────────────────────────────
 const CROP_ZONE_RADIUS = 2;
 const CROP_LEVEL_THRESHOLDS = [0, 0, 2, 4, 7, 10, 13, 17, 20, 24];
 const GROWTH_PER_CROP_PER_SEC = 0.1;
+// Level-based growth multiplier: L5 = 1.0x breakeven, low levels nerfed, high levels buffed
+const GROWTH_LEVEL_MULT = [0, 0.4, 0.5, 0.6, 0.8, 1.0, 1.1, 1.2, 1.3, 1.5];
 
 // ── Walker Ejection ─────────────────────────────────────────────────
 const EJECT_DWELL_TIME = 15;
@@ -157,7 +159,7 @@ if (typeof module !== 'undefined') {
     WALKER_SPEED, MAX_LEVEL, LEVEL_CAPACITY, SETTLEMENT_LEVELS,
     POWERS, EARTHQUAKE_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT, KNIGHT_ATTRITION_PER_SEC, KNIGHT_ASSAULT_MULT, KNIGHT_RETAL_MULT,
     TERRAIN_TREES, TERRAIN_PEBBLES, TERRAIN_RAISE_COST, TERRAIN_LOWER_COST,
-    CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, GROWTH_PER_CROP_PER_SEC,
+    CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, GROWTH_PER_CROP_PER_SEC, GROWTH_LEVEL_MULT,
     EJECT_DWELL_TIME, EJECT_FRACTION, EJECT_MIN_STRENGTH,
     MANA_PER_POP_PER_SEC, MANA_MAX,
     TECH_ADVANTAGE_MULT, WALKER_ATTRITION_PER_SEC, HOMELESS_ATTRITION_PER_SEC, ASSAULT_DMG_PER_SEC, ASSAULT_RETALIATE_FRAC,

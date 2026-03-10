@@ -1130,28 +1130,48 @@ function computeCrops(state) {
     state.cropOwnerMap[y * state.mapW + x] = -2;
   }
 
-  // Phase 3: Count crops per settlement
-  const cropCounts = new Array(state.settlements.length).fill(0);
-  const cropList = [];
-  const addedCrops = new Set();
-
+  // Phase 3: Count crops per settlement with fractional sharing
+  // Build a map: tile key → array of settlement indices that claim it (same team, uncontested)
+  const tileClaims = new Map(); // key → [si, si, ...]
   for (let si = 0; si < state.settlements.length; si++) {
     const s = state.settlements[si];
     if (s.dead) continue;
     for (const key of settlementClaims[si]) {
       if (contested.has(key)) continue;
-      cropCounts[si]++;
-      if (!addedCrops.has(key)) {
-        addedCrops.add(key);
-        const [x, y] = key.split(',').map(Number);
-        cropList.push({ x, y, t: s.team });
-        state.cropOwnerMap[y * state.mapW + x] = si;
+      if (!tileClaims.has(key)) tileClaims.set(key, []);
+      tileClaims.get(key).push(si);
+    }
+  }
+
+  const cropCounts = new Array(state.settlements.length).fill(0);
+  const effectiveCropCounts = new Array(state.settlements.length).fill(0);
+  const cropList = [];
+
+  for (const [key, claimers] of tileClaims) {
+    const [x, y] = key.split(',').map(Number);
+    const team = state.settlements[claimers[0]].team;
+    cropList.push({ x, y, t: team });
+    state.cropOwnerMap[y * state.mapW + x] = claimers[0];
+
+    // Raw integer count (each settlement gets full credit)
+    for (const si of claimers) cropCounts[si]++;
+
+    // Effective fractional count (split by level when shared)
+    if (claimers.length === 1) {
+      effectiveCropCounts[claimers[0]] += 1;
+    } else {
+      let totalLevels = 0;
+      for (const si of claimers) totalLevels += state.settlements[si].level;
+      if (totalLevels === 0) totalLevels = claimers.length;
+      for (const si of claimers) {
+        effectiveCropCounts[si] += state.settlements[si].level / totalLevels;
       }
     }
   }
 
   state.crops = cropList;
   state.cropCounts = cropCounts;
+  state.effectiveCropCounts = effectiveCropCounts;
 }
 
 // ── Population Growth & Ejection ────────────────────────────────────
@@ -1160,10 +1180,11 @@ function updatePopulationGrowth(state, dt) {
     const s = state.settlements[si];
     if (s.dead) continue;
     const cap = C.LEVEL_CAPACITY[s.level];
-    const cropCount = state.cropCounts ? (state.cropCounts[si] || 0) : 0;
+    const cropCount = state.effectiveCropCounts ? (state.effectiveCropCounts[si] || 0) : 0;
 
+    const growthMult = C.GROWTH_LEVEL_MULT[s.level] || 1;
     if (s.population < cap && cropCount > 0) {
-      s.popFrac = (s.popFrac || 0) + cropCount * C.GROWTH_PER_CROP_PER_SEC * dt;
+      s.popFrac = (s.popFrac || 0) + cropCount * C.GROWTH_PER_CROP_PER_SEC * growthMult * dt;
       const whole = Math.floor(s.popFrac);
       if (whole > 0) {
         s.popFrac -= whole;
