@@ -5,175 +5,211 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Flattening — Server Admin</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Raleway:wght@300;400;600;700&display=swap');
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0a0e14;
-    color: #c0c8d8;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    padding: 16px;
-    min-height: 100vh;
+
+  :root {
+    --bg-deep: #07090d;
+    --bg-panel: #0c1017;
+    --bg-card: #101620;
+    --bg-hover: #151d2a;
+    --border: #1a2436;
+    --border-light: #243044;
+    --text: #c0cce0;
+    --text-dim: #5a6a82;
+    --text-bright: #e8f0ff;
+    --accent: #4a9eff;
+    --accent-dim: rgba(74, 158, 255, 0.15);
+    --green: #34d399;
+    --green-dim: rgba(52, 211, 153, 0.15);
+    --yellow: #fbbf24;
+    --yellow-dim: rgba(251, 191, 36, 0.15);
+    --red: #f87171;
+    --red-dim: rgba(248, 113, 113, 0.15);
+    --orange: #fb923c;
+    --purple: #a78bfa;
   }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  /* ── Header ─────────────────────────────────────── */
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid #1e2a3a;
-    border-bottom: none;
-    background: #0d1218;
-    padding: 10px 16px;
-    border-radius: 6px 6px 0 0;
+    padding: 14px 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    margin-bottom: -1px;
   }
-  .header h1 {
-    font-size: 14px;
-    color: #5fa8d3;
-    font-weight: normal;
-    letter-spacing: 2px;
-  }
-  .header .uptime {
-    color: #6a7a8a;
-    font-size: 12px;
-  }
-  .status-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
-  .status-dot.connected { background: #4ae04a; box-shadow: 0 0 4px #4ae04a; }
-  .status-dot.disconnected { background: #e04a4a; box-shadow: 0 0 4px #e04a4a; }
-
-  .section {
-    border: 1px solid #1e2a3a;
-    background: #0d1218;
-    margin-bottom: 0;
-  }
-  .section:last-child {
-    border-radius: 0 0 6px 6px;
-  }
-  .section-title {
-    padding: 8px 16px;
-    background: #111820;
-    color: #5fa8d3;
-    font-size: 11px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    border-bottom: 1px solid #1e2a3a;
-  }
-  .section-body {
-    padding: 12px 16px;
-  }
-
-  .metrics-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 24px;
-  }
-  .metric {
+  .header-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
   }
-  .metric-label {
-    color: #6a7a8a;
-    font-size: 11px;
-    min-width: 70px;
-  }
-  .metric-bar {
-    width: 120px;
-    height: 14px;
-    background: #1a2230;
-    border-radius: 2px;
-    overflow: hidden;
-    position: relative;
-  }
-  .metric-bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.5s ease, background 0.5s ease;
-  }
-  .metric-value {
-    color: #e0e8f0;
-    font-size: 12px;
-    min-width: 60px;
-  }
-
-  .bar-green { background: #2d8a4e; }
-  .bar-yellow { background: #b8960c; }
-  .bar-red { background: #c0392b; }
-  .bar-blue { background: #2a6496; }
-
-  /* Games table */
-  .games-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-  .games-table th {
-    text-align: left;
-    color: #5a6a7a;
-    font-weight: normal;
-    font-size: 10px;
+  .header h1 {
+    font-family: 'Raleway', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 3px;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    padding: 6px 8px;
-    border-bottom: 1px solid #1e2a3a;
   }
-  .games-table td {
-    padding: 6px 8px;
-    border-bottom: 1px solid #141c24;
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
   }
-  .games-table tr:hover td {
-    background: #111820;
+  .status-pill.connected {
+    background: var(--green-dim);
+    color: var(--green);
   }
-  .game-status {
-    display: inline-block;
+  .status-pill.disconnected {
+    background: var(--red-dim);
+    color: var(--red);
+  }
+  .status-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    margin-right: 6px;
   }
-  .game-status.playing { background: #4ae04a; }
-  .game-status.waiting { background: #f0c040; }
-  .game-status.ended { background: #6a7a8a; }
-
-  .no-games {
-    color: #3a4a5a;
-    text-align: center;
-    padding: 20px;
-    font-style: italic;
+  .status-pill.connected .status-dot {
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+  }
+  .status-pill.disconnected .status-dot {
+    background: var(--red);
+    box-shadow: 0 0 6px var(--red);
+  }
+  .uptime {
+    color: var(--text-dim);
+    font-size: 11px;
   }
 
-  .tick-warn { color: #f0c040; }
-  .tick-crit { color: #e04a4a; }
+  /* ── Graphs Grid ────────────────────────────────── */
+  .graphs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-top: none;
+  }
+  .graph-card {
+    background: var(--bg-panel);
+    padding: 14px 16px;
+  }
+  .graph-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .graph-title {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 500;
+  }
+  .graph-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-bright);
+  }
+  .graph-value .unit {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-left: 2px;
+  }
+  .sparkline {
+    width: 100%;
+    height: 40px;
+    display: block;
+  }
 
-  /* Temperature gauge */
-  .temp-section {
+  /* ── Main Content ───────────────────────────────── */
+  .section {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-top: none;
+  }
+  .section:last-child {
+    border-radius: 0 0 8px 8px;
+  }
+  .section-title {
+    padding: 10px 20px;
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-badge {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  /* ── Temperature Gauge ──────────────────────────── */
+  .overview-row {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-top: none;
+  }
+  .overview-cell {
+    background: var(--bg-panel);
+    padding: 16px 20px;
+    flex: 1;
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
   }
+  .overview-cell.gauge-cell { flex: 0 0 140px; justify-content: center; }
   .temp-gauge {
     position: relative;
-    width: 80px;
-    height: 80px;
-    flex-shrink: 0;
+    width: 90px;
+    height: 90px;
   }
   .temp-gauge svg {
-    width: 80px;
-    height: 80px;
+    width: 90px;
+    height: 90px;
     transform: rotate(-90deg);
   }
   .temp-gauge-bg {
     fill: none;
-    stroke: #1a2230;
-    stroke-width: 6;
+    stroke: var(--bg-card);
+    stroke-width: 5;
   }
   .temp-gauge-fill {
     fill: none;
-    stroke-width: 6;
+    stroke-width: 5;
     stroke-linecap: round;
     transition: stroke-dashoffset 0.8s ease, stroke 0.8s ease;
   }
@@ -183,125 +219,292 @@
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    line-height: 1.2;
   }
   .temp-value {
-    font-size: 20px;
-    font-weight: bold;
-    color: #e0e8f0;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-bright);
   }
   .temp-unit {
     font-size: 9px;
-    color: #6a7a8a;
+    color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 1px;
   }
-  .temp-details {
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
     flex: 1;
   }
-
-  /* Net bandwidth */
+  .stat-item {}
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-bright);
+  }
+  .stat-value .dim { color: var(--text-dim); font-weight: 400; }
   .net-row {
     display: flex;
-    gap: 24px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #1a2230;
+    gap: 20px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
   }
   .net-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
-  .net-arrow {
-    font-size: 14px;
+  .net-arrow { font-size: 10px; }
+  .net-arrow.in { color: var(--green); }
+  .net-arrow.out { color: var(--orange); }
+
+  /* ── Workers + Games Tree ───────────────────────── */
+  .tree-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
   }
-  .net-arrow.in { color: #4ae04a; }
-  .net-arrow.out { color: #e08a4a; }
+  .tree-table th {
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    position: sticky;
+    top: 0;
+  }
+  .tree-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid rgba(26, 36, 54, 0.5);
+  }
+  .tree-table tr:hover td {
+    background: var(--bg-hover);
+  }
+
+  .worker-row td {
+    background: rgba(16, 22, 32, 0.8);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    font-weight: 500;
+  }
+  .worker-row:hover td {
+    background: var(--bg-hover) !important;
+  }
+  .worker-id {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .worker-icon {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+
+  .game-row td {
+    padding-left: 32px;
+  }
+  .game-row td:first-child {
+    padding-left: 36px;
+  }
+
+  .game-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .game-dot.playing { background: var(--green); box-shadow: 0 0 4px var(--green); }
+  .game-dot.waiting { background: var(--yellow); }
+  .game-dot.ended { background: var(--text-dim); }
+
+  .status-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+  }
+  .status-tag.playing { background: var(--green-dim); color: var(--green); }
+  .status-tag.waiting { background: var(--yellow-dim); color: var(--yellow); }
+  .status-tag.ended { background: rgba(90, 106, 130, 0.15); color: var(--text-dim); }
+
+  .tick-ok { color: var(--green); }
+  .tick-warn { color: var(--yellow); }
+  .tick-crit { color: var(--red); }
+
+  .no-data {
+    color: var(--text-dim);
+    text-align: center;
+    padding: 24px;
+    font-style: italic;
+    font-size: 12px;
+  }
+
+  .mini-bar {
+    display: inline-block;
+    height: 3px;
+    border-radius: 1px;
+    vertical-align: middle;
+    margin-left: 6px;
+    transition: width 0.3s;
+  }
+
+  /* Unassigned games */
+  .unassigned-header td {
+    background: rgba(90, 106, 130, 0.08);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-style: italic;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h1><span class="status-dot disconnected" id="connDot"></span>THE FLATTENING — SERVER ADMIN</h1>
-  <span class="uptime" id="uptime">uptime: --</span>
+  <div class="header-left">
+    <h1>The Flattening</h1>
+    <div class="status-pill disconnected" id="statusPill">
+      <div class="status-dot"></div>
+      <span id="statusText">Disconnected</span>
+    </div>
+  </div>
+  <span class="uptime" id="uptime">--</span>
 </div>
 
-<div class="section">
-  <div class="section-title">Server Overview</div>
-  <div class="section-body">
-    <div class="temp-section">
-      <div class="temp-gauge">
-        <svg viewBox="0 0 36 36">
-          <circle class="temp-gauge-bg" cx="18" cy="18" r="15.9"></circle>
-          <circle class="temp-gauge-fill" id="tempArc" cx="18" cy="18" r="15.9"
-            stroke-dasharray="100" stroke-dashoffset="100" stroke="#2d8a4e"></circle>
-        </svg>
-        <div class="temp-label">
-          <div class="temp-value" id="tempVal">0</div>
-          <div class="temp-unit">temp</div>
+<div class="overview-row">
+  <div class="overview-cell gauge-cell">
+    <div class="temp-gauge">
+      <svg viewBox="0 0 36 36">
+        <circle class="temp-gauge-bg" cx="18" cy="18" r="15.9"></circle>
+        <circle class="temp-gauge-fill" id="tempArc" cx="18" cy="18" r="15.9"
+          stroke-dasharray="100" stroke-dashoffset="100" stroke="#34d399"></circle>
+      </svg>
+      <div class="temp-label">
+        <div class="temp-value" id="tempVal">0</div>
+        <div class="temp-unit">health</div>
+      </div>
+    </div>
+  </div>
+  <div class="overview-cell">
+    <div style="flex:1">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">Connections</div>
+          <div class="stat-value" id="connVal">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Active Games</div>
+          <div class="stat-value" id="activeVal">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Lobby</div>
+          <div class="stat-value" id="lobbyVal">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Heap</div>
+          <div class="stat-value" id="heapVal">0 <span class="dim">MB</span></div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">RSS</div>
+          <div class="stat-value" id="rssVal">0 <span class="dim">MB</span></div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Workers</div>
+          <div class="stat-value" id="workerCountVal">0</div>
         </div>
       </div>
-      <div class="temp-details">
-        <div class="metrics-row">
-          <div class="metric">
-            <span class="metric-label">Tick Load</span>
-            <div class="metric-bar"><div class="metric-bar-fill bar-green" id="tickBar" style="width:0%"></div></div>
-            <span class="metric-value" id="tickVal">0%</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Heap</span>
-            <div class="metric-bar"><div class="metric-bar-fill bar-blue" id="heapBar" style="width:0%"></div></div>
-            <span class="metric-value" id="heapVal">0 MB</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">RSS</span>
-            <div class="metric-bar"><div class="metric-bar-fill bar-blue" id="rssBar" style="width:0%"></div></div>
-            <span class="metric-value" id="rssVal">0 MB</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Connections</span>
-            <span class="metric-value" id="connVal">0</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Active Games</span>
-            <span class="metric-value" id="activeVal">0</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Lobby</span>
-            <span class="metric-value" id="lobbyVal">0</span>
-          </div>
+      <div class="net-row">
+        <div class="net-item">
+          <span class="net-arrow in">&#9660;</span>
+          <span class="stat-label" style="margin-bottom:0">In</span>
+          <span class="stat-value" id="netInVal" style="font-size:13px">0 B/s</span>
         </div>
-        <div class="net-row">
-          <div class="net-item">
-            <span class="net-arrow in">&#9660;</span>
-            <span class="metric-label">Net In</span>
-            <span class="metric-value" id="netInVal">0 B/s</span>
-          </div>
-          <div class="net-item">
-            <span class="net-arrow out">&#9650;</span>
-            <span class="metric-label">Net Out</span>
-            <span class="metric-value" id="netOutVal">0 B/s</span>
-          </div>
-          <div class="net-item">
-            <span class="metric-label">Total</span>
-            <span class="metric-value" id="netTotalVal">0 B/s</span>
-          </div>
+        <div class="net-item">
+          <span class="net-arrow out">&#9650;</span>
+          <span class="stat-label" style="margin-bottom:0">Out</span>
+          <span class="stat-value" id="netOutVal" style="font-size:13px">0 B/s</span>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<div class="graphs-grid">
+  <div class="graph-card">
+    <div class="graph-header">
+      <span class="graph-title">Tick Load</span>
+      <span class="graph-value" id="gTickVal">0<span class="unit">%</span></span>
+    </div>
+    <canvas class="sparkline" id="graphTick"></canvas>
+  </div>
+  <div class="graph-card">
+    <div class="graph-header">
+      <span class="graph-title">Memory</span>
+      <span class="graph-value" id="gMemVal">0<span class="unit">MB</span></span>
+    </div>
+    <canvas class="sparkline" id="graphMem"></canvas>
+  </div>
+  <div class="graph-card">
+    <div class="graph-header">
+      <span class="graph-title">Connections</span>
+      <span class="graph-value" id="gConnVal">0</span>
+    </div>
+    <canvas class="sparkline" id="graphConn"></canvas>
+  </div>
+  <div class="graph-card">
+    <div class="graph-header">
+      <span class="graph-title">Net In</span>
+      <span class="graph-value" id="gNetInVal">0<span class="unit">B/s</span></span>
+    </div>
+    <canvas class="sparkline" id="graphNetIn"></canvas>
+  </div>
+  <div class="graph-card">
+    <div class="graph-header">
+      <span class="graph-title">Net Out</span>
+      <span class="graph-value" id="gNetOutVal">0<span class="unit">B/s</span></span>
+    </div>
+    <canvas class="sparkline" id="graphNetOut"></canvas>
+  </div>
+  <div class="graph-card">
+    <div class="graph-header">
+      <span class="graph-title">Active Games</span>
+      <span class="graph-value" id="gGamesVal">0</span>
+    </div>
+    <canvas class="sparkline" id="graphGames"></canvas>
+  </div>
+</div>
+
 <div class="section">
-  <div class="section-title">Games</div>
-  <div class="section-body" style="padding:0">
-    <table class="games-table">
+  <div class="section-title">
+    <span>Workers & Games</span>
+    <span class="section-badge" id="treeBadge">0 workers · 0 games</span>
+  </div>
+  <div style="padding:0; overflow-x:auto;">
+    <table class="tree-table">
       <thead>
         <tr>
+          <th style="min-width:120px">Name</th>
           <th>Status</th>
-          <th>Code</th>
-          <th>Name</th>
           <th>Players</th>
           <th>Map</th>
           <th>Duration</th>
@@ -312,8 +515,8 @@
           <th>Net Out</th>
         </tr>
       </thead>
-      <tbody id="gamesBody">
-        <tr><td colspan="11" class="no-games">No active games</td></tr>
+      <tbody id="treeBody">
+        <tr><td colspan="10" class="no-data">No active workers or games</td></tr>
       </tbody>
     </table>
   </div>
@@ -323,111 +526,230 @@
 (function() {
   let ws = null;
   let connected = false;
+  const dpr = window.devicePixelRatio || 1;
 
+  // ── Helpers ─────────────────────────────────────
   function formatUptime(sec) {
-    const h = Math.floor(sec / 3600);
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
-    return (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
+    return (d > 0 ? d + 'd ' : '') + (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
   }
-
   function formatDuration(sec) {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return m + ':' + String(s).padStart(2, '0');
   }
-
   function formatBytes(bytes) {
     if (bytes < 1024) return bytes + ' B/s';
-    return (bytes / 1024).toFixed(1) + ' KB/s';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB/s';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB/s';
   }
-
-  function barColor(pct) {
-    if (pct < 50) return 'bar-green';
-    if (pct < 80) return 'bar-yellow';
-    return 'bar-red';
+  function formatBytesShort(bytes) {
+    if (bytes < 1024) return bytes + '';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'K';
+    return (bytes / 1024 / 1024).toFixed(1) + 'M';
   }
-
+  function tickClass(ms) {
+    if (ms > 40) return 'tick-crit';
+    if (ms > 20) return 'tick-warn';
+    return 'tick-ok';
+  }
   function tempColor(pct) {
-    if (pct < 40) return '#2d8a4e';
-    if (pct < 65) return '#b8960c';
-    if (pct < 85) return '#e08a4a';
-    return '#c0392b';
+    if (pct < 30) return '#34d399';
+    if (pct < 55) return '#fbbf24';
+    if (pct < 80) return '#fb923c';
+    return '#f87171';
   }
 
-  function update(data) {
-    // Uptime
-    document.getElementById('uptime').textContent = 'uptime: ' + formatUptime(data.uptime);
+  // ── Sparkline Renderer ──────────────────────────
+  function drawSparkline(canvasId, data, color, opts = {}) {
+    const canvas = document.getElementById(canvasId);
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width * dpr;
+    const h = rect.height * dpr;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
 
-    // Temperature gauge
-    const temp = Math.min(data.temperature || 0, 100);
+    if (!data || data.length < 2) return;
+
+    const max = opts.max || Math.max(...data, 1);
+    const len = data.length;
+    const stepX = w / (len - 1);
+
+    // Fill gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, color + '30');
+    grad.addColorStop(1, color + '05');
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let i = 0; i < len; i++) {
+      const x = i * stepX;
+      const y = h - (data[i] / max) * (h - 2);
+      if (i === 0) ctx.lineTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    for (let i = 0; i < len; i++) {
+      const x = i * stepX;
+      const y = h - (data[i] / max) * (h - 2);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Current value dot
+    const lastX = (len - 1) * stepX;
+    const lastY = h - (data[len - 1] / max) * (h - 2);
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 2.5 * dpr, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  // ── Update ──────────────────────────────────────
+  function update(data) {
+    // Header
+    document.getElementById('uptime').textContent = 'uptime ' + formatUptime(data.uptime);
+
+    // Gauge
+    const temp = Math.min(100 - (data.temperature || 0), 100);
     const arc = document.getElementById('tempArc');
     arc.setAttribute('stroke-dashoffset', 100 - temp);
-    arc.setAttribute('stroke', tempColor(temp));
-    const tempValEl = document.getElementById('tempVal');
-    tempValEl.textContent = temp;
-    tempValEl.style.color = tempColor(temp);
+    const tColor = tempColor(100 - temp);
+    arc.setAttribute('stroke', tColor);
+    document.getElementById('tempVal').textContent = temp;
+    document.getElementById('tempVal').style.color = tColor;
 
-    // Tick load
-    const tickPct = Math.min(data.tickLoad, 100);
-    const tickBar = document.getElementById('tickBar');
-    tickBar.style.width = tickPct + '%';
-    tickBar.className = 'metric-bar-fill ' + barColor(tickPct);
-    document.getElementById('tickVal').textContent = data.tickLoad + '%';
-
-    // Memory
-    const heapPct = Math.min(data.memory.heapUsed / Math.max(data.memory.heapTotal, 1) * 100, 100);
-    document.getElementById('heapBar').style.width = heapPct + '%';
-    document.getElementById('heapVal').textContent = data.memory.heapUsed + ' MB';
-
-    const rssPct = Math.min(data.memory.rss / 200 * 100, 100); // 200MB as reference max
-    document.getElementById('rssBar').style.width = rssPct + '%';
-    document.getElementById('rssVal').textContent = data.memory.rss + ' MB';
-
-    // Counts
+    // Stats
     document.getElementById('connVal').textContent = data.connections;
     document.getElementById('activeVal').textContent = data.activeGames;
     document.getElementById('lobbyVal').textContent = data.lobbyCount;
-
-    // Network
+    document.getElementById('heapVal').innerHTML = data.memory.heapUsed + ' <span class="dim">MB</span>';
+    document.getElementById('rssVal').innerHTML = data.memory.rss + ' <span class="dim">MB</span>';
+    document.getElementById('workerCountVal').textContent = data.numWorkers || 0;
     document.getElementById('netInVal').textContent = formatBytes(data.netInRate || 0);
     document.getElementById('netOutVal').textContent = formatBytes(data.netOutRate || 0);
-    document.getElementById('netTotalVal').textContent = formatBytes((data.netInRate || 0) + (data.netOutRate || 0));
 
-    // Games table
-    const tbody = document.getElementById('gamesBody');
-    if (data.games.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="11" class="no-games">No active games</td></tr>';
+    // Graph values
+    document.getElementById('gTickVal').innerHTML = data.tickLoad + '<span class="unit">%</span>';
+    document.getElementById('gMemVal').innerHTML = data.memory.heapUsed + '<span class="unit">MB</span>';
+    document.getElementById('gConnVal').textContent = data.connections;
+    document.getElementById('gNetInVal').innerHTML = formatBytesShort(data.netInRate || 0) + '<span class="unit">B/s</span>';
+    document.getElementById('gNetOutVal').innerHTML = formatBytesShort(data.netOutRate || 0) + '<span class="unit">B/s</span>';
+    document.getElementById('gGamesVal').textContent = data.activeGames;
+
+    // Sparklines
+    if (data.history) {
+      drawSparkline('graphTick', data.history.tickLoad, '#4a9eff', { max: 100 });
+      drawSparkline('graphMem', data.history.memory, '#a78bfa');
+      drawSparkline('graphConn', data.history.connections, '#34d399');
+      drawSparkline('graphNetIn', data.history.netIn, '#34d399');
+      drawSparkline('graphNetOut', data.history.netOut, '#fb923c');
+      drawSparkline('graphGames', data.history.games, '#fbbf24');
+    }
+
+    // Build worker → games tree
+    const workers = data.workers || [];
+    const games = data.games || [];
+    const numWorkers = data.numWorkers || 0;
+    const numGames = games.length;
+
+    document.getElementById('treeBadge').textContent =
+      numWorkers + ' worker' + (numWorkers !== 1 ? 's' : '') + ' · ' +
+      numGames + ' game' + (numGames !== 1 ? 's' : '');
+
+    const tbody = document.getElementById('treeBody');
+
+    if (numWorkers === 0 && numGames === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="no-data">No active workers or games</td></tr>';
       return;
     }
 
-    let html = '';
-    for (const g of data.games) {
-      const tickClass = g.tickTimeMs > 40 ? 'tick-crit' : (g.tickTimeMs > 20 ? 'tick-warn' : '');
-      html += '<tr>'
-        + '<td><span class="game-status ' + g.status + '"></span>' + g.status + '</td>'
-        + '<td>' + g.code + '</td>'
-        + '<td>' + (g.name || '-') + '</td>'
-        + '<td>' + g.humans + '/' + g.maxPlayers + (g.aiCount > 0 ? '+' + g.aiCount + 'AI' : '') + '</td>'
-        + '<td>' + g.mapSize + '</td>'
-        + '<td>' + formatDuration(g.duration) + '</td>'
-        + '<td>' + (g.walkers != null ? g.walkers : '-') + '</td>'
-        + '<td>' + (g.settlements != null ? g.settlements : '-') + '</td>'
-        + '<td>' + (g.totalPop != null ? g.totalPop : '-') + '</td>'
-        + '<td class="' + tickClass + '">' + g.tickTimeMs + 'ms</td>'
-        + '<td>' + formatBytes(g.bytesSentRate) + '</td>'
-        + '</tr>';
+    // Group games by worker
+    const gamesByWorker = new Map();
+    const unassigned = [];
+    for (const g of games) {
+      if (g.workerIdx != null) {
+        if (!gamesByWorker.has(g.workerIdx)) gamesByWorker.set(g.workerIdx, []);
+        gamesByWorker.get(g.workerIdx).push(g);
+      } else {
+        unassigned.push(g);
+      }
     }
+
+    let html = '';
+    for (const w of workers) {
+      const wGames = gamesByWorker.get(w.id) || [];
+      const tc = tickClass(w.tickTimeMs);
+      html += '<tr class="worker-row">'
+        + '<td><span class="worker-id"><span class="worker-icon"></span>Worker #' + w.id + '</span></td>'
+        + '<td>' + w.rooms + ' room' + (w.rooms !== 1 ? 's' : '') + '</td>'
+        + '<td></td><td></td><td></td><td></td><td></td><td></td>'
+        + '<td class="' + tc + '">' + w.tickTimeMs + 'ms</td>'
+        + '<td>' + formatBytes(w.bytesOutRate) + '</td>'
+        + '</tr>';
+
+      for (const g of wGames) {
+        html += renderGameRow(g);
+      }
+    }
+
+    if (unassigned.length > 0) {
+      html += '<tr class="unassigned-header"><td colspan="10">Unassigned</td></tr>';
+      for (const g of unassigned) {
+        html += renderGameRow(g);
+      }
+    }
+
     tbody.innerHTML = html;
   }
 
+  function renderGameRow(g) {
+    const tc = tickClass(g.tickTimeMs);
+    return '<tr class="game-row">'
+      + '<td><span class="game-dot ' + g.status + '"></span>' + g.code + (g.name ? ' — ' + esc(g.name) : '') + '</td>'
+      + '<td><span class="status-tag ' + g.status + '">' + g.status + '</span></td>'
+      + '<td>' + g.humans + '/' + g.maxPlayers + (g.aiCount > 0 ? ' +' + g.aiCount + 'AI' : '') + '</td>'
+      + '<td>' + (g.mapSize || '-') + '</td>'
+      + '<td>' + formatDuration(g.duration) + '</td>'
+      + '<td>' + (g.walkers != null ? g.walkers : '-') + '</td>'
+      + '<td>' + (g.settlements != null ? g.settlements : '-') + '</td>'
+      + '<td>' + (g.totalPop != null ? g.totalPop : '-') + '</td>'
+      + '<td class="' + tc + '">' + g.tickTimeMs + 'ms</td>'
+      + '<td>' + formatBytes(g.bytesSentRate) + '</td>'
+      + '</tr>';
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── WebSocket ───────────────────────────────────
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(proto + '//' + location.host);
 
     ws.onopen = function() {
       connected = true;
-      document.getElementById('connDot').className = 'status-dot connected';
+      const pill = document.getElementById('statusPill');
+      pill.className = 'status-pill connected';
+      document.getElementById('statusText').textContent = 'Connected';
       ws.send(JSON.stringify({ type: 'admin_subscribe' }));
     };
 
@@ -439,7 +761,9 @@
 
     ws.onclose = function() {
       connected = false;
-      document.getElementById('connDot').className = 'status-dot disconnected';
+      const pill = document.getElementById('statusPill');
+      pill.className = 'status-pill disconnected';
+      document.getElementById('statusText').textContent = 'Disconnected';
       setTimeout(connect, 2000);
     };
 

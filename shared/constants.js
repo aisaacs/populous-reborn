@@ -145,7 +145,7 @@ const TERRAIN_TYPE_PRESETS = {
 
 // ── Tick ────────────────────────────────────────────────────────────
 const TICK_RATE = 20;
-const TICK_INTERVAL = 50;
+const TICK_INTERVAL = Math.round(1000 / TICK_RATE);
 
 // ── Dual-environment export ─────────────────────────────────────────
 if (typeof module !== 'undefined') {
