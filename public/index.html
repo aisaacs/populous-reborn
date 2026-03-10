@@ -685,7 +685,7 @@
     /* Mode buttons — 2x2 grid */
     .mode-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 3px;
     }
     .mode-btn {
@@ -1231,14 +1231,13 @@
       <div id="mana-text" class="mana-text">0</div>
     </div>
 
-    <!-- Mode — 2x2 grid -->
+    <!-- Mode — 3 buttons -->
     <div class="sb-section">
       <div class="sb-label">Mode</div>
       <div class="mode-grid">
         <button class="mode-btn" data-mode="0">Settle</button>
-        <button class="mode-btn" data-mode="1">Magnet</button>
+        <button class="mode-btn" data-mode="1">Gather</button>
         <button class="mode-btn" data-mode="2">Fight</button>
-        <button class="mode-btn" data-mode="3">Gather</button>
       </div>
     </div>
 
@@ -1246,12 +1245,14 @@
     <div class="sb-section">
       <div class="sb-label">Powers</div>
       <div class="power-list">
-        <div class="power-btn" data-power="swamp"><span class="power-hotkey">Q</span><span class="power-name">Swamp</span><span class="power-cost">75</span></div>
-        <div class="power-btn" data-power="earthquake"><span class="power-hotkey">W</span><span class="power-name">Earthquake</span><span class="power-cost">250</span></div>
-        <div class="power-btn" data-power="knight"><span class="power-hotkey">E</span><span class="power-name">Knight</span><span class="power-cost">400</span></div>
-        <div class="power-btn" data-power="volcano"><span class="power-hotkey">R</span><span class="power-name">Volcano</span><span class="power-cost">1500</span></div>
-        <div class="power-btn" data-power="flood"><span class="power-hotkey">T</span><span class="power-name">Flood</span><span class="power-cost">3000</span></div>
-        <div class="power-btn" data-power="armageddon"><span class="power-hotkey">Y</span><span class="power-name">Armageddon</span><span class="power-cost">ALL</span></div>
+        <div class="power-btn" data-power="lightning"><span class="power-hotkey">Q</span><span class="power-name">Lightning</span><span class="power-cost">40</span></div>
+        <div class="power-btn" data-power="swamp"><span class="power-hotkey">W</span><span class="power-name">Swamp</span><span class="power-cost">75</span></div>
+        <div class="power-btn" data-power="earthquake"><span class="power-hotkey">E</span><span class="power-name">Earthquake</span><span class="power-cost">250</span></div>
+        <div class="power-btn" data-power="knight"><span class="power-hotkey">R</span><span class="power-name">Knight</span><span class="power-cost">400</span></div>
+        <div class="power-btn" data-power="meteor"><span class="power-hotkey">T</span><span class="power-name">Meteor</span><span class="power-cost">1500</span></div>
+        <div class="power-btn" data-power="volcano"><span class="power-hotkey">Y</span><span class="power-name">Volcano</span><span class="power-cost">2500</span></div>
+        <div class="power-btn" data-power="flood"><span class="power-hotkey">U</span><span class="power-name">Flood</span><span class="power-cost">3000</span></div>
+        <div class="power-btn" data-power="armageddon"><span class="power-hotkey">I</span><span class="power-name">Armageddon</span><span class="power-cost">ALL</span></div>
       </div>
     </div>
 

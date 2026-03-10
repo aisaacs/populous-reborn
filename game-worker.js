@@ -74,6 +74,7 @@ function startTick(room) {
 
     G.updateWalkers(state, dt);
     G.handleWalkerCollisions(state);
+    G.processPendingEffects(state, dt);
     G.updateMana(state, dt);
 
     // AI update — room already has aiTimer, maxPlayers, players that updateAI expects
@@ -282,6 +283,9 @@ function handlePlayerInput(msg) {
       }
       let success = true;
       switch (powerDef.id) {
+        case 'lightning':
+          G.executePowerLightning(state, team, input.x, input.y);
+          break;
         case 'earthquake':
           G.executePowerEarthquake(state, team, input.x, input.y);
           break;
@@ -290,6 +294,9 @@ function handlePlayerInput(msg) {
           break;
         case 'knight':
           success = G.executePowerKnight(state, team);
+          break;
+        case 'meteor':
+          G.executePowerMeteor(state, team, input.x, input.y);
           break;
         case 'volcano':
           G.executePowerVolcano(state, team, input.x, input.y);
@@ -314,7 +321,7 @@ function handlePlayerInput(msg) {
     case 'mode': {
       if (state.armageddon) return;
       const mode = input.mode;
-      if (typeof mode !== 'number' || mode < 0 || mode > 3) return;
+      if (typeof mode !== 'number' || mode < 0 || mode > 2) return;
       state.teamMode[team] = mode;
       break;
     }

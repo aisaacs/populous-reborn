@@ -73,6 +73,7 @@ function createGameState(mapW, mapH, numTeams, terrainType) {
     cropOwnerMap: new Int32Array(mapW * mapH).fill(-1),
     fires: [],
     sfxQueue: [],
+    pendingEffects: [],
     seaLevel: C.SEA_LEVEL,
     leaders,
     magnetLocked,
@@ -720,7 +721,7 @@ function pickSettleTarget(state, w) {
   }
 }
 
-function pickMagnetTarget(state, w) {
+function pickGatherTarget(state, w) {
   const mp = state.magnetPos[w.team];
   const dx = mp.x - w.x, dy = mp.y - w.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
@@ -757,16 +758,11 @@ function pickFightTarget(state, w) {
   }
 }
 
-function pickGatherTarget(state, w) {
-  pickMagnetTarget(state, w);
-}
-
 function pickWalkerTarget(state, w) {
   switch (state.teamMode[w.team]) {
     case C.MODE_SETTLE:  pickSettleTarget(state, w); break;
-    case C.MODE_MAGNET:  pickMagnetTarget(state, w); break;
-    case C.MODE_FIGHT:   pickFightTarget(state, w); break;
     case C.MODE_GATHER:  pickGatherTarget(state, w); break;
+    case C.MODE_FIGHT:   pickFightTarget(state, w); break;
     default:             pickRandomTarget(state, w); break;
   }
 }
@@ -1983,6 +1979,55 @@ function queueSfx(state, name, team, x, y) {
 }
 
 // ── Divine Powers ───────────────────────────────────────────────────
+function executePowerLightning(state, team, px, py) {
+  const tx = Math.floor(px), ty = Math.floor(py);
+
+  // Check for settlement on this tile
+  if (tx >= 0 && tx < state.mapW && ty >= 0 && ty < state.mapH) {
+    const si = state.settlementMap[ty * state.mapW + tx];
+    if (si >= 0) {
+      const s = state.settlements[si];
+      if (s && !s.dead) {
+        const dmg = 30 + Math.floor(Math.random() * 21); // 30-50
+        s.population -= dmg;
+        if (s.population <= 0) {
+          s.population = 0;
+          s.dead = true;
+          clearSettlementFootprint(state, s);
+          queueSfx(state, 'destroy', s.team, s.tx, s.ty);
+        }
+        state.fires.push({ x: tx + 0.5, y: ty + 0.5, age: 0 });
+        queueSfx(state, 'lightning', team, px, py);
+        return;
+      }
+    }
+  }
+
+  // No settlement — kill strongest walker on or near the tile
+  let bestWalker = null;
+  let bestStrength = -1;
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    const dx = w.x - (tx + 0.5), dy = w.y - (ty + 0.5);
+    if (dx * dx + dy * dy < 1.0) { // within ~1 tile
+      if (w.strength > bestStrength) {
+        bestStrength = w.strength;
+        bestWalker = w;
+      }
+    }
+  }
+  if (bestWalker) {
+    const dmg = 30 + Math.floor(Math.random() * 21); // 30-50 damage, same as settlements
+    bestWalker.strength -= dmg;
+    if (bestWalker.strength <= 0) bestWalker.dead = true;
+    state.fires.push({ x: bestWalker.x, y: bestWalker.y, age: 0 });
+  } else {
+    // Hit nothing — still show fire
+    state.fires.push({ x: tx + 0.5, y: ty + 0.5, age: 0 });
+  }
+  queueSfx(state, 'lightning', team, px, py);
+}
+
 function executePowerEarthquake(state, team, px, py) {
   const r = C.EARTHQUAKE_RADIUS;
   const r2 = r * r;
@@ -2100,32 +2145,104 @@ function executePowerKnight(state, team) {
   return true;
 }
 
-function executePowerVolcano(state, team, px, py) {
-  const r = C.VOLCANO_RADIUS;
+function executePowerMeteor(state, team, px, py) {
+  // Queue SFX immediately — client starts the streak animation
+  queueSfx(state, 'meteor', team, px, py);
+
+  // Schedule destruction for after the streak animation (0.25s = 5 ticks)
+  state.pendingEffects.push({
+    delay: 0.25,
+    fn: function(st) { meteorImpact(st, team, px, py); }
+  });
+}
+
+function meteorImpact(state, team, px, py) {
+  const r = C.METEOR_RADIUS;
   const r2 = r * r;
-  for (let x = Math.max(0, px - r); x <= Math.min(state.mapW, px + r); x++) {
-    for (let y = Math.max(0, py - r); y <= Math.min(state.mapH, py + r); y++) {
+
+  // Lower terrain toward 0 with falloff from center
+  for (let x = Math.max(0, Math.floor(px) - r); x <= Math.min(state.mapW, Math.ceil(px) + r); x++) {
+    for (let y = Math.max(0, Math.floor(py) - r); y <= Math.min(state.mapH, Math.ceil(py) + r); y++) {
       const dx = x - px, dy = y - py;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < r2) {
-        const dist = Math.sqrt(d2);
-        const target = C.MAX_HEIGHT - Math.floor(dist);
-        while (state.heights[x][y] < target && state.heights[x][y] < C.MAX_HEIGHT) {
-          raisePoint(state, x, y);
+      const dist2 = dx * dx + dy * dy;
+      if (dist2 >= r2) continue;
+      const falloff = 1 - Math.sqrt(dist2) / r;
+      const drops = Math.round(state.heights[x][y] * falloff);
+      for (let i = 0; i < drops; i++) {
+        lowerPoint(state, x, y);
+      }
+    }
+  }
+
+  // Kill all walkers in radius
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    const dx = w.x - px, dy = w.y - py;
+    if (dx * dx + dy * dy < r2) {
+      w.dead = true;
+    }
+  }
+
+  // Destroy all settlements in radius, leave ruins
+  for (const s of state.settlements) {
+    if (s.dead) continue;
+    const dx = (s.tx + 0.5) - px, dy = (s.ty + 0.5) - py;
+    if (dx * dx + dy * dy < r2) {
+      s.dead = true;
+      clearSettlementFootprint(state, s);
+      for (let fx = 0; fx < s.sqSize; fx++) {
+        for (let fy = 0; fy < s.sqSize; fy++) {
+          const rx = s.sqOx + fx, ry = s.sqOy + fy;
+          if (rx >= 0 && rx < state.mapW && ry >= 0 && ry < state.mapH) {
+            const rkey = rx + ',' + ry;
+            if (!state.ruinSet.has(rkey)) {
+              state.ruins.push({ x: rx, y: ry, team: s.team });
+              state.ruinSet.add(rkey);
+            }
+          }
         }
       }
+      queueSfx(state, 'destroy', s.team, s.tx, s.ty);
     }
   }
-  const innerR = Math.floor(r / 2);
-  const innerR2 = innerR * innerR;
-  for (let tx = Math.max(0, px - innerR); tx < Math.min(state.mapW, px + innerR); tx++) {
-    for (let ty = Math.max(0, py - innerR); ty < Math.min(state.mapH, py + innerR); ty++) {
-      const dx = tx + 0.5 - px, dy = ty + 0.5 - py;
-      if (dx * dx + dy * dy < innerR2) {
-        state.rocks.add(tx + ',' + ty);
-      }
+
+  // Fires at impact
+  for (let i = 0; i < 5; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * r * 0.7;
+    state.fires.push({
+      x: px + Math.cos(angle) * dist,
+      y: py + Math.sin(angle) * dist,
+      age: Math.random() * 1.5,
+    });
+  }
+
+  invalidateSwamps(state);
+  invalidateRocks(state);
+  invalidateTrees(state);
+  invalidatePebbles(state);
+  invalidateRuins(state);
+  evaluateSettlementLevels(state);
+}
+
+function processPendingEffects(state, dt) {
+  for (let i = state.pendingEffects.length - 1; i >= 0; i--) {
+    const pe = state.pendingEffects[i];
+    pe.delay -= dt;
+    if (pe.delay < 0.001) {
+      pe.fn(state);
+      state.pendingEffects.splice(i, 1);
     }
   }
+}
+
+function executePowerVolcano(state, team, px, py) {
+  // SFX immediately for sound + screen shake
+  queueSfx(state, 'volcano', team, px, py);
+
+  // Kill walkers/settlements immediately (they're caught in the eruption)
+  const r = C.VOLCANO_RADIUS;
+  const r2 = r * r;
   for (const w of state.walkers) {
     if (w.dead) continue;
     const dx = w.x - px, dy = w.y - py;
@@ -2145,13 +2262,88 @@ function executePowerVolcano(state, team, px, py) {
       clearSettlementFootprint(state, s);
     }
   }
-  invalidateSwamps(state);
-  invalidateRocks(state);
-  invalidateTrees(state);
-  invalidatePebbles(state);
-  invalidateRuins(state);
-  evaluateSettlementLevels(state);
-  queueSfx(state, 'volcano', team, px, py);
+
+  // Generate per-point random jitter so the volcano grows irregularly
+  const jitterMap = {};
+  for (let x = Math.max(0, px - r); x <= Math.min(state.mapW, px + r); x++) {
+    for (let y = Math.max(0, py - r); y <= Math.min(state.mapH, py + r); y++) {
+      // Each point gets a random growth speed offset (-0.3 to +0.3)
+      jitterMap[x + ',' + y] = (Math.random() - 0.5) * 0.6;
+    }
+  }
+
+  // Grow terrain in phases over 1.5s
+  const phases = 6;
+  for (let phase = 0; phase < phases; phase++) {
+    const delay = phase * 0.25;
+    const phaseNum = phase;
+    state.pendingEffects.push({
+      delay: delay,
+      fn: function(st) { volcanoGrowPhase(st, team, px, py, phaseNum, phases, jitterMap); }
+    });
+  }
+}
+
+function volcanoGrowPhase(state, team, px, py, phase, totalPhases, jitterMap) {
+  const r = C.VOLCANO_RADIUS;
+  const r2 = r * r;
+  const baseProgress = (phase + 1) / totalPhases;
+
+  // Raise terrain toward target height — each point grows at its own jittered rate
+  for (let x = Math.max(0, px - r); x <= Math.min(state.mapW, px + r); x++) {
+    for (let y = Math.max(0, py - r); y <= Math.min(state.mapH, py + r); y++) {
+      const dx = x - px, dy = y - py;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= r2) continue;
+      const dist = Math.sqrt(d2);
+      const finalTarget = C.MAX_HEIGHT - Math.floor(dist);
+      const jitter = jitterMap[x + ',' + y] || 0;
+      const progress = Math.max(0, Math.min(1, baseProgress + jitter));
+      const phaseTarget = Math.round(finalTarget * progress);
+      while (state.heights[x][y] < phaseTarget && state.heights[x][y] < C.MAX_HEIGHT) {
+        raisePoint(state, x, y);
+      }
+    }
+  }
+
+  // Spawn fires each phase
+  const fireCount = phase === 0 ? 4 : 2;
+  for (let i = 0; i < fireCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * r * 0.8;
+    state.fires.push({
+      x: px + Math.cos(angle) * dist,
+      y: py + Math.sin(angle) * dist,
+      age: Math.random() * 1.0,
+    });
+  }
+
+  // Kill any walkers that wandered in
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    const dx = w.x - px, dy = w.y - py;
+    if (dx * dx + dy * dy < r2) w.dead = true;
+  }
+
+  // Final phase: add rocks and clean up
+  if (phase === totalPhases - 1) {
+    const innerR = Math.floor(r / 2);
+    const innerR2 = innerR * innerR;
+    for (let tx = Math.max(0, px - innerR); tx < Math.min(state.mapW, px + innerR); tx++) {
+      for (let ty = Math.max(0, py - innerR); ty < Math.min(state.mapH, py + innerR); ty++) {
+        const dx = tx + 0.5 - px, dy = ty + 0.5 - py;
+        if (dx * dx + dy * dy < innerR2) {
+          state.rocks.add(tx + ',' + ty);
+        }
+      }
+    }
+    invalidateSwamps(state);
+    invalidateRocks(state);
+    invalidateTrees(state);
+    invalidatePebbles(state);
+    invalidateRuins(state);
+    evaluateSettlementLevels(state);
+  }
 }
 
 function executePowerFlood(state, team) {
@@ -2249,19 +2441,39 @@ function updateAI(state, room, dt) {
       state.teamMode[team] = C.MODE_SETTLE;
     }
 
-    // Powers
+    // Powers — costs looked up from POWERS array
+    const getCost = (id) => { const p = C.POWERS.find(p => p.id === id); return p ? p.cost : Infinity; };
     if (!state.armageddon) {
-      if (myStats.pop > bestEnemyPop * 2.5 && myStats.pop > 200 && mana >= 6000) {
+      // Armageddon: overwhelming advantage
+      if (myStats.pop > bestEnemyPop * 2.5 && myStats.pop > 200 && mana >= getCost('armageddon')) {
         executePowerArmageddon(state, team);
         return;
       }
 
-      if (mana >= 200 && state.leaders[team] >= 0) {
+      // Knight: when leader is available
+      if (mana >= getCost('knight') && state.leaders[team] >= 0) {
         const success = executePowerKnight(state, team);
-        if (success) { state.mana[team] -= 200; continue; }
+        if (success) { state.mana[team] -= getCost('knight'); continue; }
       }
 
-      if (mana >= 60) {
+      // Lightning: snipe strong enemy walkers (only high-value targets)
+      if (mana >= getCost('lightning') && Math.random() < 0.15) {
+        let bestTarget = null;
+        for (const w of state.walkers) {
+          if (w.dead || w.team === team) continue;
+          if (w.isKnight || w.strength >= 80) {
+            if (!bestTarget || w.strength > bestTarget.strength) bestTarget = w;
+          }
+        }
+        if (bestTarget) {
+          state.mana[team] -= getCost('lightning');
+          executePowerLightning(state, team, bestTarget.x, bestTarget.y);
+          continue;
+        }
+      }
+
+      // Swamp: place near enemy settlements
+      if (mana >= getCost('swamp')) {
         let enemySett = null;
         for (const s of state.settlements) {
           if (s.dead || s.team === team) continue;
@@ -2273,46 +2485,70 @@ function updateAI(state, room, dt) {
           const sy = enemySett.ty + Math.floor(Math.random() * 7) - 3;
           if (sx >= 0 && sx < state.mapW && sy >= 0 && sy < state.mapH && isTileFlat(state, sx, sy)) {
             const ok = executePowerSwamp(state, team, sx, sy);
-            if (ok) { state.mana[team] -= 60; continue; }
+            if (ok) { state.mana[team] -= getCost('swamp'); continue; }
           }
         }
       }
 
-      if (mana >= 1500 && Math.random() < 0.4) {
+      // Earthquake: disrupt enemy settlements
+      if (mana >= getCost('earthquake') && Math.random() < 0.4) {
         let enemySett = null;
         for (const s of state.settlements) {
           if (s.dead || s.team === team) continue;
           if (!enemySett || s.population > enemySett.population) enemySett = s;
         }
         if (enemySett) {
-          state.mana[team] -= 1500;
+          state.mana[team] -= getCost('earthquake');
           executePowerEarthquake(state, team, enemySett.tx, enemySett.ty);
           continue;
         }
       }
 
-      if (mana >= 500 && Math.random() < 0.25) {
-        let lowEnemy = 0;
+      // Meteor: destroy high-value clusters
+      if (mana >= getCost('meteor') && Math.random() < 0.35) {
+        let bestCluster = null, bestClusterPop = 0;
         for (const s of state.settlements) {
           if (s.dead || s.team === team) continue;
-          if (state.heights[s.tx][s.ty] <= state.seaLevel + 1) lowEnemy++;
+          // Count nearby enemy pop in meteor radius
+          let clusterPop = s.population;
+          for (const s2 of state.settlements) {
+            if (s2 === s || s2.dead || s2.team === team) continue;
+            const dx = s2.tx - s.tx, dy = s2.ty - s.ty;
+            if (dx * dx + dy * dy < C.METEOR_RADIUS * C.METEOR_RADIUS) clusterPop += s2.population;
+          }
+          if (clusterPop > bestClusterPop) { bestClusterPop = clusterPop; bestCluster = s; }
         }
-        if (lowEnemy >= 2) {
-          state.mana[team] -= 500;
-          executePowerFlood(state, team);
+        if (bestCluster && bestClusterPop >= 40) {
+          state.mana[team] -= getCost('meteor');
+          executePowerMeteor(state, team, bestCluster.tx + 0.5, bestCluster.ty + 0.5);
           continue;
         }
       }
 
-      if (mana >= 5000 && Math.random() < 0.3) {
+      // Volcano: target high-level enemy settlements
+      if (mana >= getCost('volcano') && Math.random() < 0.3) {
         let bestEnemy = null;
         for (const s of state.settlements) {
           if (s.dead || s.team === team) continue;
           if (!bestEnemy || s.level > bestEnemy.level) bestEnemy = s;
         }
         if (bestEnemy && bestEnemy.level >= 5) {
-          state.mana[team] -= 5000;
+          state.mana[team] -= getCost('volcano');
           executePowerVolcano(state, team, bestEnemy.tx, bestEnemy.ty);
+          continue;
+        }
+      }
+
+      // Flood: when enemies are on low ground
+      if (mana >= getCost('flood') && Math.random() < 0.25) {
+        let lowEnemy = 0;
+        for (const s of state.settlements) {
+          if (s.dead || s.team === team) continue;
+          if (state.heights[s.tx][s.ty] <= state.seaLevel + 1) lowEnemy++;
+        }
+        if (lowEnemy >= 2) {
+          state.mana[team] -= getCost('flood');
+          executePowerFlood(state, team);
           continue;
         }
       }
@@ -2412,10 +2648,15 @@ module.exports = {
   // Stats
   getTeamStats,
 
+  // Deferred effects
+  processPendingEffects,
+
   // Powers
+  executePowerLightning,
   executePowerEarthquake,
   executePowerSwamp,
   executePowerKnight,
+  executePowerMeteor,
   executePowerVolcano,
   executePowerFlood,
   executePowerArmageddon,

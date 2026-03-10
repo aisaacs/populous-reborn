@@ -181,6 +181,12 @@ let ruinsLoaded = false;
 ruinsImg.src = 'gfx/ruins.png';
 ruinsImg.onload = () => { ruinsLoaded = true; };
 
+// ── Meteor Sprite ───────────────────────────────────────────────────
+const meteorImg = new Image();
+let meteorLoaded = false;
+meteorImg.src = 'gfx/meteor.png';
+meteorImg.onload = () => { meteorLoaded = true; };
+
 // ── Pre-rendered Water Frames ───────────────────────────────────────
 const WATER_FRAME_COUNT = 5;
 const WATER_FRAME_INTERVAL = 0.3; // seconds between frame advances
@@ -604,7 +610,7 @@ syncMusicUI();
 
 // ── SFX System ────────────────────────────────────────────────────
 const SFX_FILES = [
-  'volcano', 'earthquake', 'armageddon', 'flood', 'knight', 'swamp',
+  'volcano', 'earthquake', 'armageddon', 'flood', 'knight', 'swamp', 'lightning', 'meteor',
   'victory', 'defeat', 'settle', 'levelup', 'destroy', 'combat', 'terrain'
 ];
 const sfxBuffers = {};
@@ -653,13 +659,24 @@ if (sfxVolSlider) {
 syncSfxUI();
 
 // ── Server-Driven SFX Processing ─────────────────────────────────────
-const GLOBAL_SFX = new Set(['earthquake', 'swamp', 'knight', 'volcano', 'flood', 'armageddon']);
+const GLOBAL_SFX = new Set(['earthquake', 'swamp', 'knight', 'volcano', 'flood', 'armageddon', 'lightning', 'meteor']);
 const PROXIMITY_ZOOM_THRESHOLD = 0.7;
 
 function processSfxEvents(events) {
   if (!events || events.length === 0) return;
   const now = performance.now();
   for (const evt of events) {
+    // Spawn visual effects regardless of zoom/position
+    if (evt.n === 'lightning' && evt.x !== undefined) {
+      spawnLightningEffect(evt.x, evt.y);
+    } else if (evt.n === 'meteor' && evt.x !== undefined) {
+      spawnMeteorEffect(evt.x, evt.y);
+    } else if (evt.n === 'earthquake') {
+      earthquakeShakes.push({ life: 1.2, maxLife: 1.2 });
+    } else if (evt.n === 'volcano') {
+      earthquakeShakes.push({ life: 2.0, maxLife: 2.0 });
+    }
+
     if (GLOBAL_SFX.has(evt.n)) {
       playSfx(evt.n);
     } else {
@@ -675,6 +692,276 @@ function processSfxEvents(events) {
           lastCombatSfxTime = now;
         }
         playSfx(evt.n);
+      }
+    }
+  }
+}
+
+// ── Lightning Effect ─────────────────────────────────────────────────
+function spawnLightningEffect(gx, gy) {
+  // Generate jagged bolt segments from sky to ground
+  const segments = [];
+  const h = heightAt(gx, gy);
+  const ground = project(gx, gy, h);
+  const skyY = ground.y - 300;
+  let cx = ground.x, cy = skyY;
+  const steps = 8 + Math.floor(Math.random() * 5);
+  const stepY = (ground.y - skyY) / steps;
+  for (let i = 0; i < steps; i++) {
+    const nx = cx + (Math.random() - 0.5) * 30;
+    const ny = cy + stepY;
+    segments.push({ x1: cx, y1: cy, x2: nx, y2: ny });
+    cx = nx; cy = ny;
+    // Branch with 25% chance
+    if (Math.random() < 0.25 && i > 1 && i < steps - 1) {
+      const bx = cx + (Math.random() - 0.5) * 50;
+      const by = cy + stepY * (0.5 + Math.random() * 0.5);
+      segments.push({ x1: cx, y1: cy, x2: bx, y2: by, branch: true });
+    }
+  }
+  // Snap last segment to ground
+  if (segments.length > 0) {
+    segments[segments.length - 1].x2 = ground.x;
+    segments[segments.length - 1].y2 = ground.y;
+  }
+  lightningBolts.push({
+    segments,
+    gx, gy,
+    life: 0.5,
+    maxLife: 0.5,
+    flashAlpha: 1,
+  });
+}
+
+function updateLightningEffects(dt) {
+  for (let i = lightningBolts.length - 1; i >= 0; i--) {
+    lightningBolts[i].life -= dt;
+    lightningBolts[i].flashAlpha = Math.max(0, lightningBolts[i].life / lightningBolts[i].maxLife);
+    if (lightningBolts[i].life <= 0) lightningBolts.splice(i, 1);
+  }
+}
+
+function drawLightningEffects() {
+  // Screen darkening effect — darkens early in life, bright flash later
+  for (const bolt of lightningBolts) {
+    const t = 1 - bolt.life / bolt.maxLife; // 0→1 over lifetime
+    let darkAlpha = 0;
+    if (t < 0.15) {
+      // Quick darken ramp up
+      darkAlpha = (t / 0.15) * 0.45;
+    } else if (t < 0.3) {
+      // Hold dark then fade as flash takes over
+      darkAlpha = 0.45 * (1 - (t - 0.15) / 0.15);
+    }
+    if (darkAlpha > 0) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // screen space
+      ctx.fillStyle = 'rgba(0, 0, 0, ' + darkAlpha.toFixed(3) + ')';
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
+  }
+  for (const bolt of lightningBolts) {
+    const alpha = bolt.flashAlpha;
+    // Flicker
+    const flicker = alpha > 0.3 ? (Math.random() > 0.3 ? 1 : 0.3) : 1;
+    const a = alpha * flicker;
+
+    ctx.save();
+    // Glow
+    ctx.shadowColor = 'rgba(180, 200, 255, ' + (a * 0.8).toFixed(2) + ')';
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = 'rgba(220, 230, 255, ' + a.toFixed(2) + ')';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (const seg of bolt.segments) {
+      if (seg.branch) continue;
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+    }
+    ctx.stroke();
+
+    // Bright core
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, ' + (a * 0.9).toFixed(2) + ')';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const seg of bolt.segments) {
+      if (seg.branch) continue;
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+    }
+    ctx.stroke();
+
+    // Branches (thinner, dimmer)
+    ctx.strokeStyle = 'rgba(180, 200, 255, ' + (a * 0.5).toFixed(2) + ')';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const seg of bolt.segments) {
+      if (!seg.branch) continue;
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+    }
+    ctx.stroke();
+
+    // Impact flash at ground
+    if (alpha > 0.5) {
+      const h = heightAt(bolt.gx, bolt.gy);
+      const gnd = project(bolt.gx, bolt.gy, h);
+      const flashR = 20 * alpha;
+      const grad = ctx.createRadialGradient(gnd.x, gnd.y, 0, gnd.x, gnd.y, flashR);
+      grad.addColorStop(0, 'rgba(255, 255, 255, ' + (alpha * 0.6).toFixed(2) + ')');
+      grad.addColorStop(0.5, 'rgba(180, 200, 255, ' + (alpha * 0.3).toFixed(2) + ')');
+      grad.addColorStop(1, 'rgba(180, 200, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(gnd.x - flashR, gnd.y - flashR, flashR * 2, flashR * 2);
+    }
+    ctx.restore();
+
+    // Full-screen white flash right after the dark dip
+    const t = 1 - bolt.life / bolt.maxLife;
+    if (t >= 0.12 && t < 0.35) {
+      const flashT = (t - 0.12) / 0.23;
+      const whiteAlpha = (1 - flashT) * 0.2;
+      if (whiteAlpha > 0.01) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'rgba(200, 210, 255, ' + whiteAlpha.toFixed(3) + ')';
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.restore();
+      }
+    }
+  }
+}
+
+// ── Meteor Effect ────────────────────────────────────────────────────
+function spawnMeteorEffect(gx, gy) {
+  meteorEffects.push({
+    gx, gy,
+    life: 1.8,
+    maxLife: 1.8,
+    streakDur: 0.25,  // fast streak — crater forms on server same tick
+    impacted: false,
+    shakeIntensity: 0,
+    rotation: Math.random() * Math.PI * 2,
+    rotSpeed: 3 + Math.random() * 4,
+  });
+}
+
+function updateMeteorEffects(dt) {
+  for (let i = meteorEffects.length - 1; i >= 0; i--) {
+    const m = meteorEffects[i];
+    m.life -= dt;
+    const elapsed = m.maxLife - m.life;
+    if (!m.impacted && elapsed >= m.streakDur) {
+      m.impacted = true;
+    }
+    if (m.impacted) {
+      const impactAge = elapsed - m.streakDur;
+      m.shakeIntensity = Math.max(0, (1 - impactAge / 0.8) * 8);
+    }
+    m.rotation += m.rotSpeed * dt;
+    if (m.life <= 0) meteorEffects.splice(i, 1);
+  }
+}
+
+function drawMeteorEffects() {
+  for (const m of meteorEffects) {
+    const h = heightAt(m.gx, m.gy);
+    const ground = project(m.gx, m.gy, h);
+    const elapsed = m.maxLife - m.life;
+
+    if (!m.impacted) {
+      // Streak phase — meteor sprite flying from upper-left to ground
+      const t = elapsed / m.streakDur; // 0 to 1
+      // Ease in (accelerate)
+      const et = t * t;
+      const startX = ground.x - 250, startY = ground.y - 400;
+      const cx = startX + (ground.x - startX) * et;
+      const cy = startY + (ground.y - startY) * et;
+      // Scale grows as it approaches
+      const scale = 0.3 + et * 0.7;
+      const spriteSize = 40 * scale;
+
+      ctx.save();
+
+      // Fire trail particles behind the meteor
+      const trailLen = 8;
+      for (let i = 1; i <= trailLen; i++) {
+        const tt = Math.max(0, et - i * 0.04);
+        const tx = startX + (ground.x - startX) * tt;
+        const ty = startY + (ground.y - startY) * tt;
+        const a = (1 - i / trailLen) * 0.6 * scale;
+        const r = (5 - i * 0.4) * scale;
+        ctx.beginPath();
+        ctx.arc(tx + (Math.random() - 0.5) * 4, ty + (Math.random() - 0.5) * 4, Math.max(0.5, r), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, ' + Math.floor(120 + i * 15) + ', 30, ' + a.toFixed(2) + ')';
+        ctx.fill();
+      }
+
+      // Glow behind meteor
+      const glowR = spriteSize * 1.2;
+      const glowGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      glowGrad.addColorStop(0, 'rgba(255, 160, 50, ' + (0.4 * scale).toFixed(2) + ')');
+      glowGrad.addColorStop(0.5, 'rgba(255, 80, 20, ' + (0.15 * scale).toFixed(2) + ')');
+      glowGrad.addColorStop(1, 'rgba(255, 40, 10, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
+
+      // Draw meteor sprite with rotation
+      if (meteorLoaded) {
+        ctx.translate(cx, cy);
+        ctx.rotate(m.rotation);
+        ctx.drawImage(meteorImg, -spriteSize / 2, -spriteSize / 2, spriteSize, spriteSize);
+      }
+
+      ctx.restore();
+    } else {
+      // Impact phase
+      const impactAge = elapsed - m.streakDur;
+      const impactDur = m.maxLife - m.streakDur;
+      const t = impactAge / impactDur;
+
+      // White flash on impact
+      if (impactAge < 0.15) {
+        const flashA = (1 - impactAge / 0.15) * 0.7;
+        const flashR = 50 + impactAge / 0.15 * 60;
+        const grad = ctx.createRadialGradient(ground.x, ground.y, 0, ground.x, ground.y, flashR);
+        grad.addColorStop(0, 'rgba(255, 255, 230, ' + flashA.toFixed(2) + ')');
+        grad.addColorStop(0.4, 'rgba(255, 180, 80, ' + (flashA * 0.6).toFixed(2) + ')');
+        grad.addColorStop(1, 'rgba(255, 80, 20, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ground.x - flashR, ground.y - flashR, flashR * 2, flashR * 2);
+      }
+
+      // Expanding shockwave ring
+      if (t < 0.5) {
+        const ringT = t / 0.5;
+        const ringR = ringT * 90;
+        const ringA = (1 - ringT) * 0.7;
+        ctx.beginPath();
+        ctx.arc(ground.x, ground.y, ringR, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 140, 40, ' + ringA.toFixed(2) + ')';
+        ctx.lineWidth = 4 * (1 - ringT);
+        ctx.stroke();
+
+        // Inner dust ring
+        ctx.beginPath();
+        ctx.arc(ground.x, ground.y, ringR * 0.6, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(200, 160, 100, ' + (ringA * 0.4).toFixed(2) + ')';
+        ctx.lineWidth = 6 * (1 - ringT);
+        ctx.stroke();
+      }
+
+      // Lingering smoke/dust
+      if (t > 0.1 && t < 0.8) {
+        const smokeA = Math.min(1, (t - 0.1) / 0.2) * (1 - (t - 0.1) / 0.7) * 0.25;
+        const smokeR = 40 + t * 30;
+        const grad = ctx.createRadialGradient(ground.x, ground.y, 0, ground.x, ground.y, smokeR);
+        grad.addColorStop(0, 'rgba(80, 60, 40, ' + smokeA.toFixed(2) + ')');
+        grad.addColorStop(1, 'rgba(60, 40, 30, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ground.x - smokeR, ground.y - smokeR, smokeR * 2, smokeR * 2);
       }
     }
   }
@@ -868,6 +1155,9 @@ let magnetLocked = [];
 let teamPop = [];
 let fires = []; // {x, y, a (age in seconds)}
 let fireParticles = []; // client-side particles for rendering
+let lightningBolts = []; // client-side lightning effects
+let meteorEffects = []; // client-side meteor streak effects
+let earthquakeShakes = []; // client-side earthquake screen shake
 let targetingPower = null;
 let inspectMode = false;
 let inspectData = null; // {type:'settlement'|'walker', screenX, screenY, ...data}
@@ -2646,9 +2936,21 @@ function render() {
   }
   if (_p) { const _t = performance.now(); _sample.space = _t - _t0; _t0 = _t; }
 
-  // Apply zoom around viewport center (with armageddon screen shake)
-  const shx = armageddon ? armageddonShake.x : 0;
-  const shy = armageddon ? armageddonShake.y : 0;
+  // Apply zoom around viewport center (with screen shake)
+  let shx = armageddon ? armageddonShake.x : 0;
+  let shy = armageddon ? armageddonShake.y : 0;
+  for (const m of meteorEffects) {
+    if (m.impacted && m.shakeIntensity > 0) {
+      shx += (Math.random() - 0.5) * m.shakeIntensity * 2;
+      shy += (Math.random() - 0.5) * m.shakeIntensity * 2;
+    }
+  }
+  for (const eq of earthquakeShakes) {
+    const t = eq.life / eq.maxLife;
+    const intensity = t * 10;
+    shx += (Math.random() - 0.5) * intensity * 2;
+    shy += (Math.random() - 0.5) * intensity * 2;
+  }
   ctx.setTransform(zoom, 0, 0, zoom, _vpCX * (1 - zoom) + shx, _vpCY * (1 - zoom) + shy);
 
   rebuildWalkerGrid();
@@ -2817,6 +3119,8 @@ function render() {
 
   // Fire particles (on top of everything in world space)
   drawFireParticles();
+  drawLightningEffects();
+  drawMeteorEffects();
   if (_p) { const _t = performance.now(); _sample.fire = _t - _t0; _t0 = _t; }
 
   // Edge mist (world space, tied to tiles)
@@ -2831,6 +3135,7 @@ function render() {
       let radius = 0;
       if (targetingPower === 'earthquake') radius = EARTHQUAKE_RADIUS;
       else if (targetingPower === 'volcano') radius = VOLCANO_RADIUS;
+      else if (targetingPower === 'meteor') radius = METEOR_RADIUS;
 
       if (radius > 0) {
         for (let tx = Math.max(0, px - radius); tx < Math.min(localMapW, px + radius); tx++) {
@@ -2849,10 +3154,28 @@ function render() {
               ctx.lineTo(pBottom.x, pBottom.y);
               ctx.lineTo(pLeft.x, pLeft.y);
               ctx.closePath();
-              ctx.fillStyle = 'rgba(255, 140, 0, 0.25)';
+              ctx.fillStyle = targetingPower === 'meteor' ? 'rgba(255, 60, 20, 0.3)' : 'rgba(255, 140, 0, 0.25)';
               ctx.fill();
             }
           }
+        }
+      } else if (targetingPower === 'lightning') {
+        const tx = Math.floor(px), ty = Math.floor(py);
+        if (tx >= 0 && tx < localMapW && ty >= 0 && ty < localMapH) {
+          const t = heights[tx][ty], r = heights[tx + 1][ty];
+          const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
+          const pTop    = project(tx,     ty,     t);
+          const pRight  = project(tx + 1, ty,     r);
+          const pBottom = project(tx + 1, ty + 1, b);
+          const pLeft   = project(tx,     ty + 1, l);
+          ctx.beginPath();
+          ctx.moveTo(pTop.x, pTop.y);
+          ctx.lineTo(pRight.x, pRight.y);
+          ctx.lineTo(pBottom.x, pBottom.y);
+          ctx.lineTo(pLeft.x, pLeft.y);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(180, 200, 255, 0.4)';
+          ctx.fill();
         }
       } else if (targetingPower === 'swamp') {
         const tx = Math.floor(px), ty = Math.floor(py);
@@ -4000,7 +4323,6 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '1') sendMessage({ type: 'mode', mode: 0 });
   if (e.key === '2') sendMessage({ type: 'mode', mode: 1 });
   if (e.key === '3') sendMessage({ type: 'mode', mode: 2 });
-  if (e.key === '4') sendMessage({ type: 'mode', mode: 3 });
 });
 
 // Pan — middle mouse (purely local)
@@ -4746,6 +5068,12 @@ function gameLoop(now) {
   lastFrame = now;
   updateEdgePan(dt);
   updateFireParticles(dt);
+  updateLightningEffects(dt);
+  updateMeteorEffects(dt);
+  for (let i = earthquakeShakes.length - 1; i >= 0; i--) {
+    earthquakeShakes[i].life -= dt;
+    if (earthquakeShakes[i].life <= 0) earthquakeShakes.splice(i, 1);
+  }
   if (settingEffects) {
     updateArmageddonEffects(dt);
     spawnWaterfallParticles(dt);

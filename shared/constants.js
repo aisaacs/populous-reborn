@@ -30,10 +30,9 @@ const MAP_SIZE_PRESETS = {
 
 // ── Modes ───────────────────────────────────────────────────────────
 const MODE_SETTLE = 0;
-const MODE_MAGNET = 1;
+const MODE_GATHER = 1;
 const MODE_FIGHT = 2;
-const MODE_GATHER = 3;
-const MODE_NAMES = ['Settle', 'Magnet', 'Fight', 'Gather'];
+const MODE_NAMES = ['Settle', 'Gather', 'Fight'];
 
 // ── Gameplay ────────────────────────────────────────────────────────
 const WALKER_SPEED = 0.8;
@@ -57,14 +56,17 @@ const SETTLEMENT_LEVELS = [
 
 // ── Powers ──────────────────────────────────────────────────────────
 const POWERS = [
-  { id: 'swamp',      name: 'Swamp',      cost: 75,    hotkey: 'Q', targeted: true },
-  { id: 'earthquake', name: 'Earthquake', cost: 250,   hotkey: 'W', targeted: true },
-  { id: 'knight',     name: 'Knight',     cost: 400,   hotkey: 'E', targeted: false },
-  { id: 'volcano',    name: 'Volcano',    cost: 1500,  hotkey: 'R', targeted: true },
-  { id: 'flood',      name: 'Flood',      cost: 3000,  hotkey: 'T', targeted: false },
-  { id: 'armageddon', name: 'Armageddon', cost: 5000,  hotkey: 'Y', targeted: false },
+  { id: 'lightning',  name: 'Lightning',  cost: 40,    hotkey: 'Q', targeted: true },
+  { id: 'swamp',      name: 'Swamp',      cost: 75,    hotkey: 'W', targeted: true },
+  { id: 'earthquake', name: 'Earthquake', cost: 250,   hotkey: 'E', targeted: true },
+  { id: 'knight',     name: 'Knight',     cost: 400,   hotkey: 'R', targeted: false },
+  { id: 'meteor',     name: 'Meteor',     cost: 1500,  hotkey: 'T', targeted: true },
+  { id: 'volcano',    name: 'Volcano',    cost: 2500,  hotkey: 'Y', targeted: true },
+  { id: 'flood',      name: 'Flood',      cost: 3000,  hotkey: 'U', targeted: false },
+  { id: 'armageddon', name: 'Armageddon', cost: 5000,  hotkey: 'I', targeted: false },
 ];
-const EARTHQUAKE_RADIUS = 7;
+const EARTHQUAKE_RADIUS = 3;
+const METEOR_RADIUS = 4;
 const VOLCANO_RADIUS = 5;
 const KNIGHT_STRENGTH_MULT = 1.75;
 const KNIGHT_SPEED_MULT = 1.5;
@@ -82,8 +84,8 @@ const TERRAIN_LOWER_COST = 6;
 const CROP_ZONE_RADIUS = 2;
 const CROP_LEVEL_THRESHOLDS = [0, 0, 2, 4, 7, 10, 13, 17, 20, 24];
 const GROWTH_PER_CROP_PER_SEC = 0.1;
-// Level-based growth multiplier: L5 = 1.0x breakeven, low levels nerfed, high levels buffed
-const GROWTH_LEVEL_MULT = [0, 0.4, 0.5, 0.6, 0.8, 1.0, 1.1, 1.2, 1.3, 1.5];
+// Level-based growth multiplier: L1 tents can't grow, L5 = 1.0x breakeven, castles = 2.0x
+const GROWTH_LEVEL_MULT = [0, 0, 0.2, 0.35, 0.6, 1.0, 1.2, 1.4, 1.7, 2.0];
 
 // ── Walker Ejection ─────────────────────────────────────────────────
 const EJECT_DWELL_TIME = 15;
@@ -155,9 +157,9 @@ if (typeof module !== 'undefined') {
     MAP_W, MAP_H, TILE_HALF_W, TILE_HALF_H, HEIGHT_STEP, MAX_HEIGHT, SEA_LEVEL,
     MAX_TEAMS, TEAM_BLUE, TEAM_RED, TEAM_GREEN, TEAM_YELLOW, TEAM_PURPLE, TEAM_ORANGE,
     TEAM_COLORS, TEAM_NAMES, TEAM_SPRITE_NAMES, MAP_SIZE_PRESETS,
-    MODE_SETTLE, MODE_MAGNET, MODE_FIGHT, MODE_GATHER, MODE_NAMES,
+    MODE_SETTLE, MODE_GATHER, MODE_FIGHT, MODE_NAMES,
     WALKER_SPEED, MAX_LEVEL, LEVEL_CAPACITY, SETTLEMENT_LEVELS,
-    POWERS, EARTHQUAKE_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT, KNIGHT_ATTRITION_PER_SEC, KNIGHT_ASSAULT_MULT, KNIGHT_RETAL_MULT,
+    POWERS, EARTHQUAKE_RADIUS, METEOR_RADIUS, VOLCANO_RADIUS, KNIGHT_STRENGTH_MULT, KNIGHT_SPEED_MULT, KNIGHT_ATTRITION_PER_SEC, KNIGHT_ASSAULT_MULT, KNIGHT_RETAL_MULT,
     TERRAIN_TREES, TERRAIN_PEBBLES, TERRAIN_RAISE_COST, TERRAIN_LOWER_COST,
     CROP_ZONE_RADIUS, CROP_LEVEL_THRESHOLDS, GROWTH_PER_CROP_PER_SEC, GROWTH_LEVEL_MULT,
     EJECT_DWELL_TIME, EJECT_FRACTION, EJECT_MIN_STRENGTH,

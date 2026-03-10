@@ -30,19 +30,20 @@ flows in. Proximity radius prevents cross-map griefing.
 
 | Lvl | Name | Crops Needed | Capacity | Tech | Growth Mult | Footprint |
 |-----|------|-------------|----------|------|-------------|-----------|
-| 1 | Tent | 0 | 4 | 0 | 0.4x | 1x1 |
-| 2 | Hut | 2 | 8 | 1 | 0.5x | 1x1 |
-| 3 | Cottage | 4 | 15 | 1 | 0.6x | 1x1 |
-| 4 | House | 7 | 30 | 2 | 0.8x | 1x1 |
+| 1 | Tent | 0 | 4 | 0 | 0x | 1x1 |
+| 2 | Hut | 2 | 8 | 1 | 0.2x | 1x1 |
+| 3 | Cottage | 4 | 15 | 1 | 0.35x | 1x1 |
+| 4 | House | 7 | 30 | 2 | 0.6x | 1x1 |
 | 5 | Large House | 10 | 55 | 2 | 1.0x | 1x1 |
-| 6 | Manor | 13 | 90 | 3 | 1.1x | 1x1 |
-| 7 | Tower House | 17 | 140 | 3 | 1.2x | 1x1 |
-| 8 | Fortress | 20 | 200 | 4 | 1.3x | 1x1 |
-| 9 | Castle | 24 | 255 | 4 | 1.5x | 5x5 |
+| 6 | Manor | 13 | 90 | 3 | 1.2x | 1x1 |
+| 7 | Tower House | 17 | 140 | 3 | 1.4x | 1x1 |
+| 8 | Fortress | 20 | 200 | 4 | 1.7x | 1x1 |
+| 9 | Castle | 24 | 255 | 4 | 2.0x | 5x5 |
 
 **Growth mult** (`GROWTH_LEVEL_MULT`): Scales population growth rate. L5 is the breakeven (1.0x).
-Low-level settlements grow significantly slower, preventing tent spam from outpacing castles.
-A single castle outproduces ~87 tents in walker generation.
+Tents (L1) cannot grow at all — they're placeholders until you flatten more land. Low-level
+settlements grow very slowly, preventing spam from outpacing castles. A single castle outproduces
+~30 cottages in walker generation.
 
 **Castle footprint**: 5x5 tiles must all be flat. If any tile becomes non-flat, castle downgrades
 to fortress (L8). This is the payoff for heavy terrain investment.
@@ -76,13 +77,14 @@ Growth is continuous: `crops * 0.1 * growthMult * dt` per tick. Ejection only ha
 **Settle mode**. At capacity, settlement waits 15s then ejects half as a new walker inheriting
 the settlement's tech level. Over-capacity from level downgrade ejects immediately.
 
-### Production rates (approximate, 1 crop each unless noted)
+### Production rates (approximate, minimum crops for level)
 
 | Level | Effective growth/sec | Fill time | Eject cycle | Walkers/sec |
 |-------|---------------------|-----------|-------------|-------------|
-| L1 Tent | 0.04 | 100s | 115s | 0.017 |
-| L5 Large House | 0.10 | 55s | 70s | 0.39 |
-| L9 Castle (24 crops) | 3.60 | 71s | 86s | 1.48 |
+| L1 Tent | 0 (can't grow) | — | — | 0 |
+| L3 Cottage (4 crops) | 0.14 | 107s | 122s | 0.061 |
+| L5 Large House (10) | 1.00 | 55s | 70s | 0.39 |
+| L9 Castle (24 crops) | 4.80 | 53s | 68s | 1.87 |
 
 ## Walker Stats
 
@@ -93,8 +95,8 @@ the settlement's tech level. Over-capacity from level downgrade ejects immediate
 | `HOMELESS_ATTRITION_PER_SEC` | 0.5 | 10x attrition when team has no settlements |
 
 Walkers carry strength (1-255) and tech (0-4, inherited from settlement). They move toward
-targets based on team mode: Settle (find flat land), Magnet (go to papal magnet), Fight
-(attack enemies), Gather (go to own settlements).
+targets based on team mode: Settle (find flat land), Gather (go to beacon), Fight
+(attack enemies).
 
 ## Combat
 
@@ -135,19 +137,23 @@ available after ~1 min of having 500 pop. Volcano (1500) requires sustained high
 
 ## Powers
 
-Ordered by cost. Hotkeys Q-Y left to right.
+Ordered by cost. Hotkeys Q-I left to right.
 
 | Power | Cost | Key | Targeted | Effect |
 |-------|------|-----|----------|--------|
-| Swamp | 75 | Q | Yes | 3-5 swamp tiles near target. Enemy walkers die on contact (knights immune) |
-| Earthquake | 250 | W | Yes | Random raise/lower in radius 7. Devastates settlements |
-| Knight | 400 | E | No | Leader + settlement → knight. Consumes settlement, creates ruins |
-| Volcano | 1500 | R | Yes | Raise to max height in radius 5, add rocks, kill everything |
-| Flood | 3000 | T | No | Lower ALL terrain by 1. Drowns low-lying entities |
-| Armageddon | 5000 | Y | No | Destroy all settlements, everyone fights at map center. Drains all mana |
+| Lightning | 40 | Q | Yes | Single tile. Deals 30-50 damage to strongest walker or settlement. Fire at impact |
+| Swamp | 75 | W | Yes | 3-5 swamp tiles near target. Enemy walkers die on contact (knights immune) |
+| Earthquake | 250 | E | Yes | Random raise/lower in radius 4. Devastates settlements |
+| Knight | 400 | R | No | Leader + settlement → knight. Consumes settlement, creates ruins |
+| Meteor | 1500 | T | Yes | Lowers terrain toward 0 in radius 4 with falloff. Kills all walkers/settlements, leaves ruins. Rebuildable (no rocks) |
+| Volcano | 2500 | Y | Yes | Raise to max height in radius 5, add rocks, kill everything. Permanently impassable |
+| Flood | 3000 | U | No | Lower ALL terrain by 1. Drowns low-lying entities |
+| Armageddon | 5000 | I | No | Destroy all settlements, everyone fights at map center. Drains all mana |
 
-**Design intent**: Swamp/earthquake are tactical (affordable, frequent). Knight is a mid-game
-investment. Volcano/flood are strategic (rare, game-changing). Armageddon is the endgame gambit.
+**Design intent**: Lightning is a spammable sniper shot for picking off key units. Swamp/earthquake
+are tactical area denial. Knight is a mid-game investment. Meteor vs Volcano is the key choice:
+meteor is cheaper and the area is rebuildable, volcano is permanent terrain destruction. Flood is
+the global nuke. Armageddon is the endgame gambit.
 
 ## Tick & Network
 
