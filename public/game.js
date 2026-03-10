@@ -157,23 +157,102 @@ let walkerSpritesLoaded = false;
   }
 })();
 
-// ── Boulder Sprite ──────────────────────────────────────────────────
-const boulderImg = new Image();
+// ── Boulder Sprites (height-based variants) ─────────────────────────
+const boulderImgs = {};
+const boulderLoadState = {};
+for (const variant of ['default', 'sand', 'snow']) {
+  boulderImgs[variant] = new Image();
+  boulderLoadState[variant] = false;
+  const src = variant === 'default' ? 'gfx/boulders.png' : 'gfx/boulders-' + variant + '.png';
+  boulderImgs[variant].src = src;
+  boulderImgs[variant].onload = () => { boulderLoadState[variant] = true; };
+}
+// Backwards compat
+const boulderImg = boulderImgs['default'];
 let boulderLoaded = false;
-boulderImg.src = 'gfx/boulders.png';
-boulderImg.onload = () => { boulderLoaded = true; };
+boulderImg.addEventListener('load', () => { boulderLoaded = true; });
 
-// ── Tree Sprite ─────────────────────────────────────────────────────
-const treeImg = new Image();
+// ── Tree Sprites (height-based variants) ────────────────────────────
+// Variant keys: palm (beach h1-2), oak (lowland h3-4), pine (highland h5-6), snowpine (mountain h7-8)
+const treeImgs = {};
+const treeLoadState = {};
+for (const variant of ['palm', 'oak', 'pine', 'snowpine']) {
+  treeImgs[variant] = new Image();
+  treeLoadState[variant] = false;
+  const src = variant === 'oak' ? 'gfx/tree.png' : 'gfx/' + variant + '.png';
+  treeImgs[variant].src = src;
+  treeImgs[variant].onload = () => { treeLoadState[variant] = true; };
+}
+// Backwards compat
+const treeImg = treeImgs['oak'];
 let treeLoaded = false;
-treeImg.src = 'gfx/tree.png';
-treeImg.onload = () => { treeLoaded = true; };
+treeImg.addEventListener('load', () => { treeLoaded = true; });
 
-// ── Pebbles Sprite ──────────────────────────────────────────────────
-const pebblesImg = new Image();
+// ── Pebbles Sprites (height-based variants) ─────────────────────────
+const pebblesImgs = {};
+const pebblesLoadState = {};
+for (const variant of ['default', 'sand']) {
+  pebblesImgs[variant] = new Image();
+  pebblesLoadState[variant] = false;
+  const src = variant === 'default' ? 'gfx/pebbles.png' : 'gfx/pebbles-' + variant + '.png';
+  pebblesImgs[variant].src = src;
+  pebblesImgs[variant].onload = () => { pebblesLoadState[variant] = true; };
+}
+// Backwards compat
+const pebblesImg = pebblesImgs['default'];
 let pebblesLoaded = false;
-pebblesImg.src = 'gfx/pebbles.png';
-pebblesImg.onload = () => { pebblesLoaded = true; };
+pebblesImg.addEventListener('load', () => { pebblesLoaded = true; });
+
+// ── Sprite Config (live-reloadable via WebSocket) ────────────────────
+let spriteConfig = null;
+function loadSpriteConfig() {
+  fetch('sprite-config.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(cfg => {
+      spriteConfig = cfg;
+      if (typeof _terrainDirtyAll === 'function') _terrainDirtyAll();
+      console.log('[sprite-config] loaded');
+    })
+    .catch(() => {});
+}
+loadSpriteConfig();
+// Server sends 'sprite_config' message when file changes — handled in WS message handler
+
+function getSpriteParams(category, variant) {
+  const defaults = { scale: 0.5, anchorX: 0.5, anchorY: 1.0, offsetY: 0 };
+  if (!spriteConfig || !spriteConfig[category]) return defaults;
+  return spriteConfig[category][variant] || spriteConfig[category]['default'] || defaults;
+}
+
+// ── Height-based variant selection ───────────────────────────────────
+// Uses tileColorIdx thresholds: 1=sand, 2-5=grass, 6-7=rock, 8=peak
+function tileColorGroup(tx, ty) {
+  if (!heights[tx] || !heights[tx + 1]) return 1;
+  const t = heights[tx][ty], r = heights[tx + 1][ty];
+  const b = heights[tx + 1][ty + 1], l = heights[tx][ty + 1];
+  const ci = (t === r && r === b && b === l)
+    ? Math.max(1, Math.min(MAX_HEIGHT, t))
+    : Math.max(1, Math.min(MAX_HEIGHT, Math.ceil((t + r + b + l) / 4)));
+  return ci;
+}
+function getTreeVariant(tx, ty) {
+  const ci = tileColorGroup(tx, ty);
+  if (ci <= 1) return 'palm';    // sand
+  if (ci <= 5) return 'oak';     // grass
+  if (ci <= 6) return 'pine';    // lower rock/highland
+  return 'snowpine';             // peaks
+}
+function getBoulderVariant(tx, ty) {
+  const ci = tileColorGroup(tx, ty);
+  if (ci <= 1) return 'sand';    // sand
+  if (ci <= 6) return 'default'; // grass + lower rock
+  return 'snow';                 // peaks
+}
+function getPebblesVariant(tx, ty) {
+  const ci = tileColorGroup(tx, ty);
+  if (ci <= 1) return 'sand';    // sand
+  return 'default';
+}
 
 // ── Ruins Sprite ────────────────────────────────────────────────────
 const ruinsImg = new Image();
@@ -308,6 +387,7 @@ let terrainBufferW = 0;
 let terrainBufferH = 0;
 let terrainBufferDirty = null;      // Uint8Array(mapW*mapH), 1=needs redraw
 let terrainBufferNeedsFull = true;  // triggers complete re-render
+function _terrainDirtyAll() { terrainBufferNeedsFull = true; }
 let terrainBufferInited = false;
 // Previous frame overlay state for diffing
 let prevCropTeamTiles = null;
@@ -1342,6 +1422,7 @@ let zoom = 2;
 // Hoisted origin — recomputed once per frame at top of render()
 let _originX = 0;
 let _originY = 0;
+const _tileSpriteCols = []; // reusable buffer: [col, row, col, row, ...] for depth-sorted tile sprites
 
 // Viewport — usable area excluding sidebar. Recomputed per frame.
 const SIDEBAR_WIDTH = 160;
@@ -1591,8 +1672,10 @@ function drawTile(tx, ty) {
         ctx.fill();
       }
 
-      // Sprite overlays
-      drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY);
+      // Collect sprite for depth-sorted pass (don't draw inline)
+      if (rockTiles[tileIdx] || treeTiles[tileIdx] || pebbleTiles[tileIdx] || ruinTiles[tileIdx]) {
+        _tileSpriteCols.push(tx, ty);
+      }
       return;
     }
   }
@@ -1688,43 +1771,55 @@ function drawTile(tx, ty) {
     ctx.stroke();
   }
 
-  drawTileSprites(tileIdx, pTop.x, pTop.y, pRight.x, pRight.y, pBottom.x, pBottom.y, pLeft.x, pLeft.y);
+  // Collect sprite for depth-sorted pass (don't draw inline)
+  if (rockTiles[tileIdx] || treeTiles[tileIdx] || pebbleTiles[tileIdx] || ruinTiles[tileIdx]) {
+    _tileSpriteCols.push(tx, ty);
+  }
+}
+
+// Draw a sprite using config params.
+// anchorX: 0=left, 0.5=center, 1=right (fraction of sprite width from left)
+// anchorY: 0=top, 0.5=center, 1=bottom (fraction of sprite height from top)
+// offsetY: 0=tile center, 1=tile bottom corner (interpolation toward pBottomY)
+// scale: fraction of tileW used as sprite width
+function _drawSpriteOnTile(targetCtx, img, tileW, midX, midY, pBottomY, params) {
+  const sw = tileW * params.scale;
+  const sh = sw * (img.height / img.width);
+  const baseY = midY + (pBottomY - midY) * (params.offsetY || 0);
+  const dx = midX - sw * (params.anchorX || 0.5);
+  const dy = baseY - sh * (params.anchorY || 1.0);
+  targetCtx.drawImage(img, dx, dy, sw, sh);
 }
 
 // Extracted sprite overlays (boulders, trees, pebbles, ruins)
 function drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY) {
-  // Boulder sprite on rock tiles
-  if (rockTiles[tileIdx] && boulderLoaded) {
-    const midX = (pTopX + pBottomX) / 2;
-    const midY = (pTopY + pBottomY) / 2;
-    const tileW = (pRightX - pLeftX);
-    const scale = tileW * 0.7 / boulderImg.width;
-    const sw = boulderImg.width * scale;
-    const sh = boulderImg.height * scale;
-    ctx.drawImage(boulderImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
+  const tx = tileIdx % localMapW;
+  const ty = (tileIdx - tx) / localMapW;
+  const midX = (pTopX + pBottomX) / 2;
+  const midY = (pTopY + pBottomY) / 2;
+  const tileW = (pRightX - pLeftX);
+
+  if (rockTiles[tileIdx]) {
+    const variant = getBoulderVariant(tx, ty);
+    const img = boulderImgs[variant];
+    if (boulderLoadState[variant]) {
+      _drawSpriteOnTile(ctx, img, tileW, midX, midY, pBottomY, getSpriteParams('boulder', variant));
+    }
   }
 
-  // Tree sprite on tree tiles
-  if (treeTiles[tileIdx] && treeLoaded) {
-    const midX = (pTopX + pBottomX) / 2;
-    const midY = (pTopY + pBottomY) / 2;
-    const tileW = (pRightX - pLeftX);
-    const scale = tileW * 0.7 / treeImg.width;
-    const sw = treeImg.width * scale;
-    const sh = treeImg.height * scale;
-    ctx.drawImage(treeImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
+  if (treeTiles[tileIdx]) {
+    const variant = getTreeVariant(tx, ty);
+    const img = treeImgs[variant];
+    if (treeLoadState[variant]) {
+      _drawSpriteOnTile(ctx, img, tileW, midX, midY, pBottomY, getSpriteParams('tree', variant));
+    }
   }
 
-  // Pebble sprite on pebble tiles
   if (pebbleTiles[tileIdx]) {
-    const midX = (pTopX + pBottomX) / 2;
-    const midY = (pTopY + pBottomY) / 2;
-    const tileW = (pRightX - pLeftX);
-    if (pebblesLoaded) {
-      const scale = tileW * 0.5 / pebblesImg.width;
-      const sw = pebblesImg.width * scale;
-      const sh = pebblesImg.height * scale;
-      ctx.drawImage(pebblesImg, midX - sw / 2, midY - sh * 0.5, sw, sh);
+    const variant = getPebblesVariant(tx, ty);
+    const img = pebblesImgs[variant];
+    if (pebblesLoadState[variant]) {
+      _drawSpriteOnTile(ctx, img, tileW, midX, midY, pBottomY, getSpriteParams('pebbles', variant));
     } else {
       ctx.fillStyle = '#8a7a6a';
       for (let i = 0; i < 4; i++) {
@@ -1740,19 +1835,19 @@ function drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBot
   // Ruins sprite on ruin tiles
   const ruinTeam = ruinTiles[tileIdx];
   if (ruinTeam) {
-    const midX = (pTopX + pBottomX) / 2;
-    const midY = (pTopY + pBottomY) / 2;
-    const tileW = (pRightX - pLeftX);
     const ruinTeamIdx = ruinTeam - 1;
     if (ruinsLoaded) {
-      const scale = tileW * 0.6 / ruinsImg.width;
-      const sw = ruinsImg.width * scale;
-      const sh = ruinsImg.height * scale;
-      ctx.drawImage(ruinsImg, midX - sw / 2, midY - sh * 0.6, sw, sh);
+      const rp = getSpriteParams('ruins', 'default');
+      const sw = tileW * rp.scale;
+      const sh = sw * (ruinsImg.height / ruinsImg.width);
+      const baseY = midY + (pBottomY - midY) * (rp.offsetY || 0);
+      const dx = midX - sw * (rp.anchorX || 0.5);
+      const dy = baseY - sh * (rp.anchorY || 0.6);
+      ctx.drawImage(ruinsImg, dx, dy, sw, sh);
       ctx.save();
       ctx.globalAlpha = 0.2;
       ctx.fillStyle = TEAM_COLORS[ruinTeamIdx];
-      ctx.fillRect(midX - sw / 2, midY - sh * 0.6, sw, sh);
+      ctx.fillRect(dx, dy, sw, sh);
       ctx.restore();
     } else {
       ctx.fillStyle = ruinTeamIdx === TEAM_BLUE ? '#4a5a6a' : '#6a4a4a';
@@ -1861,33 +1956,31 @@ function drawTileToBuffer(tx, ty) {
 
 // Sprite overlays that can render to any context (buffer or screen)
 function drawTileSpritesToCtx(targetCtx, tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY) {
-  if (rockTiles[tileIdx] && boulderLoaded) {
-    const midX = (pTopX + pBottomX) / 2;
-    const midY = (pTopY + pBottomY) / 2;
-    const tileW = (pRightX - pLeftX);
-    const scale = tileW * 0.7 / boulderImg.width;
-    const sw = boulderImg.width * scale;
-    const sh = boulderImg.height * scale;
-    targetCtx.drawImage(boulderImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
+  const tx = tileIdx % localMapW;
+  const ty = (tileIdx - tx) / localMapW;
+  const midX = (pTopX + pBottomX) / 2;
+  const midY = (pTopY + pBottomY) / 2;
+  const tileW = (pRightX - pLeftX);
+
+  if (rockTiles[tileIdx]) {
+    const variant = getBoulderVariant(tx, ty);
+    const img = boulderImgs[variant];
+    if (boulderLoadState[variant]) {
+      _drawSpriteOnTile(targetCtx, img, tileW, midX, midY, pBottomY, getSpriteParams('boulder', variant));
+    }
   }
-  if (treeTiles[tileIdx] && treeLoaded) {
-    const midX = (pTopX + pBottomX) / 2;
-    const midY = (pTopY + pBottomY) / 2;
-    const tileW = (pRightX - pLeftX);
-    const scale = tileW * 0.7 / treeImg.width;
-    const sw = treeImg.width * scale;
-    const sh = treeImg.height * scale;
-    targetCtx.drawImage(treeImg, midX - sw / 2, midY - sh * 0.75, sw, sh);
+  if (treeTiles[tileIdx]) {
+    const variant = getTreeVariant(tx, ty);
+    const img = treeImgs[variant];
+    if (treeLoadState[variant]) {
+      _drawSpriteOnTile(targetCtx, img, tileW, midX, midY, pBottomY, getSpriteParams('tree', variant));
+    }
   }
   if (pebbleTiles[tileIdx]) {
-    const midX = (pTopX + pBottomX) / 2;
-    const midY = (pTopY + pBottomY) / 2;
-    const tileW = (pRightX - pLeftX);
-    if (pebblesLoaded) {
-      const scale = tileW * 0.5 / pebblesImg.width;
-      const sw = pebblesImg.width * scale;
-      const sh = pebblesImg.height * scale;
-      targetCtx.drawImage(pebblesImg, midX - sw / 2, midY - sh * 0.5, sw, sh);
+    const variant = getPebblesVariant(tx, ty);
+    const img = pebblesImgs[variant];
+    if (pebblesLoadState[variant]) {
+      _drawSpriteOnTile(targetCtx, img, tileW, midX, midY, pBottomY, getSpriteParams('pebbles', variant));
     }
   }
   const ruinTeam = ruinTiles[tileIdx];
@@ -1989,14 +2082,16 @@ function drawWalker(w) {
 
   const key = spriteDir + '-' + team + '-' + animFrame;
   const img = walkerSprites[key];
-  const spriteH = isKnight ? 18 : 14;
+  const wCfg = spriteConfig && spriteConfig.walker || {};
+  const spriteH = isKnight ? (wCfg.knightHeight || 18) : (wCfg.height || 14);
+  const wOffsetY = wCfg.offsetY !== undefined ? wCfg.offsetY : 2;
   const spriteReady = walkerSpritesLoaded && img && (img instanceof HTMLCanvasElement || (img.complete && img.naturalWidth > 0));
 
   if (spriteReady) {
     const scale = spriteH / (img.height || img.naturalHeight || 14);
     const spriteW = (img.width || img.naturalWidth || 14) * scale;
     const drawX = p.x - spriteW / 2;
-    const drawY = p.y - spriteH + 2;
+    const drawY = p.y - spriteH + wOffsetY;
 
     ctx.save();
     if (mirror) {
@@ -2079,17 +2174,20 @@ function drawSettlement(s) {
   ctx.stroke();
   ctx.restore();
 
-  // Sprite: center at top corner of diamond, bottom-center at bottom corner
+  // Sprite: positioned via sprite-config.json
   if (settlementSpritesLoaded && s.l >= 1 && s.l <= SETT_LEVEL_NAMES.length) {
+    const levelName = SETT_LEVEL_NAMES[s.l - 1];
     const team = TEAM_SPRITE_NAMES[s.t] || 'blue';
-    const key = SETT_LEVEL_NAMES[s.l - 1] + '-' + team;
+    const key = levelName + '-' + team;
     const img = settlementSprites[key];
     if (img && (img instanceof HTMLCanvasElement || (img.complete && img.naturalWidth > 0))) {
       const imgW = img.width || img.naturalWidth;
       const imgH = img.height || img.naturalHeight;
       const tileH = pBottom.y - pTop.y;
-      const fillPct = s.sz >= 5 ? 0.55 : s.l === 1 ? 0.55 : s.l <= 2 ? 0.75 : s.l <= 6 ? 0.85 : 0.95;
-      const centerY = s.sz >= 5 ? pTop.y + tileH * 0.45 : s.l === 1 ? pTop.y + tileH * 0.35 : pTop.y + tileH * 0.25;
+      const cfg = getSpriteParams('settlement', levelName);
+      const fillPct = cfg.fillPct !== undefined ? cfg.fillPct : 0.85;
+      const centerYPct = cfg.centerY !== undefined ? cfg.centerY : 0.25;
+      const centerY = pTop.y + tileH * centerYPct;
       const dh = tileH * fillPct / 0.75;
       const scale = dh / imgH;
       const dw = imgW * scale;
@@ -3059,23 +3157,13 @@ function render() {
       }
     }
 
-    // Sprite overlays (rocks, trees, pebbles, ruins) — drawn after grid so they appear on top
+    // Collect visible tile sprites for depth-sorted rendering (pass 2)
     for (let row = _startRow; row < _endRow; row++) {
       for (let col = _startCol; col < _endCol; col++) {
         const tileIdx = row * localMapW + col;
         if (fallenTiles[tileIdx]) continue;
         if (!rockTiles[tileIdx] && !treeTiles[tileIdx] && !pebbleTiles[tileIdx] && !ruinTiles[tileIdx]) continue;
-        const t = heights[col][row], r = heights[col + 1][row];
-        const b = heights[col + 1][row + 1], l = heights[col][row + 1];
-        const pTopX = _originX + (col - row) * TILE_HALF_W;
-        const pTopY = _originY + (col + row) * TILE_HALF_H - t * HEIGHT_STEP;
-        const pRightX = _originX + (col + 1 - row) * TILE_HALF_W;
-        const pRightY = _originY + (col + 1 + row) * TILE_HALF_H - r * HEIGHT_STEP;
-        const pBottomX = _originX + (col + 1 - row - 1) * TILE_HALF_W;
-        const pBottomY = _originY + (col + 1 + row + 1) * TILE_HALF_H - b * HEIGHT_STEP;
-        const pLeftX = _originX + (col - row - 1) * TILE_HALF_W;
-        const pLeftY = _originY + (col + row + 1) * TILE_HALF_H - l * HEIGHT_STEP;
-        drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY);
+        _tileSpriteCols.push(col, row);
       }
     }
 
@@ -3098,8 +3186,14 @@ function render() {
 
   if (_p) { const _t = performance.now(); _sample.terrain = _t - _t0; _sample.tileCount = _waterCount + _landCount; _sample.waterCount = _waterCount; _sample.landCount = _landCount; _t0 = _t; }
 
-  // Pass 2: settlements, walkers, and fires sorted together by depth (x+y)
+  // Pass 2: tile sprites, settlements, walkers, and fires sorted together by depth (x+y)
   const drawList = [];
+  // Add tile sprites collected from terrain pass (or fallback: scan visible tiles)
+  for (let i = 0; i < _tileSpriteCols.length; i += 2) {
+    const col = _tileSpriteCols[i], row = _tileSpriteCols[i + 1];
+    drawList.push({ depth: col + row + 0.25, type: 't', col: col, row: row });
+  }
+  _tileSpriteCols.length = 0;
   for (const s of settlements) {
     drawList.push({ depth: s.ox + s.oy + s.sz, type: 's', obj: s });
   }
@@ -3111,7 +3205,22 @@ function render() {
   }
   drawList.sort((a, b) => a.depth - b.depth);
   for (const item of drawList) {
-    if (item.type === 's') drawSettlement(item.obj);
+    if (item.type === 't') {
+      const col = item.col, row = item.row;
+      const tileIdx = row * localMapW + col;
+      const t = heights[col][row], r = heights[col + 1][row];
+      const b = heights[col + 1][row + 1], l = heights[col][row + 1];
+      const pTopX = _originX + (col - row) * TILE_HALF_W;
+      const pTopY = _originY + (col + row) * TILE_HALF_H - t * HEIGHT_STEP;
+      const pRightX = _originX + (col + 1 - row) * TILE_HALF_W;
+      const pRightY = _originY + (col + 1 + row) * TILE_HALF_H - r * HEIGHT_STEP;
+      const pBottomX = _originX + (col + 1 - row - 1) * TILE_HALF_W;
+      const pBottomY = _originY + (col + 1 + row + 1) * TILE_HALF_H - b * HEIGHT_STEP;
+      const pLeftX = _originX + (col - row - 1) * TILE_HALF_W;
+      const pLeftY = _originY + (col + row + 1) * TILE_HALF_H - l * HEIGHT_STEP;
+      drawTileSprites(tileIdx, pTopX, pTopY, pRightX, pRightY, pBottomX, pBottomY, pLeftX, pLeftY);
+    }
+    else if (item.type === 's') drawSettlement(item.obj);
     else if (item.type === 'w') drawWalker(item.obj);
     else drawSingleFire(item.obj);
   }
@@ -3809,6 +3918,12 @@ function handleServerMessage(msg) {
 
     case 'error':
       document.getElementById('error-text').textContent = msg.message;
+      break;
+
+    case 'sprite_config':
+      spriteConfig = msg.config;
+      _terrainDirtyAll();
+      console.log('[sprite-config] live reload via WS');
       break;
   }
 }

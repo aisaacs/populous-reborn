@@ -383,6 +383,21 @@ function startGame(room) {
 // ── WebSocket Handler ───────────────────────────────────────────────
 const wss = new WebSocketServer({ server, perMessageDeflate: true });
 
+// ── Sprite Config Live Reload ─────────────────────────────────────
+const SPRITE_CONFIG_PATH = path.join(__dirname, 'public', 'sprite-config.json');
+try {
+  fs.watch(SPRITE_CONFIG_PATH, { persistent: false }, () => {
+    try {
+      const config = JSON.parse(fs.readFileSync(SPRITE_CONFIG_PATH, 'utf8'));
+      const msg = JSON.stringify({ type: 'sprite_config', config });
+      for (const c of wss.clients) {
+        if (c.readyState === 1) c.send(msg);
+      }
+      console.log('[sprite-config] pushed to', wss.clients.size, 'clients');
+    } catch(e) { /* ignore parse errors during save */ }
+  });
+} catch(e) { console.warn('[sprite-config] watch failed:', e.message); }
+
 wss.on('connection', (ws) => {
   let playerRoom = null;
   let playerTeam = -1;

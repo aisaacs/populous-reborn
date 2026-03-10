@@ -1,0 +1,36 @@
+{
+  "tree": {
+    "palm":     { "scale": 0.45, "anchorX": 0.2, "anchorY": 0.9, "offsetY": 0 },
+    "oak":      { "scale": 0.65, "anchorX": 0.5, "anchorY": 0.9, "offsetY": 0 },
+    "pine":     { "scale": 0.45, "anchorX": 0.5, "anchorY": 0.9, "offsetY": 0 },
+    "snowpine": { "scale": 0.45, "anchorX": 0.5, "anchorY": 0.93, "offsetY": 0 }
+  },
+  "boulder": {
+    "default":  { "scale": 0.60, "anchorX": 0.5, "anchorY": 1.0, "offsetY": 0.4 },
+    "sand":     { "scale": 0.60, "anchorX": 0.42, "anchorY": 0.9, "offsetY": 0.4 },
+    "snow":     { "scale": 0.60, "anchorX": 0.5, "anchorY": 1.0, "offsetY": 0.4 }
+  },
+  "pebbles": {
+    "default":  { "scale": 0.40, "anchorX": 0.5, "anchorY": 0.5, "offsetY": 0 },
+    "sand":     { "scale": 0.40, "anchorX": 0.5, "anchorY": 0.5, "offsetY": 0 }
+  },
+  "ruins": {
+    "default":  { "scale": 0.60, "anchorX": 0.5, "anchorY": 0.6, "offsetY": 0 }
+  },
+  "settlement": {
+    "tent":       { "fillPct": 0.55, "centerY": 0.35 },
+    "hut":        { "fillPct": 0.75, "centerY": 0.25 },
+    "cottage":    { "fillPct": 0.75, "centerY": 0.25 },
+    "house":      { "fillPct": 0.85, "centerY": 0.25 },
+    "largehouse": { "fillPct": 0.85, "centerY": 0.25 },
+    "manor":      { "fillPct": 0.85, "centerY": 0.25 },
+    "towerhouse": { "fillPct": 0.95, "centerY": 0.12 },
+    "fortress":   { "fillPct": 0.95, "centerY": 0.23 },
+    "castle":     { "fillPct": 0.5, "centerY": 0.33 }
+  },
+  "walker": {
+    "height": 14,
+    "knightHeight": 18,
+    "offsetY": 2
+  }
+}
