@@ -151,8 +151,11 @@ function startTick(room) {
 
     // Compute shared delta once if anyone will use it
     let sharedDelta = null;
+    let walkerBuf = null;
     if (!allNeedFull) {
-      sharedDelta = G.computeDelta(state, heightsPayload);
+      const result = G.computeDelta(state, heightsPayload);
+      sharedDelta = result.delta;
+      walkerBuf = G.encodeWalkerBinary(result.walkerDelta);
     }
 
     // Build per-team serialized messages
@@ -160,21 +163,26 @@ function startTick(room) {
     for (let i = 0; i < room.maxPlayers; i++) {
       if (room.players[i] === null) continue; // Skip AI teams
 
-      let json;
       if (room.needsFullSnapshot[i] || periodicFull) {
+        // Full snapshots stay as JSON strings
         const msg = G.serializeFullState(state, i, heightsPayload);
-        json = JSON.stringify(msg);
+        teamMessages[i] = JSON.stringify(msg);
         room.needsFullSnapshot[i] = false;
       } else {
+        // Delta: binary frame = [u32 jsonLen][json bytes][walker binary]
         const msg = Object.assign({}, sharedDelta);
         msg.mana = Math.floor(state.mana[i]);
         msg.team = i;
         msg.numTeams = state.numTeams;
         msg.mapW = state.mapW;
         msg.mapH = state.mapH;
-        json = JSON.stringify(msg);
+        const jsonBuf = Buffer.from(JSON.stringify(msg), 'utf8');
+        const combined = Buffer.alloc(4 + jsonBuf.length + walkerBuf.length);
+        combined.writeUInt32LE(jsonBuf.length, 0);
+        jsonBuf.copy(combined, 4);
+        walkerBuf.copy(combined, 4 + jsonBuf.length);
+        teamMessages[i] = combined;
       }
-      teamMessages[i] = json;
     }
 
     if (periodicFull) state._fullSnapshotCounter = 0;

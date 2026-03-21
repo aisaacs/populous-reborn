@@ -1728,6 +1728,53 @@ function computeWalkerDelta(state) {
   return { wMov, wUpd, wRem };
 }
 
+// Encode walker delta as binary ArrayBuffer for bandwidth reduction
+// Format: [u16 wMovCount][u16 wUpdCount][u16 wRemCount]
+//         [wMov × 8 bytes: id(u32) x(u16) y(u16)]
+//         [wUpd × 14 bytes: id(u32) flags(u8) str(u8) x(u16) y(u16) tx(u16) ty(u16)]
+//         [wRem × 4 bytes: id(u32)]
+// Positions encoded as value×100 clamped to u16. Flags byte: team(3)|leader(1)|knight(1)|unused(3)
+function encodeWalkerBinary(wd) {
+  const movCount = wd.wMov.length / 3;
+  const updCount = wd.wUpd.length;
+  const remCount = wd.wRem.length;
+  const size = 6 + movCount * 8 + updCount * 14 + remCount * 4;
+  const buf = Buffer.alloc(size);
+  let off = 0;
+
+  buf.writeUInt16LE(movCount, off); off += 2;
+  buf.writeUInt16LE(updCount, off); off += 2;
+  buf.writeUInt16LE(remCount, off); off += 2;
+
+  const encPos = (v) => Math.max(0, Math.min(65535, Math.round(v * 100)));
+
+  // wMov: flat triplets [id, x, y, ...]
+  for (let i = 0; i < wd.wMov.length; i += 3) {
+    buf.writeUInt32LE(wd.wMov[i], off); off += 4;
+    buf.writeUInt16LE(encPos(wd.wMov[i + 1]), off); off += 2;
+    buf.writeUInt16LE(encPos(wd.wMov[i + 2]), off); off += 2;
+  }
+
+  // wUpd: objects {id, t, s, x, y, tx, ty, l?, k?}
+  for (const w of wd.wUpd) {
+    buf.writeUInt32LE(w.id, off); off += 4;
+    const flags = ((w.t & 0x07) << 5) | ((w.l || 0) << 4) | ((w.k || 0) << 3);
+    buf.writeUInt8(flags, off); off += 1;
+    buf.writeUInt8(w.s, off); off += 1;
+    buf.writeUInt16LE(encPos(w.x), off); off += 2;
+    buf.writeUInt16LE(encPos(w.y), off); off += 2;
+    buf.writeUInt16LE(encPos(w.tx), off); off += 2;
+    buf.writeUInt16LE(encPos(w.ty), off); off += 2;
+  }
+
+  // wRem: walker IDs
+  for (const id of wd.wRem) {
+    buf.writeUInt32LE(id, off); off += 4;
+  }
+
+  return buf;
+}
+
 function computeSettlementDelta(state) {
   const prev = state._prevSettlements;
   const sUpd = [];
@@ -1795,11 +1842,8 @@ function computeDelta(state, heightsPayload) {
     }
   }
 
-  // Walker delta
-  const wd = computeWalkerDelta(state);
-  if (wd.wMov.length > 0) delta.wMov = wd.wMov;
-  if (wd.wUpd.length > 0) delta.wUpd = wd.wUpd;
-  if (wd.wRem.length > 0) delta.wRem = wd.wRem;
+  // Walker delta — encoded as binary, not included in JSON delta
+  const walkerDelta = computeWalkerDelta(state);
 
   // Settlement delta
   const sd = computeSettlementDelta(state);
@@ -1906,7 +1950,7 @@ function computeDelta(state, heightsPayload) {
 
   if (state.sfxQueue.length > 0) delta.sfx = state.sfxQueue;
 
-  return delta;
+  return { delta, walkerDelta };
 }
 
 function serializeFullState(state, team, heightsPayload) {
@@ -2668,6 +2712,7 @@ module.exports = {
   computeHeightsPayload,
   serializeState,
   computeDelta,
+  encodeWalkerBinary,
   serializeFullState,
   serializeReplaySnapshot,
 

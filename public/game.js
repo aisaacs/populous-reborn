@@ -3722,6 +3722,7 @@ function connectToServer() {
   if (ws && (ws.readyState === 0 || ws.readyState === 1)) return; // Already connected/connecting
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(protocol + '//' + location.host);
+  ws.binaryType = 'arraybuffer';
 
   ws.onopen = () => {
     console.log('Connected to server');
@@ -3762,8 +3763,20 @@ function connectToServer() {
   };
 
   ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    handleServerMessage(msg);
+    if (typeof event.data === 'string') {
+      // JSON message (full snapshots, lobby, chat, etc.)
+      const msg = JSON.parse(event.data);
+      handleServerMessage(msg);
+    } else {
+      // Binary delta: [u32 jsonLen][json bytes][walker binary]
+      const buf = event.data;
+      const view = new DataView(buf);
+      const jsonLen = view.getUint32(0, true);
+      const jsonStr = new TextDecoder().decode(new Uint8Array(buf, 4, jsonLen));
+      const msg = JSON.parse(jsonStr);
+      decodeWalkerBinary(buf, 4 + jsonLen, msg);
+      handleServerMessage(msg);
+    }
   };
 
   ws.onclose = () => {
@@ -4067,6 +4080,51 @@ function applyFullSnapshot(msg) {
   detectTerrainDirty(msg);
 }
 
+// Decode binary walker payload and apply directly to walkerMap
+// Format: [u16 movCount][u16 updCount][u16 remCount]
+//         [mov × 8B: id(u32) x(u16) y(u16)]
+//         [upd × 14B: id(u32) flags(u8) str(u8) x(u16) y(u16) tx(u16) ty(u16)]
+//         [rem × 4B: id(u32)]
+function decodeWalkerBinary(buf, offset, msg) {
+  const view = new DataView(buf);
+  const movCount = view.getUint16(offset, true); offset += 2;
+  const updCount = view.getUint16(offset, true); offset += 2;
+  const remCount = view.getUint16(offset, true); offset += 2;
+
+  // Position-only moves
+  for (let i = 0; i < movCount; i++) {
+    const id = view.getUint32(offset, true); offset += 4;
+    const x = view.getUint16(offset, true) / 100; offset += 2;
+    const y = view.getUint16(offset, true) / 100; offset += 2;
+    const w = walkerMap.get(id);
+    if (w) { w.x = x; w.y = y; }
+  }
+
+  // Full updates (new or changed walkers)
+  for (let i = 0; i < updCount; i++) {
+    const id = view.getUint32(offset, true); offset += 4;
+    const flags = view.getUint8(offset); offset += 1;
+    const s = view.getUint8(offset); offset += 1;
+    const x = view.getUint16(offset, true) / 100; offset += 2;
+    const y = view.getUint16(offset, true) / 100; offset += 2;
+    const tx = view.getUint16(offset, true) / 100; offset += 2;
+    const ty = view.getUint16(offset, true) / 100; offset += 2;
+    const t = (flags >> 5) & 0x07;
+    const w = { id, t, s, x, y, tx, ty };
+    if (flags & 0x10) w.l = 1;
+    if (flags & 0x08) w.k = 1;
+    walkerMap.set(id, w);
+  }
+
+  // Removals
+  for (let i = 0; i < remCount; i++) {
+    const id = view.getUint32(offset, true); offset += 4;
+    walkerMap.delete(id);
+  }
+
+  msg._walkerBinaryApplied = true;
+}
+
 function applyDeltaSnapshot(msg) {
   if (msg.mapW) localMapW = msg.mapW;
   if (msg.mapH) localMapH = msg.mapH;
@@ -4075,28 +4133,25 @@ function applyDeltaSnapshot(msg) {
   // Heights (already supports delta)
   if (msg.heights) applyHeights(msg.heights);
 
-  // Walker delta
+  // Walker delta (skip if already applied from binary decode)
   prevWalkers = currWalkers;
 
-  // Apply position-only moves
-  if (msg.wMov) {
-    for (let i = 0; i < msg.wMov.length; i += 3) {
-      const id = msg.wMov[i], x = msg.wMov[i + 1], y = msg.wMov[i + 2];
-      const w = walkerMap.get(id);
-      if (w) { w.x = x; w.y = y; }
+  if (!msg._walkerBinaryApplied) {
+    if (msg.wMov) {
+      for (let i = 0; i < msg.wMov.length; i += 3) {
+        const id = msg.wMov[i], x = msg.wMov[i + 1], y = msg.wMov[i + 2];
+        const w = walkerMap.get(id);
+        if (w) { w.x = x; w.y = y; }
+      }
     }
-  }
-
-  // Apply full updates (new or changed walkers)
-  if (msg.wUpd) {
-    for (const w of msg.wUpd) {
-      walkerMap.set(w.id, w);
+    if (msg.wUpd) {
+      for (const w of msg.wUpd) {
+        walkerMap.set(w.id, w);
+      }
     }
-  }
-
-  // Remove dead walkers
-  if (msg.wRem) {
-    for (const id of msg.wRem) walkerMap.delete(id);
+    if (msg.wRem) {
+      for (const id of msg.wRem) walkerMap.delete(id);
+    }
   }
 
   // Rebuild currWalkers array from map

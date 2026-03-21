@@ -110,15 +110,16 @@ function spawnWorker(index) {
         _rm.settlements = msg.settlements;
         _rm.totalPop = msg.totalPop;
         wm.tickTimeAvg = wm.tickTimeAvg * 0.95 + msg.tickTimeMs * 0.05;
-        for (const [teamStr, json] of Object.entries(msg.teamMessages)) {
+        for (const [teamStr, data] of Object.entries(msg.teamMessages)) {
           const team = parseInt(teamStr);
           const ws = room.players[team];
           if (!ws || ws.readyState !== 1) continue;
-          _rm.bytesSentAcc += json.length;
+          const size = typeof data === 'string' ? data.length : data.byteLength;
+          _rm.bytesSentAcc += size;
           _rm.msgsSentAcc++;
-          serverBytesOutAcc += json.length;
-          wm.bytesOutAcc += json.length;
-          ws.send(json);
+          serverBytesOutAcc += size;
+          wm.bytesOutAcc += size;
+          ws.send(data);
         }
         break;
       }
