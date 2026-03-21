@@ -92,11 +92,6 @@ function createGameState(mapW, mapH, numTeams, terrainType) {
     _prevWalkerMap: new Map(),      // id → {t,s,x,y,tx,ty,l,k}
     _prevSettlements: [],           // prev serialized settlement array
     _prevCropStr: '',               // joined crop triplets for fast compare
-    _prevRocksSize: 0,
-    _prevTreesSize: 0,
-    _prevPebblesSize: 0,
-    _prevRuinsLen: 0,
-    _prevSwampsLen: 0,
     _prevSwampsStr: '',
     _prevMagnetPosStr: '',
     _prevMagnetLockedStr: '',
@@ -424,11 +419,6 @@ function setSettlement(state, tx, ty, s) {
   state.settlementMap[ty * state.mapW + tx] = s ? state.settlements.indexOf(s) : -1;
 }
 
-function clearSettlementMap(state, tx, ty) {
-  if (tx < 0 || tx >= state.mapW || ty < 0 || ty >= state.mapH) return;
-  state.settlementMap[ty * state.mapW + tx] = -1;
-}
-
 function clearSettlementFootprint(state, s) {
   for (let fx = 0; fx < s.sqSize; fx++) {
     for (let fy = 0; fy < s.sqSize; fy++) {
@@ -605,14 +595,6 @@ function canBuildAtPoint(state, team, px, py) {
   for (const s of state.settlements) {
     if (s.dead || s.team !== team) continue;
     if (Math.abs(s.tx - px) <= r && Math.abs(s.ty - py) <= r) return true;
-  }
-  return false;
-}
-
-function isWalkerAlive(state, id) {
-  if (id < 0) return false;
-  for (const w of state.walkers) {
-    if (w.id === id && !w.dead) return true;
   }
   return false;
 }
@@ -1734,6 +1716,8 @@ function computeWalkerDelta(state) {
 //         [wUpd × 14 bytes: id(u32) flags(u8) str(u8) x(u16) y(u16) tx(u16) ty(u16)]
 //         [wRem × 4 bytes: id(u32)]
 // Positions encoded as value×100 clamped to u16. Flags byte: team(3)|leader(1)|knight(1)|unused(3)
+function encPos(v) { return Math.max(0, Math.min(65535, Math.round(v * 100))); }
+
 function encodeWalkerBinary(wd) {
   const movCount = wd.wMov.length / 3;
   const updCount = wd.wUpd.length;
@@ -1745,8 +1729,6 @@ function encodeWalkerBinary(wd) {
   buf.writeUInt16LE(movCount, off); off += 2;
   buf.writeUInt16LE(updCount, off); off += 2;
   buf.writeUInt16LE(remCount, off); off += 2;
-
-  const encPos = (v) => Math.max(0, Math.min(65535, Math.round(v * 100)));
 
   // wMov: flat triplets [id, x, y, ...]
   for (let i = 0; i < wd.wMov.length; i += 3) {

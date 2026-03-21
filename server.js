@@ -27,10 +27,104 @@ const MIME = {
   '.md':   'text/markdown; charset=utf-8',
 };
 
+// ── Bundle Endpoint ──────────────────────────────────────────────────
+// GET /bundle/file1.js,file2.js,... → concatenate, minify, serve
+// Files resolve: shared/* from project root, everything else from public/
+const { minify: terserMinify } = require('terser');
+const bundleCache = new Map(); // url → { result, maxMtime }
+
+function resolveBundle(fileName) {
+  if (fileName.startsWith('shared/')) return path.join(__dirname, fileName);
+  return path.join(__dirname, 'public', fileName);
+}
+
+async function handleBundle(url, res) {
+  const fileList = url.slice('/bundle/'.length);
+  if (!fileList) { res.writeHead(400); res.end('No files specified'); return; }
+
+  const files = fileList.split(',').map(f => f.trim()).filter(Boolean);
+  if (files.length === 0) { res.writeHead(400); res.end('No files specified'); return; }
+
+  // Determine type from first file's extension
+  const ext = path.extname(files[0]);
+  if (ext !== '.js' && ext !== '.css') {
+    res.writeHead(400); res.end('Only .js and .css bundles supported'); return;
+  }
+
+  // Resolve paths and check they stay within allowed directories
+  const resolved = [];
+  for (const f of files) {
+    if (path.extname(f) !== ext) {
+      res.writeHead(400); res.end('All files must have the same extension'); return;
+    }
+    const full = resolveBundle(f);
+    const rel = path.relative(__dirname, full);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      res.writeHead(403); res.end('Forbidden'); return;
+    }
+    resolved.push(full);
+  }
+
+  try {
+    // Check mtimes for cache invalidation
+    let maxMtime = 0;
+    for (const fp of resolved) {
+      const stat = fs.statSync(fp);
+      if (stat.mtimeMs > maxMtime) maxMtime = stat.mtimeMs;
+    }
+
+    const cached = bundleCache.get(url);
+    if (cached && cached.maxMtime === maxMtime) {
+      const mime = ext === '.js' ? 'application/javascript' : 'text/css';
+      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'no-cache' });
+      res.end(cached.result);
+      return;
+    }
+
+    // Read and concatenate
+    let combined = '';
+    for (const fp of resolved) {
+      combined += fs.readFileSync(fp, 'utf8') + '\n';
+    }
+
+    // Minify
+    let result;
+    if (ext === '.js') {
+      const out = await terserMinify(combined, {
+        compress: { dead_code: true, drop_console: false },
+        mangle: true,
+        sourceMap: false,
+      });
+      result = out.code;
+    } else {
+      // Basic CSS minification: strip comments, collapse whitespace
+      result = combined
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s*([{}:;,])\s*/g, '$1')
+        .replace(/;}/g, '}')
+        .trim();
+    }
+
+    bundleCache.set(url, { result, maxMtime });
+    const mime = ext === '.js' ? 'application/javascript' : 'text/css';
+    res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'no-cache' });
+    res.end(result);
+  } catch (e) {
+    console.error('[bundle] Error:', e.message);
+    res.writeHead(500); res.end('Bundle error: ' + e.message);
+  }
+}
+
 const server = http.createServer((req, res) => {
-  let filePath;
   const url = req.url.split('?')[0];
 
+  if (url.startsWith('/bundle/')) {
+    handleBundle(url, res);
+    return;
+  }
+
+  let filePath;
   if (url === '/admin') {
     filePath = path.join(__dirname, 'public', 'admin.html');
   } else if (url.startsWith('/shared/')) {
@@ -319,11 +413,9 @@ function createRoom(maxPlayers, mapSize, opts) {
     mapW: preset.w,
     mapH: preset.h,
     state: null,
-    tickInterval: null,
     started: false,
     ai: false,
     aiCount: 0,
-    aiTimer: 0,
     name: sanitizeName(opts.gameName) || '',
     isPublic: !!opts.isPublic,
     terrainType: opts.terrainType || 'continental',
@@ -338,7 +430,6 @@ function createRoom(maxPlayers, mapSize, opts) {
 function cleanupRoom(code) {
   const room = rooms.get(code);
   if (!room) return;
-  if (room.tickInterval) clearInterval(room.tickInterval);
   // Notify worker to clean up
   const workerIdx = roomWorkerMap.get(code);
   if (workerIdx !== undefined) {
@@ -351,7 +442,7 @@ function cleanupRoom(code) {
 }
 
 // ── Game Simulation (imported from game-simulation.js) ─────────────
-const { computeSpawnZones, getTeamStats } = G;
+const { computeSpawnZones } = G;
 
 // ── Start Game (delegates to worker thread) ────────────────────────
 function startGame(room) {
@@ -704,8 +795,6 @@ wss.on('connection', (ws) => {
       lobbyClients.delete(ws);
       broadcastLobbySystem(leaveName + ' has left');
       broadcastLobbyCount();
-    } else {
-      lobbyClients.delete(ws);
     }
     adminClients.delete(ws);
 
