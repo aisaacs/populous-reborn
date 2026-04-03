@@ -1034,6 +1034,11 @@ function updateEdgePan(dt) {
 function gameLoop(now) {
   const dt = Math.min(0.1, (now - lastFrame) / 1000);
   lastFrame = now;
+  // Age fires client-side (server only sends on add/remove)
+  for (let i = fires.length - 1; i >= 0; i--) {
+    fires[i].a += dt;
+    if (fires[i].a >= 5) fires.splice(i, 1);
+  }
   updateEdgePan(dt);
   updateFireParticles(dt);
   updateLightningEffects(dt);

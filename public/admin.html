@@ -720,7 +720,7 @@
 
   function renderGameRow(g) {
     const tc = tickClass(g.tickTimeMs);
-    return '<tr class="game-row">'
+    let row = '<tr class="game-row">'
       + '<td><span class="game-dot ' + g.status + '"></span>' + g.code + (g.name ? ' — ' + esc(g.name) : '') + '</td>'
       + '<td><span class="status-tag ' + g.status + '">' + g.status + '</span></td>'
       + '<td>' + g.humans + '/' + g.maxPlayers + (g.aiCount > 0 ? ' +' + g.aiCount + 'AI' : '') + '</td>'
@@ -730,8 +730,26 @@
       + '<td>' + (g.settlements != null ? g.settlements : '-') + '</td>'
       + '<td>' + (g.totalPop != null ? g.totalPop : '-') + '</td>'
       + '<td class="' + tc + '">' + g.tickTimeMs + 'ms</td>'
-      + '<td>' + formatBytes(g.bytesSentRate) + '</td>'
+      + '<td>' + formatBytes(g.bytesSentRate) + (g.bytesSentRawRate ? ' <span style="opacity:0.5">(' + formatBytes(g.bytesSentRawRate) + ' raw)</span>' : '') + '</td>'
       + '</tr>';
+    // Delta stats breakdown row
+    if (g.deltaStats && g.status === 'playing') {
+      const ds = g.deltaStats;
+      const parts = [];
+      // Walker binary
+      if (ds._walkerBin) parts.push('walkers:' + ds._walkerBin + 'B(' + (ds._wMov||0) + 'mov,' + (ds._wUpd||0) + 'upd,' + (ds._wRem||0) + 'rem)');
+      // JSON fields by size descending
+      const fields = Object.keys(ds).filter(k => !k.startsWith('_')).sort((a,b) => ds[b] - ds[a]);
+      for (const f of fields) parts.push(f + ':' + ds[f] + 'B');
+      // Compression ratio
+      if (g.lastRawSize) {
+        const ratio = Math.round((1 - g.lastDeflatedSize / g.lastRawSize) * 100);
+        parts.push('<span style="color:#aaa">|</span> <span style="color:#8ad">deflate:' + g.lastRawSize + '→' + g.lastDeflatedSize + 'B (' + ratio + '% compression)</span>');
+      }
+      row += '<tr class="stats-row"><td colspan="10" style="padding:2px 8px 6px 32px;font-size:11px;color:#8a8;border-top:none;opacity:0.8">'
+        + parts.join(' &nbsp; ') + '</td></tr>';
+    }
+    return row;
   }
 
   function esc(s) {

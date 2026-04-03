@@ -89,7 +89,7 @@ async function handleBundle(url, res) {
 
     // Minify
     let result;
-    if (ext === '.js') {
+    if (ext === '.js') {      
       const out = await terserMinify(combined, {
         compress: { dead_code: true, drop_console: false },
         mangle: true,
@@ -203,17 +203,35 @@ function spawnWorker(index) {
         _rm.walkers = msg.walkers;
         _rm.settlements = msg.settlements;
         _rm.totalPop = msg.totalPop;
+        if (msg.deltaStats) _rm.deltaStats = msg.deltaStats;
         wm.tickTimeAvg = wm.tickTimeAvg * 0.95 + msg.tickTimeMs * 0.05;
-        for (const [teamStr, data] of Object.entries(msg.teamMessages)) {
+        // Deflate one sample to get compression ratio, then estimate wire sizes
+        let sampleRaw = 0, sampleDeflated = 0, ratio = 0.6; // default estimate
+        const entries = Object.entries(msg.teamMessages);
+        // Sample first message for compression ratio
+        if (entries.length > 0) {
+          const [, firstData] = entries[0];
+          const buf = typeof firstData === 'string' ? Buffer.from(firstData) : firstData;
+          sampleRaw = buf.length;
+          sampleDeflated = zlib.deflateRawSync(buf).length;
+          ratio = sampleRaw > 0 ? sampleDeflated / sampleRaw : 0.6;
+        }
+        for (const [teamStr, data] of entries) {
           const team = parseInt(teamStr);
           const ws = room.players[team];
           if (!ws || ws.readyState !== 1) continue;
-          const size = typeof data === 'string' ? data.length : data.byteLength;
-          _rm.bytesSentAcc += size;
+          const rawSize = typeof data === 'string' ? Buffer.byteLength(data) : data.byteLength;
+          const wireSize = Math.round(rawSize * ratio) + 2; // estimate + WS frame header
+          _rm.bytesSentRawAcc += rawSize;
+          _rm.bytesSentAcc += wireSize;
           _rm.msgsSentAcc++;
-          serverBytesOutAcc += size;
-          wm.bytesOutAcc += size;
+          serverBytesOutAcc += wireSize;
+          wm.bytesOutAcc += wireSize;
           ws.send(data);
+        }
+        if (sampleRaw) {
+          _rm.lastRawSize = sampleRaw;
+          _rm.lastDeflatedSize = sampleDeflated;
         }
         break;
       }
@@ -292,7 +310,7 @@ console.log(`Spawned ${NUM_WORKERS} game worker threads`);
 function getOrCreateRoomMetrics(code) {
   let m = roomMetrics.get(code);
   if (!m) {
-    m = { tickTimeMs: 0, tickTimeAvg: 0, bytesSentAcc: 0, msgsSentAcc: 0, bytesSentRate: 0, msgsSentRate: 0 };
+    m = { tickTimeMs: 0, tickTimeAvg: 0, bytesSentAcc: 0, bytesSentRawAcc: 0, msgsSentAcc: 0, bytesSentRate: 0, bytesSentRawRate: 0, msgsSentRate: 0 };
     roomMetrics.set(code, m);
   }
   return m;
@@ -887,11 +905,15 @@ function buildAdminSnapshot() {
       duration: room.createdAt ? Math.floor((endTime - room.createdAt) / 1000) : 0,
       tickTimeMs: Math.round(m.tickTimeAvg * 100) / 100,
       bytesSentRate: m.bytesSentRate,
+      bytesSentRawRate: m.bytesSentRawRate,
       msgsSentRate: m.msgsSentRate,
       walkers: m.walkers,
       settlements: m.settlements,
       totalPop: m.totalPop,
       workerIdx: roomWorkerMap.get(code),
+      deltaStats: m.deltaStats || null,
+      lastRawSize: m.lastRawSize || 0,
+      lastDeflatedSize: m.lastDeflatedSize || 0,
     };
 
     if (room.started) {
@@ -950,8 +972,10 @@ setInterval(() => {
   // Compute per-second rates from accumulators and reset
   for (const [code, m] of roomMetrics) {
     m.bytesSentRate = m.bytesSentAcc;
+    m.bytesSentRawRate = m.bytesSentRawAcc;
     m.msgsSentRate = m.msgsSentAcc;
     m.bytesSentAcc = 0;
+    m.bytesSentRawAcc = 0;
     m.msgsSentAcc = 0;
   }
   // Compute worker per-second rates and reset

@@ -1,4 +1,5 @@
 // ── WebSocket Client ────────────────────────────────────────────────
+let _lastResyncTime = 0;
 let ws = null;
 let gameStarted = false;
 let gameOver = false;
@@ -154,11 +155,12 @@ function connectToServer() {
 
   ws.onmessage = (event) => {
     if (typeof event.data === 'string') {
-      // JSON message (full snapshots, lobby, chat, etc.)
+      // JSON message (lobby, chat, etc. — no longer used for game state)
       const msg = JSON.parse(event.data);
       handleServerMessage(msg);
     } else {
-      // Binary delta: [u32 jsonLen][json bytes][walker binary]
+      // Binary frame: [u32 jsonLen][json bytes][walker binary]
+      // Used for both delta ticks and full snapshots
       const buf = event.data;
       const view = new DataView(buf);
       const jsonLen = view.getUint32(0, true);
@@ -427,14 +429,10 @@ function applyFullSnapshot(msg) {
 
   applyHeights(msg.heights);
 
-  // Shift walker snapshots for interpolation
+  // Walkers already decoded from binary by decodeWalkerBinary into walkerMap
   prevWalkers = currWalkers;
-  currWalkers = msg.walkers;
+  currWalkers = Array.from(walkerMap.values());
   lastTickTime = performance.now();
-
-  // Rebuild walkerMap from full walker list
-  walkerMap = new Map();
-  for (const w of currWalkers) walkerMap.set(w.id, w);
 
   // Unpack settlements
   settlements = msg.settlements;
@@ -556,6 +554,18 @@ function applyDeltaSnapshot(msg) {
   if (msg.pebbles !== undefined) applyPebbles(msg.pebbles);
   if (msg.ruins !== undefined) applyRuins(msg.ruins);
   if (msg.crops !== undefined) applyCrops(msg.crops);
+  // Incremental crop deltas
+  if (msg.cAdd) {
+    for (let i = 0; i < msg.cAdd.length; i += 3) {
+      const x = msg.cAdd[i], y = msg.cAdd[i + 1], t = msg.cAdd[i + 2];
+      if (t >= 0 && t < numTeams) cropTeamTiles[y * localMapW + x] = t + 1;
+    }
+  }
+  if (msg.cRem) {
+    for (let i = 0; i < msg.cRem.length; i += 2) {
+      cropTeamTiles[msg.cRem[i + 1] * localMapW + msg.cRem[i]] = 0;
+    }
+  }
 
   if (msg.magnetPos !== undefined) magnetPos = msg.magnetPos;
   if (msg.teamMode !== undefined) teamMode = msg.teamMode;
@@ -572,6 +582,22 @@ function applyDeltaSnapshot(msg) {
   processSfxEvents(msg.sfx);
   minimapDirty = true;
   detectTerrainDirty(msg);
+
+  // State checksum verification — request resync on drift (cooldown 5s)
+  if (msg.cs) {
+    const now = performance.now();
+    if (now - _lastResyncTime > 5000) {
+      const [srvWalkers, srvSettlements, srvPop] = msg.cs;
+      let localPop = 0;
+      for (const s of settlements) localPop += s.p;
+      if (walkerMap.size !== srvWalkers || settlementMap.size !== srvSettlements || localPop !== srvPop) {
+        console.warn('[desync] checksum mismatch — local: w=' + walkerMap.size + ' s=' + settlementMap.size + ' p=' + localPop
+          + ' server: w=' + srvWalkers + ' s=' + srvSettlements + ' p=' + srvPop + ' — requesting resync');
+        sendMessage({ type: 'resync' });
+        _lastResyncTime = now;
+      }
+    }
+  }
 }
 
 // ── Terrain Buffer Dirty Detection ──────────────────────────────────

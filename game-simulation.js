@@ -92,6 +92,9 @@ function createGameState(mapW, mapH, numTeams, terrainType) {
     _prevWalkerMap: new Map(),      // id → {t,s,x,y,tx,ty,l,k}
     _prevSettlements: [],           // prev serialized settlement array
     _prevCropStr: '',               // joined crop triplets for fast compare
+    _prevCropMap: new Map(),         // "x,y" → team for crop delta
+    _prevTeamPopStr: '',             // JSON string for teamPop comparison
+    _prevFireKey: '',                // fire position key for conditional send
     _prevSwampsStr: '',
     _prevMagnetPosStr: '',
     _prevMagnetLockedStr: '',
@@ -1500,22 +1503,7 @@ function computeHeightsPayload(state) {
 
 function serializeState(state, team, heightsPayload) {
 
-  const walkerData = [];
-  for (const w of state.walkers) {
-    if (w.dead) continue;
-    const wd = {
-      id: w.id,
-      t: w.team,
-      s: w.strength,
-      x: Math.round(w.x * 100) / 100,
-      y: Math.round(w.y * 100) / 100,
-      tx: Math.round(w.tx * 100) / 100,
-      ty: Math.round(w.ty * 100) / 100,
-    };
-    if (w.isLeader) wd.l = 1;
-    if (w.isKnight) wd.k = 1;
-    walkerData.push(wd);
-  }
+  // Walkers are now binary-encoded separately (not in JSON)
 
   const settlementData = [];
   for (const s of state.settlements) {
@@ -1523,7 +1511,7 @@ function serializeState(state, team, heightsPayload) {
     const sd = {
       t: s.team,
       l: s.level,
-      p: s.population,
+      p: Math.floor(s.population),
       tx: s.tx, ty: s.ty,
       ox: s.sqOx, oy: s.sqOy, sz: s.sqSize,
     };
@@ -1572,7 +1560,6 @@ function serializeState(state, team, heightsPayload) {
   return {
     type: 'state',
     heights: heightsPayload,
-    walkers: walkerData,
     settlements: settlementData,
     magnetPos: state.magnetPos,
     teamMode: state.teamMode,
@@ -1757,6 +1744,23 @@ function encodeWalkerBinary(wd) {
   return buf;
 }
 
+// Encode all alive walkers as binary for full snapshots (all as wUpd, no wMov/wRem)
+function encodeAllWalkersBinary(state) {
+  const wUpd = [];
+  for (const w of state.walkers) {
+    if (w.dead) continue;
+    const wd = {
+      id: w.id, t: w.team, s: w.strength,
+      x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100,
+      tx: Math.round(w.tx * 100) / 100, ty: Math.round(w.ty * 100) / 100,
+    };
+    if (w.isLeader) wd.l = 1;
+    if (w.isKnight) wd.k = 1;
+    wUpd.push(wd);
+  }
+  return encodeWalkerBinary({ wMov: [], wUpd, wRem: [] });
+}
+
 function computeSettlementDelta(state) {
   const prev = state._prevSettlements;
   const sUpd = [];
@@ -1767,7 +1771,7 @@ function computeSettlementDelta(state) {
     if (s.dead) continue;
     const key = s.tx + ',' + s.ty;
     const sd = {
-      t: s.team, l: s.level, p: s.population,
+      t: s.team, l: s.level, p: Math.floor(s.population),
       tx: s.tx, ty: s.ty,
       ox: s.sqOx, oy: s.sqOy, sz: s.sqSize,
     };
@@ -1781,7 +1785,7 @@ function computeSettlementDelta(state) {
     prevMap.set(sd.tx + ',' + sd.ty, sd);
   }
 
-  // Find new/changed
+  // Find new/changed (population compared as integers due to Math.floor above)
   for (const [key, sd] of currMap) {
     const p = prevMap.get(key);
     if (!p || p.t !== sd.t || p.l !== sd.l || p.p !== sd.p ||
@@ -1832,31 +1836,50 @@ function computeDelta(state, heightsPayload) {
   if (sd.sUpd.length > 0) delta.sUpd = sd.sUpd;
   if (sd.sRem.length > 0) delta.sRem = sd.sRem;
 
-  // Fires — always sent (small, changes every tick due to age)
-  delta.fires = state.fires.map(f => ({ x: f.x, y: f.y, a: Math.round(f.age * 10) / 10 }));
+  // Fires — only sent when fires are added or removed (client ages locally)
+  let fireKey = '';
+  for (const f of state.fires) fireKey += f.x + ',' + f.y + ';';
+  if (fireKey !== state._prevFireKey) {
+    delta.fires = state.fires.map(f => ({ x: f.x, y: f.y, a: Math.round(f.age * 10) / 10 }));
+    state._prevFireKey = fireKey;
+  }
 
-  // teamPop — always sent (small)
+  // teamPop — only if changed
   const teamPop = [];
   for (let t = 0; t < state.numTeams; t++) {
     teamPop.push(getTeamStats(state, t).pop);
   }
-  delta.teamPop = teamPop;
+  const teamPopStr = teamPop.join(',');
+  if (teamPopStr !== state._prevTeamPopStr) {
+    delta.teamPop = teamPop;
+    state._prevTeamPopStr = teamPopStr;
+  }
 
-  // Crops — string compare
-  let cropStr = '';
+  // Crops — delta (only send added/removed crops)
+  const currCropMap = new Map();
   if (state.crops) {
-    for (const c of state.crops) {
-      cropStr += c.x + ',' + c.y + ',' + c.t + ';';
+    for (const c of state.crops) currCropMap.set(c.x + ',' + c.y, c.t);
+  }
+  const prevCropMap = state._prevCropMap;
+  const cAdd = [];
+  const cRem = [];
+  // Find added or changed crops
+  for (const [key, t] of currCropMap) {
+    if (prevCropMap.get(key) !== t) {
+      const [x, y] = key.split(',');
+      cAdd.push(+x, +y, t);
     }
   }
-  if (cropStr !== state._prevCropStr) {
-    const cropData = [];
-    if (state.crops) {
-      for (const c of state.crops) cropData.push(c.x, c.y, c.t);
+  // Find removed crops
+  for (const key of prevCropMap.keys()) {
+    if (!currCropMap.has(key)) {
+      const [x, y] = key.split(',');
+      cRem.push(+x, +y);
     }
-    delta.crops = cropData;
-    state._prevCropStr = cropStr;
   }
+  if (cAdd.length > 0) delta.cAdd = cAdd;
+  if (cRem.length > 0) delta.cRem = cRem;
+  state._prevCropMap = currCropMap;
 
   // Rocks
   const rocksStr = Array.from(state.rocks).join(';');
@@ -1932,7 +1955,18 @@ function computeDelta(state, heightsPayload) {
 
   if (state.sfxQueue.length > 0) delta.sfx = state.sfxQueue;
 
-  return { delta, walkerDelta };
+  // Per-field byte size stats for admin instrumentation
+  const deltaStats = {};
+  for (const key of Object.keys(delta)) {
+    if (key === 'type') continue;
+    deltaStats[key] = JSON.stringify(delta[key]).length;
+  }
+  // Walker binary stats
+  deltaStats._wMov = walkerDelta.wMov.length / 3;
+  deltaStats._wUpd = walkerDelta.wUpd.length;
+  deltaStats._wRem = walkerDelta.wRem.length;
+
+  return { delta, walkerDelta, deltaStats };
 }
 
 function serializeFullState(state, team, heightsPayload) {
@@ -1961,7 +1995,7 @@ function serializeFullState(state, team, heightsPayload) {
   for (const s of state.settlements) {
     if (s.dead) continue;
     const sd = {
-      t: s.team, l: s.level, p: s.population,
+      t: s.team, l: s.level, p: Math.floor(s.population),
       tx: s.tx, ty: s.ty,
       ox: s.sqOx, oy: s.sqOy, sz: s.sqSize,
     };
@@ -1970,11 +2004,22 @@ function serializeFullState(state, team, heightsPayload) {
   }
 
   // Crops
-  let cropStr = '';
+  const cropMap = new Map();
   if (state.crops) {
-    for (const c of state.crops) cropStr += c.x + ',' + c.y + ',' + c.t + ';';
+    for (const c of state.crops) cropMap.set(c.x + ',' + c.y, c.t);
   }
-  state._prevCropStr = cropStr;
+  state._prevCropMap = cropMap;
+  state._prevCropStr = ''; // legacy, no longer used for delta
+
+  // teamPop
+  const teamPop = [];
+  for (let t = 0; t < state.numTeams; t++) teamPop.push(getTeamStats(state, t).pop);
+  state._prevTeamPopStr = teamPop.join(',');
+
+  // Fires
+  let fireKey = '';
+  for (const f of state.fires) fireKey += f.x + ',' + f.y + ';';
+  state._prevFireKey = fireKey;
 
   // Collections
   state._prevRocksStr = Array.from(state.rocks).join(';');
@@ -2695,6 +2740,7 @@ module.exports = {
   serializeState,
   computeDelta,
   encodeWalkerBinary,
+  encodeAllWalkersBinary,
   serializeFullState,
   serializeReplaySnapshot,
 
